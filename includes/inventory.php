@@ -116,8 +116,7 @@ function inventory_ensure_schema(PDO $db): void
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             KEY `idx_receipts_date` (`movement_date`),
-            KEY `idx_receipts_product` (`product_code`),
-            CONSTRAINT `fk_receipts_product_code` FOREIGN KEY (`product_code`) REFERENCES `product` (`code`)
+            KEY `idx_receipts_product` (`product_code`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
     );
     $db->exec(
@@ -134,8 +133,7 @@ function inventory_ensure_schema(PDO $db): void
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             KEY `idx_issues_date` (`movement_date`),
-            KEY `idx_issues_product` (`product_code`),
-            CONSTRAINT `fk_issues_product_code` FOREIGN KEY (`product_code`) REFERENCES `product` (`code`)
+            KEY `idx_issues_product` (`product_code`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
     );
 
