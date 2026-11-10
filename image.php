@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/inventory.php';
 
 $filename = isset($_GET['file']) && is_string($_GET['file']) ? trim($_GET['file']) : '';
 
@@ -45,7 +45,7 @@ try {
 
     if ($image && !empty($image['data'])) {
         $mimeType = (string) $image['mime_type'];
-        $data = $image['data'];
+        $data = is_resource($image['data']) ? (string) stream_get_contents($image['data']) : (string) $image['data'];
         $etag = '"' . md5($data) . '"';
 
         if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim($_SERVER['HTTP_IF_NONE_MATCH']) === $etag) {

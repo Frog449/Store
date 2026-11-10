@@ -30,7 +30,7 @@ $hasImage = ($productImageUrl !== null);
         <span class="product-badge"><?= h($product['type']) ?></span>
         <span class="part-number">PART / <?= str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) ?></span>
         <?php if ($hasImage): ?>
-            <img class="product-photo" src="<?= h($productImageUrl) ?>" alt="<?= h($product['name']) ?>" loading="lazy" onerror="this.remove(); var p = this.parentElement; if (p) { p.querySelectorAll('.part-art, .art-caption').forEach(function(el){ el.style.display = ''; }); }">
+            <img class="product-photo" src="<?= h($productImageUrl) ?>" alt="<?= h($product['name']) ?>" loading="lazy" onerror="var p=this.parentElement;this.remove();if(p){p.querySelectorAll('.part-art,.art-caption').forEach(function(e){e.style.display='';});}">
         <?php endif; ?>
         <?php if ($product['art'] === 'seal'): ?>
             <svg class="part-art" viewBox="0 0 240 180" fill="none" aria-hidden="true"<?= $hasImage ? ' style="display:none;"' : '' ?>>
