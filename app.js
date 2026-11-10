@@ -246,3 +246,78 @@ if (movementProduct) {
     movementProduct.addEventListener("change", updateMovementProduct);
     updateMovementProduct();
 }
+
+const historySearch = document.querySelector("#history-search");
+const historyTabs = document.querySelectorAll("[data-history-tab]");
+const historyRows = document.querySelectorAll(".history-row");
+const receiptSection = document.querySelector("#history-section-receipts");
+const issueSection = document.querySelector("#history-section-issues");
+const historyResultCount = document.querySelector("#history-result-count");
+
+if (historySearch || historyTabs.length > 0) {
+    let currentTab = "all";
+
+    const filterHistory = () => {
+        const query = historySearch ? historySearch.value.trim().toLocaleLowerCase("th") : "";
+        let visibleReceipts = 0;
+        let visibleIssues = 0;
+
+        historyRows.forEach((row) => {
+            const rowType = row.dataset.type;
+            const rowSearch = row.dataset.search || "";
+            const matchesQuery = query === "" || rowSearch.includes(query);
+            const matchesTab = currentTab === "all" || currentTab === rowType;
+
+            const visible = matchesQuery && matchesTab;
+            row.hidden = !visible;
+
+            if (visible) {
+                if (rowType === "receipt") visibleReceipts++;
+                if (rowType === "issue") visibleIssues++;
+            }
+        });
+
+        if (receiptSection) {
+            receiptSection.hidden = currentTab === "issue";
+            const emptyEl = receiptSection.querySelector(".history-empty-search");
+            if (emptyEl) {
+                emptyEl.hidden = visibleReceipts > 0 || currentTab === "issue";
+            }
+            const countEl = receiptSection.querySelector(".section-visible-count");
+            if (countEl) countEl.textContent = `${visibleReceipts} รายการ`;
+        }
+
+        if (issueSection) {
+            issueSection.hidden = currentTab === "receipt";
+            const emptyEl = issueSection.querySelector(".history-empty-search");
+            if (emptyEl) {
+                emptyEl.hidden = visibleIssues > 0 || currentTab === "receipt";
+            }
+            const countEl = issueSection.querySelector(".section-visible-count");
+            if (countEl) countEl.textContent = `${visibleIssues} รายการ`;
+        }
+
+        if (historyResultCount) {
+            historyResultCount.textContent = `แสดง ${visibleReceipts + visibleIssues} รายการ`;
+        }
+    };
+
+    if (historySearch) {
+        historySearch.addEventListener("input", filterHistory);
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+                event.preventDefault();
+                historySearch.focus();
+            }
+        });
+    }
+
+    historyTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+            currentTab = tab.dataset.historyTab;
+            historyTabs.forEach((t) => t.classList.toggle("selected", t === tab));
+            filterHistory();
+        });
+    });
+}

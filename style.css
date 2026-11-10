@@ -810,3 +810,41 @@ body {
     .product-code, .product-code span { color: #51494c; }
     .dashboard-row > span, .dashboard-category-row { color: #40383b; }
 }
+
+/* History page custom styles */
+.history-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .3px;
+}
+.history-badge-receipt {
+    background: #eaf6ec;
+    color: #1e7e34;
+    border: 1px solid #c3e6cb;
+}
+.history-badge-issue {
+    background: #fdf0f2;
+    color: #c92a2a;
+    border: 1px solid #f8d7da;
+}
+.history-stats-strip {
+    margin-bottom: 26px;
+}
+.history-toolbar .search-box {
+    margin-left: auto;
+}
+@media (max-width: 860px) {
+    .history-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .history-toolbar .search-box {
+        width: 100%;
+        margin-left: 0;
+    }
+}
