@@ -60,6 +60,15 @@ if (productDetailDialog) {
     let activeProductCard = null;
     let previewObjectUrl = null;
 
+    detailImage.addEventListener("error", () => {
+        detailImage.hidden = true;
+        detailImageEmpty.hidden = false;
+    });
+    editImage.addEventListener("error", () => {
+        editImage.hidden = true;
+        editImageEmpty.hidden = false;
+    });
+
     const openProductDetails = (card) => {
         activeProductCard = card;
         const trigger = card.dataset;

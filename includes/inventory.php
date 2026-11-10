@@ -16,9 +16,9 @@ function inventory_db(): PDO
         $config['database']
     );
     $options = [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
+        PDO::ATTR_EMULATE_PREPARES => false,
     ];
     if (!empty($config['ssl'])) {
         $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
@@ -143,6 +143,18 @@ function inventory_ensure_schema(PDO $db): void
         );
     }
 
+    if (!inventory_table_exists($db, 'product_images')) {
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS `product_images` (
+            `filename` VARCHAR(80) NOT NULL,
+            `mime_type` VARCHAR(32) NOT NULL,
+            `data` MEDIUMBLOB NOT NULL,
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`filename`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    }
+
     $legacyProducts = $db->query(
         'SELECT p.`code`, p.`รับเข้ารวม` AS received, p.`เบิกออกรวม` AS issued,
                 r.total AS recorded_receipts, i.total AS recorded_issues
@@ -225,23 +237,38 @@ function inventory_store_product_image(?array $upload): ?string
         'image/png' => 'png',
         'image/webp' => 'webp',
     ];
-    if (!is_string($mimeType)
+    if (
+        !is_string($mimeType)
         || !isset($extensions[$mimeType])
         || $imageInfo === false
         || ($imageInfo['mime'] ?? null) !== $mimeType
-        || $imageInfo[0] * $imageInfo[1] > 20000000) {
+        || $imageInfo[0] * $imageInfo[1] > 20000000
+    ) {
         throw new DomainException('รองรับเฉพาะรูป JPG, PNG หรือ WEBP ที่มีขนาดไม่เกิน 20 ล้านพิกเซล');
     }
 
-    $directory = __DIR__ . '/../storage/product-images';
-    if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
-        throw new RuntimeException('ไม่สามารถสร้างโฟลเดอร์จัดเก็บรูปสินค้าได้');
+    $data = file_get_contents($temporaryPath);
+    if ($data === false) {
+        throw new RuntimeException('ไม่สามารถอ่านไฟล์รูปสินค้าได้');
     }
 
     $filename = bin2hex(random_bytes(16)) . '.' . $extensions[$mimeType];
-    if (!move_uploaded_file($temporaryPath, $directory . '/' . $filename)) {
-        throw new RuntimeException('ไม่สามารถจัดเก็บรูปสินค้าได้');
+
+    $db = inventory_db();
+    $statement = $db->prepare(
+        'INSERT INTO `product_images` (`filename`, `mime_type`, `data`)
+         VALUES (:filename, :mime_type, :data)'
+    );
+    $statement->bindValue(':filename', $filename, PDO::PARAM_STR);
+    $statement->bindValue(':mime_type', $mimeType, PDO::PARAM_STR);
+    $statement->bindValue(':data', $data, PDO::PARAM_LOB);
+    $statement->execute();
+
+    $directory = __DIR__ . '/../storage/product-images';
+    if (is_dir($directory) || @mkdir($directory, 0755, true)) {
+        @file_put_contents($directory . '/' . $filename, $data);
     }
+
     return $filename;
 }
 
@@ -250,18 +277,25 @@ function inventory_product_image_url(?string $filename): ?string
     if ($filename === null || !preg_match('/\A[a-f0-9]{32}\.(?:jpg|png|webp)\z/', $filename)) {
         return null;
     }
-    return 'storage/product-images/' . $filename;
+    return 'image.php?file=' . rawurlencode($filename);
 }
 
 function inventory_delete_product_image(?string $filename): void
 {
-    if (inventory_product_image_url($filename) === null) {
+    if ($filename === null || !preg_match('/\A[a-f0-9]{32}\.(?:jpg|png|webp)\z/', $filename)) {
         return;
     }
 
+    try {
+        $statement = inventory_db()->prepare('DELETE FROM `product_images` WHERE `filename` = :filename');
+        $statement->execute(['filename' => $filename]);
+    } catch (Throwable $e) {
+        error_log('Unable to remove product image from database: ' . $e->getMessage());
+    }
+
     $path = __DIR__ . '/../storage/product-images/' . $filename;
-    if (is_file($path) && !unlink($path)) {
-        error_log('Unable to remove product image: ' . $filename);
+    if (is_file($path)) {
+        @unlink($path);
     }
 }
 

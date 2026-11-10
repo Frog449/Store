@@ -171,7 +171,7 @@ require __DIR__ . '/includes/header.php';
                 <input class="product-image-upload" type="file" name="product_image" accept="image/jpeg,image/png,image/webp">
                 <small>JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB</small>
                 <span class="product-image-preview" data-current-image="<?= h($editProductImageUrl ?? '') ?>">
-                    <img alt="ตัวอย่างรูปสินค้า" <?= $editProductImageUrl === null ? 'hidden' : 'src="' . h($editProductImageUrl) . '"' ?>>
+                    <img alt="ตัวอย่างรูปสินค้า" <?= $editProductImageUrl === null ? 'hidden' : 'src="' . h($editProductImageUrl) . '"' ?> onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
                     <span <?= $editProductImageUrl === null ? '' : 'hidden' ?>>ยังไม่ได้เลือกรูปสินค้า</span>
                 </span>
                 <span class="product-image-remove"><input type="checkbox" class="product-image-remove-toggle" value="1" <?= !empty($_POST['remove_image']) ? 'checked' : '' ?>> เอารูปสินค้าเดิมออก</span>
