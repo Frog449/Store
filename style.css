@@ -207,7 +207,8 @@ main { max-width: 1180px; margin: auto; padding: 0 28px; }
 .product-detail-list dt { color: #7d8983; font-size: 10px; }
 .product-detail-list dd { margin: 0; color: #344a40; font-size: 11px; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .product-detail-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
-.product-delete-form { margin-right: auto; }
+.product-detail-actions .primary-button, .product-detail-actions .secondary-button, .product-detail-actions .danger-button { min-height: 37px; font-size: 13px; font-weight: 600; }
+.product-delete-form { display: flex; margin-right: auto; }
 .stock-value.negative { color: #c65148; }.stock-value.low { color: #c3834d; }.stock-value.normal { color: #4e7656; }
 .inventory-status { display: inline-block; padding: 4px 7px; border-radius: 4px; font-size: 9px; }
 .inventory-status.negative { color: #a84940; background: #fae9e6; }.inventory-status.low { color: #aa733f; background: #fbf0e2; }.inventory-status.normal { color: #4c7755; background: #eaf3e9; }
@@ -255,6 +256,7 @@ main { max-width: 1180px; margin: auto; padding: 0 28px; }
     .inventory-form input, .inventory-form select { height: 36px; padding: 0 8px; font-size: 10px; }
     .form-span-2 { grid-column: span 2; }
     .primary-button, .secondary-button { min-height: 34px; padding: 0 10px; font-size: 9px; }
+    .product-detail-actions .primary-button, .product-detail-actions .secondary-button, .product-detail-actions .danger-button { min-height: 34px; padding: 0 10px; }
     .product-detail-dialog { padding: 16px; }
     .product-detail-heading h2 { font-size: 15px; }
     .product-detail-list { gap: 0 10px; }
@@ -743,7 +745,7 @@ body {
 .inventory-form input, .inventory-form select { border-color: #ded4d7; color: #292326; background: #fff; }
 .inventory-form input[readonly] { color: #625b5e; background: #f5f2f3; }
 .secondary-button { border-color: #dcced1; color: #852231; background: #fff; }
-.danger-button { border-color: #b42335; color: #fff; background: #b42335; }
+.danger-button { border-color: #a7192b; color: #fff; background: #a7192b; }
 .danger-button:hover { border-color: #8e1d2c; background: #8e1d2c; }
 .secondary-button:hover { border-color: #c96471; color: #6f1422; background: #fff1f2; }
 .table-scroll { border-color: #e5dade; }
