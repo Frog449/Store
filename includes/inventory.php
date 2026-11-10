@@ -42,8 +42,9 @@ function inventory_db(): PDO
 
 function inventory_ensure_schema(PDO $db): void
 {
-    $db->exec(
-        'CREATE TABLE IF NOT EXISTS `product` (
+    if (!inventory_table_exists($db, 'product')) {
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS `product` (
             `รหัสสินค้า` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `ชื่อสินค้า` TEXT NOT NULL,
             `หมวดหมู่` VARCHAR(100) NOT NULL,
@@ -60,8 +61,9 @@ function inventory_ensure_schema(PDO $db): void
             `image_filename` VARCHAR(80) NULL,
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`รหัสสินค้า`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
-    );
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    }
 
     $columns = inventory_table_columns($db, 'product');
     $legacyColumns = [
@@ -102,8 +104,9 @@ function inventory_ensure_schema(PDO $db): void
         $db->exec('ALTER TABLE `product` ADD UNIQUE KEY `uq_product_code_ref` (`code`)');
     }
 
-    $db->exec(
-        'CREATE TABLE IF NOT EXISTS `receipts` (
+    if (!inventory_table_exists($db, 'receipts')) {
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS `receipts` (
             `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `movement_date` DATE NOT NULL,
             `document_no` VARCHAR(100) NOT NULL DEFAULT \'\',
@@ -117,10 +120,12 @@ function inventory_ensure_schema(PDO $db): void
             PRIMARY KEY (`id`),
             KEY `idx_receipts_date` (`movement_date`),
             KEY `idx_receipts_product` (`product_code`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
-    );
-    $db->exec(
-        'CREATE TABLE IF NOT EXISTS `issues` (
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    }
+    if (!inventory_table_exists($db, 'issues')) {
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS `issues` (
             `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `movement_date` DATE NOT NULL,
             `document_no` VARCHAR(100) NOT NULL DEFAULT \'\',
@@ -134,8 +139,9 @@ function inventory_ensure_schema(PDO $db): void
             PRIMARY KEY (`id`),
             KEY `idx_issues_date` (`movement_date`),
             KEY `idx_issues_product` (`product_code`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
-    );
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    }
 
     $legacyProducts = $db->query(
         'SELECT p.`code`, p.`รับเข้ารวม` AS received, p.`เบิกออกรวม` AS issued,
@@ -266,6 +272,16 @@ function inventory_table_columns(PDO $db, string $table): array
         $columns[$column['Field']] = $column;
     }
     return $columns;
+}
+
+function inventory_table_exists(PDO $db, string $table): bool
+{
+    $statement = $db->prepare(
+        'SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema = DATABASE() AND table_name = :table'
+    );
+    $statement->execute(['table' => $table]);
+    return (int) $statement->fetchColumn() > 0;
 }
 
 function inventory_has_unique_index(PDO $db, string $table, string $column): bool
