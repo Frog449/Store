@@ -15,11 +15,16 @@ function inventory_db(): PDO
         $config['port'],
         $config['database']
     );
-    $db = new PDO($dsn, $config['username'], $config['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+    if (!empty($config['ssl'])) {
+        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+        $options[PDO::MYSQL_ATTR_SSL_CA] = true;
+    }
+    $db = new PDO($dsn, $config['username'], $config['password'], $options);
     inventory_ensure_schema($db);
 
     $count = (int) $db->query('SELECT COUNT(*) FROM `product`')->fetchColumn();
