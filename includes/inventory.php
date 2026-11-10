@@ -98,9 +98,8 @@ function inventory_ensure_schema(PDO $db): void
          SET `code` = CONCAT(\'legacy-\', `รหัสสินค้า`)
          WHERE `code` IS NULL OR `code` = \'\''
     );
-    $indexes = inventory_table_indexes($db, 'product');
-    if (!in_array('uq_product_code', $indexes, true)) {
-        $db->exec('ALTER TABLE `product` ADD UNIQUE KEY `uq_product_code` (`code`)');
+    if (!inventory_has_unique_index($db, 'product', 'code')) {
+        $db->exec('ALTER TABLE `product` ADD UNIQUE KEY `uq_product_code_ref` (`code`)');
     }
 
     $db->exec(
@@ -271,13 +270,30 @@ function inventory_table_columns(PDO $db, string $table): array
     return $columns;
 }
 
-function inventory_table_indexes(PDO $db, string $table): array
+function inventory_has_unique_index(PDO $db, string $table, string $column): bool
 {
     $indexes = [];
     foreach ($db->query('SHOW INDEX FROM `' . $table . '`')->fetchAll() as $index) {
-        $indexes[] = $index['Key_name'];
+        $indexes[$index['Key_name']][] = $index;
     }
-    return array_values(array_unique($indexes));
+
+    foreach ($indexes as $indexColumns) {
+        if (count($indexColumns) !== 1) {
+            continue;
+        }
+
+        $index = $indexColumns[0];
+        if (
+            $index['Column_name'] === $column
+            && (int) $index['Non_unique'] === 0
+            && (int) $index['Seq_in_index'] === 1
+            && $index['Sub_part'] === null
+        ) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function inventory_category_options(): array
