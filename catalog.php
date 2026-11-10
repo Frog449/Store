@@ -58,6 +58,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_product') {
+    try {
+        inventory_require_csrf();
+        $code = inventory_text('product_code', 'รหัสสินค้า', 80, true);
+        $imageFilename = inventory_delete_product($code);
+        inventory_delete_product_image($imageFilename);
+        inventory_flash_redirect('ลบสินค้าและประวัติรับ–เบิกที่เกี่ยวข้องแล้ว', 'catalog.php');
+    } catch (DomainException|RuntimeException $exception) {
+        $notice = inventory_handle_error($exception);
+        $noticeType = 'error';
+    }
+}
+
 $categoryOptions = inventory_category_options();
 $typeOptions = inventory_type_options();
 $unitOptions = inventory_unit_options();
@@ -118,6 +131,12 @@ require __DIR__ . '/includes/header.php';
             <div><dt>สถานะสต๊อก</dt><dd data-detail="status"></dd></div>
         </dl>
         <div class="product-detail-actions">
+            <form class="product-delete-form" method="post" data-product-delete-form>
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="delete_product">
+                <input type="hidden" name="product_code" value="">
+                <button class="danger-button" type="submit">ลบสินค้า</button>
+            </form>
             <button class="secondary-button" type="button" data-close-product-dialog>ปิด</button>
             <button class="primary-button" type="button" id="product-detail-edit">แก้ไขข้อมูล</button>
         </div>

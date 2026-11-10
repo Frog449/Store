@@ -169,6 +169,8 @@ main { max-width: 1180px; margin: auto; padding: 0 28px; }
 .form-span-2 { grid-column: span 2; }
 .form-actions { display: flex; align-items: flex-end; }
 .primary-button, .secondary-button { min-height: 37px; display: inline-flex; align-items: center; justify-content: center; padding: 0 15px; border: 1px solid var(--green); border-radius: 5px; color: #fff; background: var(--green); cursor: pointer; font-size: 10px; font-weight: 600; transition: background .2s,border-color .2s; }
+.danger-button { min-height: 37px; display: inline-flex; align-items: center; justify-content: center; padding: 0 15px; border: 1px solid #b42335; border-radius: 5px; color: #fff; background: #b42335; cursor: pointer; font-size: 13px; font-weight: 700; transition: background .2s,border-color .2s; }
+.danger-button:hover { border-color: #861b2a; background: #961d2c; }
 .primary-button:hover { border-color: var(--green-dark); background: var(--green-dark); }
 .secondary-button { min-height: 33px; border-color: #dce5da; color: #52705a; background: #fff; }
 .secondary-button:hover { border-color: #9fb6a4; background: #f6f9f4; }
@@ -204,7 +206,8 @@ main { max-width: 1180px; margin: auto; padding: 0 28px; }
 .product-detail-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid #edf0eb; }
 .product-detail-list dt { color: #7d8983; font-size: 10px; }
 .product-detail-list dd { margin: 0; color: #344a40; font-size: 11px; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
-.product-detail-actions { display: flex; justify-content: flex-end; gap: 9px; }
+.product-detail-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
+.product-delete-form { margin-right: auto; }
 .stock-value.negative { color: #c65148; }.stock-value.low { color: #c3834d; }.stock-value.normal { color: #4e7656; }
 .inventory-status { display: inline-block; padding: 4px 7px; border-radius: 4px; font-size: 9px; }
 .inventory-status.negative { color: #a84940; background: #fae9e6; }.inventory-status.low { color: #aa733f; background: #fbf0e2; }.inventory-status.normal { color: #4c7755; background: #eaf3e9; }
@@ -740,6 +743,8 @@ body {
 .inventory-form input, .inventory-form select { border-color: #ded4d7; color: #292326; background: #fff; }
 .inventory-form input[readonly] { color: #625b5e; background: #f5f2f3; }
 .secondary-button { border-color: #dcced1; color: #852231; background: #fff; }
+.danger-button { border-color: #b42335; color: #fff; background: #b42335; }
+.danger-button:hover { border-color: #8e1d2c; background: #8e1d2c; }
 .secondary-button:hover { border-color: #c96471; color: #6f1422; background: #fff1f2; }
 .table-scroll { border-color: #e5dade; }
 .inventory-table { color: #40383b; }

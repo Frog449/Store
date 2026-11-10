@@ -688,6 +688,43 @@ function inventory_save_product(array $values, ?string $originalCode = null): vo
     }
 }
 
+function inventory_delete_product(string $code): ?string
+{
+    $db = inventory_db();
+    $db->beginTransaction();
+    try {
+        $findProduct = $db->prepare(
+            'SELECT `image_filename` FROM `product` WHERE `code` = :code FOR UPDATE'
+        );
+        $findProduct->execute(['code' => $code]);
+        $product = $findProduct->fetch();
+        if ($product === false) {
+            throw new DomainException('ไม่พบสินค้าที่ต้องการลบ');
+        }
+
+        foreach (['issues', 'receipts'] as $table) {
+            $deleteMovements = $db->prepare(
+                "DELETE FROM `{$table}` WHERE `product_code` = :code"
+            );
+            $deleteMovements->execute(['code' => $code]);
+        }
+
+        $deleteProduct = $db->prepare('DELETE FROM `product` WHERE `code` = :code');
+        $deleteProduct->execute(['code' => $code]);
+        if ($deleteProduct->rowCount() !== 1) {
+            throw new RuntimeException('ลบสินค้าไม่สำเร็จ กรุณาลองอีกครั้ง');
+        }
+
+        $db->commit();
+        return $product['image_filename'] === null ? null : (string) $product['image_filename'];
+    } catch (Throwable $exception) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $exception;
+    }
+}
+
 function inventory_create_product_with_receipt(array $product, array $receipt): void
 {
     $db = inventory_db();

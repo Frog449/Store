@@ -45,6 +45,7 @@ if (productDetailDialog) {
     const detailTitle = document.querySelector("#product-detail-title");
     const detailCode = document.querySelector("#product-detail-code");
     const editButton = document.querySelector("#product-detail-edit");
+    const deleteForm = productDetailDialog.querySelector("[data-product-delete-form]");
     const editDialog = document.querySelector("#product-edit-dialog");
     const detailImage = document.querySelector("#product-detail-image");
     const detailImageEmpty = document.querySelector("#product-detail-image-empty");
@@ -62,6 +63,7 @@ if (productDetailDialog) {
     const openProductDetails = (card) => {
         activeProductCard = card;
         const trigger = card.dataset;
+        deleteForm.elements.product_code.value = trigger.code;
         detailTitle.textContent = trigger.name;
         detailCode.textContent = `รหัสสินค้า ${trigger.code}`;
         detailFields.forEach((field) => {
@@ -123,6 +125,16 @@ if (productDetailDialog) {
         editDialog.querySelector("#product-edit-code").textContent = `รหัสสินค้า ${values.code}`;
         productDetailDialog.close();
         editDialog.showModal();
+    });
+
+    deleteForm.addEventListener("submit", (event) => {
+        const productName = activeProductCard.dataset.name;
+        const confirmed = window.confirm(
+            `ยืนยันลบสินค้า "${productName}" หรือไม่?\nรายการนี้จะลบประวัติรับ–เบิกที่เกี่ยวข้องทั้งหมดและไม่สามารถกู้คืนได้`
+        );
+        if (!confirmed) {
+            event.preventDefault();
+        }
     });
 
     editImageInput.addEventListener("change", () => {
