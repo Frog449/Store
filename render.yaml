@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: store
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    disk:
+      name: storage
+      mountPath: /var/www/html/storage
+      sizeGB: 1
+    envVars:
+      - key: STORE_DB_HOST
+        sync: false
+      - key: STORE_DB_PORT
+        value: "3306"
+      - key: STORE_DB_NAME
+        sync: false
+      - key: STORE_DB_USER
+        sync: false
+      - key: STORE_DB_PASSWORD
+        sync: false
