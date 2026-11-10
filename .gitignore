@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+/storage/inventory.sqlite
+/storage/product-images/*
+!/storage/product-images/.htaccess

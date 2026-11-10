@@ -1,0 +1,6 @@
+*
+!.htaccess
+!.gitignore
+!product-images/
+product-images/*
+!product-images/.htaccess
