@@ -11,8 +11,8 @@ $activePage = 'history';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_movement') {
     try {
         inventory_require_csrf();
-        $kind = (string)($_POST['movement_kind'] ?? '');
-        $id = (int)($_POST['movement_id'] ?? 0);
+        $kind = (string) ($_POST['movement_kind'] ?? '');
+        $id = (int) ($_POST['movement_id'] ?? 0);
         $values = [
             'movement_date' => inventory_date('movement_date'),
             'document_no' => inventory_text('document_no', 'เลขที่เอกสาร', 100),
@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_movements') {
     try {
         inventory_require_csrf();
-        $kind = (string)($_POST['movement_kind'] ?? '');
+        $kind = (string) ($_POST['movement_kind'] ?? '');
         $ids = $_POST['delete_ids'] ?? [];
         if (!is_array($ids) || $ids === []) {
             throw new DomainException('กรุณาเลือกรายการที่ต้องการลบ');
@@ -88,28 +88,33 @@ require __DIR__ . '/includes/header.php';
         <div class="stat-item">
             <span class="stat-icon icon-box">IN</span>
             <div>
-                <strong><?= number_format(count($receipts)) ?> <small style="font-size:11px;font-weight:normal;">รายการ</small></strong>
+                <strong><?= number_format(count($receipts)) ?> <small
+                        style="font-size:11px;font-weight:normal;">รายการ</small></strong>
                 <span>รับเข้ารวม <?= inventory_quantity($totalReceiptQty) ?> หน่วย</span>
             </div>
         </div>
         <div class="stat-item">
             <span class="stat-icon icon-alert" style="color:#ef233c;background:#ffebee;">OUT</span>
             <div>
-                <strong><?= number_format(count($issues)) ?> <small style="font-size:11px;font-weight:normal;">รายการ</small></strong>
+                <strong><?= number_format(count($issues)) ?> <small
+                        style="font-size:11px;font-weight:normal;">รายการ</small></strong>
                 <span>เบิกออกรวม <?= inventory_quantity($totalIssueQty) ?> หน่วย</span>
             </div>
         </div>
         <div class="stat-item">
             <span class="stat-icon icon-check">ALL</span>
             <div>
-                <strong><?= number_format(count($receipts) + count($issues)) ?> <small style="font-size:11px;font-weight:normal;">รายการ</small></strong>
+                <strong><?= number_format(count($receipts) + count($issues)) ?> <small
+                        style="font-size:11px;font-weight:normal;">รายการ</small></strong>
                 <span>การเคลื่อนไหวทั้งหมด</span>
             </div>
         </div>
         <div class="stats-note" style="display:flex;gap:10px;">
             <?php if (!auth_is_viewer()): ?>
-                <a class="primary-button" href="receive.php" style="min-height:36px;padding:0 14px;font-size:11px;">+ รับสินค้าเข้า</a>
-                <a class="secondary-button" href="issue.php" style="min-height:36px;padding:0 14px;font-size:11px;">+ บันทึกเบิก</a>
+                <a class="primary-button" href="receive.php" style="min-height:36px;padding:0 14px;font-size:11px;">+
+                    รับสินค้าเข้า</a>
+                <a class="secondary-button" href="issue.php" style="min-height:36px;padding:0 14px;font-size:11px;">+
+                    เบิกสินค้า</a>
             <?php endif; ?>
         </div>
     </div>
@@ -127,10 +132,15 @@ require __DIR__ . '/includes/header.php';
             </button>
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <span class="result-count" id="history-result-count">แสดง <?= count($receipts) + count($issues) ?> รายการ</span>
+            <span class="result-count" id="history-result-count">แสดง <?= count($receipts) + count($issues) ?>
+                รายการ</span>
             <label class="search-box" style="min-width:280px;">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                <input id="history-search" type="search" placeholder="ค้นหารหัส, ชื่อสินค้า, เลขที่เอกสาร..." autocomplete="off">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8" />
+                    <path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+                <input id="history-search" type="search" placeholder="ค้นหารหัส, ชื่อสินค้า, เลขที่เอกสาร..."
+                    autocomplete="off">
                 <kbd>/</kbd>
             </label>
         </div>
@@ -147,21 +157,27 @@ require __DIR__ . '/includes/header.php';
             <div style="display:flex;align-items:center;gap:10px;">
                 <span class="history-badge history-badge-receipt">รับเข้า</span>
                 <span class="result-count section-visible-count"><?= count($receipts) ?> รายการ</span>
-                <a class="secondary-button" href="export.php?type=receipts" style="font-size:10px;padding:4px 10px;">Export</a>
+                <a class="secondary-button" href="export.php?type=receipts"
+                    style="font-size:10px;padding:4px 10px;">Export</a>
             </div>
         </div>
 
         <?php if (!auth_is_viewer()): ?>
-        <form method="post" id="receipt-bulk-form" style="margin:0 0 10px;">
-            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-            <input type="hidden" name="action" value="delete_movements">
-            <input type="hidden" name="movement_kind" value="receipt">
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;" id="receipt-bulk-toolbar" hidden>
-                <span id="receipt-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0 รายการที่เลือก</span>
-                <button class="primary-button" type="submit" style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:30px;padding:0 12px;font-size:11px;" onclick="return confirm('ยืนยันการลบประวัติรับสินค้าที่เลือก?\nยอดสต๊อกจะถูกอัปเดตโดยอัตโนมัติ')">ลบรายการที่เลือก</button>
-                <button class="secondary-button" type="button" style="min-height:30px;padding:0 12px;font-size:11px;" onclick="clearSelection('receipt')">ยกเลิก</button>
-            </div>
-        </form>
+            <form method="post" id="receipt-bulk-form" style="margin:0 0 10px;">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="delete_movements">
+                <input type="hidden" name="movement_kind" value="receipt">
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;"
+                    id="receipt-bulk-toolbar" hidden>
+                    <span id="receipt-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0
+                        รายการที่เลือก</span>
+                    <button class="primary-button" type="submit"
+                        style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:30px;padding:0 12px;font-size:11px;"
+                        onclick="return confirm('ยืนยันการลบประวัติรับสินค้าที่เลือก?\nยอดสต๊อกจะถูกอัปเดตโดยอัตโนมัติ')">ลบรายการที่เลือก</button>
+                    <button class="secondary-button" type="button" style="min-height:30px;padding:0 12px;font-size:11px;"
+                        onclick="clearSelection('receipt')">ยกเลิก</button>
+                </div>
+            </form>
         <?php endif; ?>
 
         <div class="table-scroll">
@@ -169,9 +185,11 @@ require __DIR__ . '/includes/header.php';
                 <thead>
                     <tr>
                         <?php if (!auth_is_viewer()): ?>
-                        <th style="width:36px;text-align:center;">
-                            <input type="checkbox" id="receipt-select-all" title="เลือกทั้งหมด" style="accent-color:#ef233c;cursor:pointer;" onchange="toggleAll('receipt', this.checked)">
-                        </th>
+                            <th style="width:36px;text-align:center;">
+                                <input type="checkbox" id="receipt-select-all" title="เลือกทั้งหมด"
+                                    style="accent-color:#ef233c;cursor:pointer;"
+                                    onchange="toggleAll('receipt', this.checked)">
+                            </th>
                         <?php endif; ?>
                         <th>วันที่รับ</th>
                         <th>เลขที่เอกสาร</th>
@@ -190,32 +208,32 @@ require __DIR__ . '/includes/header.php';
                 <tbody>
                     <?php foreach ($receipts as $row): ?>
                         <?php
-                            $searchText = strtolower(implode(' ', [
-                                (string) ($row['movement_date'] ?? ''),
-                                (string) ($row['document_no'] ?? ''),
-                                (string) ($row['product_code'] ?? ''),
-                                (string) ($row['product_name'] ?? ''),
-                                (string) ($row['supplier'] ?? ''),
-                                (string) ($row['received_by'] ?? ''),
-                                (string) ($row['department'] ?? ''),
-                                (string) ($row['created_by_name'] ?? ''),
-                                (string) ($row['notes'] ?? ''),
-                            ]));
+                        $searchText = strtolower(implode(' ', [
+                            (string) ($row['movement_date'] ?? ''),
+                            (string) ($row['document_no'] ?? ''),
+                            (string) ($row['product_code'] ?? ''),
+                            (string) ($row['product_name'] ?? ''),
+                            (string) ($row['supplier'] ?? ''),
+                            (string) ($row['received_by'] ?? ''),
+                            (string) ($row['department'] ?? ''),
+                            (string) ($row['created_by_name'] ?? ''),
+                            (string) ($row['notes'] ?? ''),
+                        ]));
                         ?>
                         <tr class="history-row" data-type="receipt" data-search="<?= h($searchText) ?>">
                             <?php if (!auth_is_viewer()): ?>
-                            <td style="text-align:center;">
-                                <input type="checkbox" name="delete_ids[]" value="<?= (int)($row['id'] ?? 0) ?>"
-                                       form="receipt-bulk-form" class="receipt-row-check"
-                                       style="accent-color:#ef233c;cursor:pointer;"
-                                       onchange="updateBulkToolbar('receipt')">
-                            </td>
+                                <td style="text-align:center;">
+                                    <input type="checkbox" name="delete_ids[]" value="<?= (int) ($row['id'] ?? 0) ?>"
+                                        form="receipt-bulk-form" class="receipt-row-check"
+                                        style="accent-color:#ef233c;cursor:pointer;" onchange="updateBulkToolbar('receipt')">
+                                </td>
                             <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>
                             <td><?= h($row['document_no'] !== '' ? $row['document_no'] : '-') ?></td>
                             <td class="code-cell"><?= h($row['product_code']) ?></td>
                             <td class="name-cell"><strong><?= h($row['product_name']) ?></strong></td>
-                            <td class="numeric" style="color:#2b773c;font-weight:700;">+<?= inventory_quantity($row['quantity']) ?></td>
+                            <td class="numeric" style="color:#2b773c;font-weight:700;">
+                                +<?= inventory_quantity($row['quantity']) ?></td>
                             <td><?= h($row['unit']) ?></td>
                             <td><?= h($row['supplier'] !== '' ? $row['supplier'] : '-') ?></td>
                             <td><?= h($row['received_by'] !== '' ? $row['received_by'] : '-') ?></td>
@@ -224,9 +242,14 @@ require __DIR__ . '/includes/header.php';
                             <td><?= h($row['notes'] !== '' ? $row['notes'] : '-') ?></td>
                             <td style="white-space:nowrap;">
                                 <div style="display:inline-flex;gap:5px;align-items:center;">
-                                    <a class="secondary-button" href="slip.php?type=receipt&id=<?= (int)($row['id'] ?? 0) ?>" target="_blank" style="min-height:28px;padding:0 8px;font-size:11px;" title="พิมพ์ใบรับสินค้า">พิมพ์</a>
+                                    <a class="secondary-button"
+                                        href="slip.php?type=receipt&id=<?= (int) ($row['id'] ?? 0) ?>" target="_blank"
+                                        style="min-height:28px;padding:0 8px;font-size:11px;"
+                                        title="พิมพ์ใบรับสินค้า">พิมพ์</a>
                                     <?php if (inventory_can_edit_movement($row)): ?>
-                                        <button class="secondary-button" type="button" style="min-height:28px;padding:0 8px;font-size:11px;" onclick="openEditMovement('receipt', <?= htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8') ?>)">แก้ไข</button>
+                                        <button class="secondary-button" type="button"
+                                            style="min-height:28px;padding:0 8px;font-size:11px;"
+                                            onclick="openEditMovement('receipt', <?= htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8') ?>)">แก้ไข</button>
                                     <?php endif; ?>
                                 </div>
                             </td>
@@ -235,7 +258,8 @@ require __DIR__ . '/includes/header.php';
                 </tbody>
             </table>
         </div>
-        <p class="history-empty-search" style="padding:22px;text-align:center;color:#888;" hidden>ไม่พบรายการรับสินค้าที่ตรงกับคำค้นหา</p>
+        <p class="history-empty-search" style="padding:22px;text-align:center;color:#888;" hidden>
+            ไม่พบรายการรับสินค้าที่ตรงกับคำค้นหา</p>
         <?php if ($receipts === []): ?>
             <p class="table-empty">ยังไม่มีประวัติรับสินค้า</p>
         <?php endif; ?>
@@ -252,21 +276,27 @@ require __DIR__ . '/includes/header.php';
             <div style="display:flex;align-items:center;gap:10px;">
                 <span class="history-badge history-badge-issue">เบิกออก</span>
                 <span class="result-count section-visible-count"><?= count($issues) ?> รายการ</span>
-                <a class="secondary-button" href="export.php?type=issues" style="font-size:10px;padding:4px 10px;">Export</a>
+                <a class="secondary-button" href="export.php?type=issues"
+                    style="font-size:10px;padding:4px 10px;">Export</a>
             </div>
         </div>
 
         <?php if (!auth_is_viewer()): ?>
-        <form method="post" id="issue-bulk-form" style="margin:0 0 10px;">
-            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-            <input type="hidden" name="action" value="delete_movements">
-            <input type="hidden" name="movement_kind" value="issue">
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;" id="issue-bulk-toolbar" hidden>
-                <span id="issue-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0 รายการที่เลือก</span>
-                <button class="primary-button" type="submit" style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:30px;padding:0 12px;font-size:11px;" onclick="return confirm('ยืนยันการลบประวัติเบิกสินค้าที่เลือก?\nยอดสต๊อกจะถูกอัปเดตโดยอัตโนมัติ')">ลบรายการที่เลือก</button>
-                <button class="secondary-button" type="button" style="min-height:30px;padding:0 12px;font-size:11px;" onclick="clearSelection('issue')">ยกเลิก</button>
-            </div>
-        </form>
+            <form method="post" id="issue-bulk-form" style="margin:0 0 10px;">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="delete_movements">
+                <input type="hidden" name="movement_kind" value="issue">
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;"
+                    id="issue-bulk-toolbar" hidden>
+                    <span id="issue-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0
+                        รายการที่เลือก</span>
+                    <button class="primary-button" type="submit"
+                        style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:30px;padding:0 12px;font-size:11px;"
+                        onclick="return confirm('ยืนยันการลบประวัติเบิกสินค้าที่เลือก?\nยอดสต๊อกจะถูกอัปเดตโดยอัตโนมัติ')">ลบรายการที่เลือก</button>
+                    <button class="secondary-button" type="button" style="min-height:30px;padding:0 12px;font-size:11px;"
+                        onclick="clearSelection('issue')">ยกเลิก</button>
+                </div>
+            </form>
         <?php endif; ?>
 
         <div class="table-scroll">
@@ -274,9 +304,11 @@ require __DIR__ . '/includes/header.php';
                 <thead>
                     <tr>
                         <?php if (!auth_is_viewer()): ?>
-                        <th style="width:36px;text-align:center;">
-                            <input type="checkbox" id="issue-select-all" title="เลือกทั้งหมด" style="accent-color:#ef233c;cursor:pointer;" onchange="toggleAll('issue', this.checked)">
-                        </th>
+                            <th style="width:36px;text-align:center;">
+                                <input type="checkbox" id="issue-select-all" title="เลือกทั้งหมด"
+                                    style="accent-color:#ef233c;cursor:pointer;"
+                                    onchange="toggleAll('issue', this.checked)">
+                            </th>
                         <?php endif; ?>
                         <th>วันที่เบิก</th>
                         <th>เลขที่เอกสาร</th>
@@ -295,32 +327,32 @@ require __DIR__ . '/includes/header.php';
                 <tbody>
                     <?php foreach ($issues as $row): ?>
                         <?php
-                            $searchText = strtolower(implode(' ', [
-                                (string) ($row['movement_date'] ?? ''),
-                                (string) ($row['document_no'] ?? ''),
-                                (string) ($row['product_code'] ?? ''),
-                                (string) ($row['product_name'] ?? ''),
-                                (string) ($row['requested_by'] ?? ''),
-                                (string) ($row['department'] ?? ''),
-                                (string) ($row['approved_by'] ?? ''),
-                                (string) ($row['created_by_name'] ?? ''),
-                                (string) ($row['notes'] ?? ''),
-                            ]));
+                        $searchText = strtolower(implode(' ', [
+                            (string) ($row['movement_date'] ?? ''),
+                            (string) ($row['document_no'] ?? ''),
+                            (string) ($row['product_code'] ?? ''),
+                            (string) ($row['product_name'] ?? ''),
+                            (string) ($row['requested_by'] ?? ''),
+                            (string) ($row['department'] ?? ''),
+                            (string) ($row['approved_by'] ?? ''),
+                            (string) ($row['created_by_name'] ?? ''),
+                            (string) ($row['notes'] ?? ''),
+                        ]));
                         ?>
                         <tr class="history-row" data-type="issue" data-search="<?= h($searchText) ?>">
                             <?php if (!auth_is_viewer()): ?>
-                            <td style="text-align:center;">
-                                <input type="checkbox" name="delete_ids[]" value="<?= (int)($row['id'] ?? 0) ?>"
-                                       form="issue-bulk-form" class="issue-row-check"
-                                       style="accent-color:#ef233c;cursor:pointer;"
-                                       onchange="updateBulkToolbar('issue')">
-                            </td>
+                                <td style="text-align:center;">
+                                    <input type="checkbox" name="delete_ids[]" value="<?= (int) ($row['id'] ?? 0) ?>"
+                                        form="issue-bulk-form" class="issue-row-check"
+                                        style="accent-color:#ef233c;cursor:pointer;" onchange="updateBulkToolbar('issue')">
+                                </td>
                             <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>
                             <td><?= h($row['document_no'] !== '' ? $row['document_no'] : '-') ?></td>
                             <td class="code-cell"><?= h($row['product_code']) ?></td>
                             <td class="name-cell"><strong><?= h($row['product_name']) ?></strong></td>
-                            <td class="numeric" style="color:#c53030;font-weight:700;">-<?= inventory_quantity($row['quantity']) ?></td>
+                            <td class="numeric" style="color:#c53030;font-weight:700;">
+                                -<?= inventory_quantity($row['quantity']) ?></td>
                             <td><?= h($row['unit']) ?></td>
                             <td><?= h($row['requested_by'] !== '' ? $row['requested_by'] : '-') ?></td>
                             <td><?= h($row['department'] !== '' ? $row['department'] : '-') ?></td>
@@ -329,9 +361,13 @@ require __DIR__ . '/includes/header.php';
                             <td><?= h($row['notes'] !== '' ? $row['notes'] : '-') ?></td>
                             <td style="white-space:nowrap;">
                                 <div style="display:inline-flex;gap:5px;align-items:center;">
-                                    <a class="secondary-button" href="slip.php?type=issue&id=<?= (int)($row['id'] ?? 0) ?>" target="_blank" style="min-height:28px;padding:0 8px;font-size:11px;" title="พิมพ์ใบเบิกสินค้า">พิมพ์</a>
+                                    <a class="secondary-button" href="slip.php?type=issue&id=<?= (int) ($row['id'] ?? 0) ?>"
+                                        target="_blank" style="min-height:28px;padding:0 8px;font-size:11px;"
+                                        title="พิมพ์ใบเบิกสินค้า">พิมพ์</a>
                                     <?php if (inventory_can_edit_movement($row)): ?>
-                                        <button class="secondary-button" type="button" style="min-height:28px;padding:0 8px;font-size:11px;" onclick="openEditMovement('issue', <?= htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8') ?>)">แก้ไข</button>
+                                        <button class="secondary-button" type="button"
+                                            style="min-height:28px;padding:0 8px;font-size:11px;"
+                                            onclick="openEditMovement('issue', <?= htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8') ?>)">แก้ไข</button>
                                     <?php endif; ?>
                                 </div>
                             </td>
@@ -340,7 +376,8 @@ require __DIR__ . '/includes/header.php';
                 </tbody>
             </table>
         </div>
-        <p class="history-empty-search" style="padding:22px;text-align:center;color:#888;" hidden>ไม่พบรายการเบิกสินค้าที่ตรงกับคำค้นหา</p>
+        <p class="history-empty-search" style="padding:22px;text-align:center;color:#888;" hidden>
+            ไม่พบรายการเบิกสินค้าที่ตรงกับคำค้นหา</p>
         <?php if ($issues === []): ?>
             <p class="table-empty">ยังไม่มีประวัติเบิกสินค้า</p>
         <?php endif; ?>
@@ -353,15 +390,18 @@ require __DIR__ . '/includes/header.php';
                 <div class="eyebrow section-eyebrow" id="edit-movement-eyebrow">EDIT MOVEMENT</div>
                 <h2 id="edit-movement-title">แก้ไขรายการ</h2>
             </div>
-            <button class="product-detail-close" type="button" onclick="document.querySelector('#edit-movement-dialog').close()">×</button>
+            <button class="product-detail-close" type="button"
+                onclick="document.querySelector('#edit-movement-dialog').close()">×</button>
         </div>
-        <form class="inventory-form" method="post" id="edit-movement-form" style="grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">
+        <form class="inventory-form" method="post" id="edit-movement-form"
+            style="grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
             <input type="hidden" name="action" value="update_movement">
             <input type="hidden" name="movement_kind" id="edit-movement-kind" value="">
             <input type="hidden" name="movement_id" id="edit-movement-id" value="">
 
-            <div style="grid-column:span 2;padding:10px 14px;background:#f5f7f4;border-radius:6px;border:1px solid #e2e8e0;">
+            <div
+                style="grid-column:span 2;padding:10px 14px;background:#f5f7f4;border-radius:6px;border:1px solid #e2e8e0;">
                 <div style="font-size:11px;color:#777;">สินค้าที่ทำรายการ:</div>
                 <strong id="edit-movement-product" style="font-size:13px;color:#292326;"></strong>
             </div>
@@ -394,19 +434,22 @@ require __DIR__ . '/includes/header.php';
                 </label>
                 <label>
                     ผู้รับสินค้า
-                    <input type="text" name="received_by" id="edit-movement-received-by" placeholder="ชื่อพนักงานที่รับ">
+                    <input type="text" name="received_by" id="edit-movement-received-by"
+                        placeholder="ชื่อพนักงานที่รับ">
                 </label>
             </div>
 
             <!-- Fields for Issue only -->
-            <div id="issue-fields" style="grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:14px;" hidden>
+            <div id="issue-fields" style="grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:14px;"
+                hidden>
                 <label>
                     ผู้ขอเบิก
                     <input type="text" name="requested_by" id="edit-movement-requested-by" placeholder="ชื่อผู้เบิก">
                 </label>
                 <label>
                     ผู้อนุมัติ (ถ้ามี)
-                    <input type="text" name="approved_by" id="edit-movement-approved-by" placeholder="หัวหน้างาน / ผู้มีอำนาจ">
+                    <input type="text" name="approved_by" id="edit-movement-approved-by"
+                        placeholder="หัวหน้างาน / ผู้มีอำนาจ">
                 </label>
             </div>
 
@@ -415,8 +458,10 @@ require __DIR__ . '/includes/header.php';
                 <input type="text" name="notes" id="edit-movement-notes" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)">
             </label>
 
-            <div class="form-actions" style="grid-column:span 2;display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
-                <button class="secondary-button" type="button" onclick="document.querySelector('#edit-movement-dialog').close()">ยกเลิก</button>
+            <div class="form-actions"
+                style="grid-column:span 2;display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+                <button class="secondary-button" type="button"
+                    onclick="document.querySelector('#edit-movement-dialog').close()">ยกเลิก</button>
                 <button class="primary-button" type="submit">บันทึกการแก้ไข</button>
             </div>
         </form>
@@ -424,80 +469,80 @@ require __DIR__ . '/includes/header.php';
 </section>
 
 <script>
-// ---- Bulk Select / Delete helpers ----
-function toggleAll(kind, checked) {
-    document.querySelectorAll('.' + kind + '-row-check').forEach(cb => { cb.checked = checked; });
-    updateBulkToolbar(kind);
-}
-
-function updateBulkToolbar(kind) {
-    const checks = document.querySelectorAll('.' + kind + '-row-check');
-    const checked = document.querySelectorAll('.' + kind + '-row-check:checked');
-    const n = checked.length;
-    const toolbar = document.getElementById(kind + '-bulk-toolbar');
-    const countEl = document.getElementById(kind + '-selected-count');
-    const selectAll = document.getElementById(kind + '-select-all');
-    if (toolbar) toolbar.hidden = n === 0;
-    if (countEl) countEl.textContent = n + ' รายการที่เลือก';
-    if (selectAll) {
-        selectAll.indeterminate = n > 0 && n < checks.length;
-        selectAll.checked = n > 0 && n === checks.length;
-    }
-}
-
-function clearSelection(kind) {
-    document.querySelectorAll('.' + kind + '-row-check').forEach(cb => { cb.checked = false; });
-    const selectAll = document.getElementById(kind + '-select-all');
-    if (selectAll) selectAll.checked = false;
-    updateBulkToolbar(kind);
-}
-
-// ---- Edit movement dialog ----
-function openEditMovement(kind, data) {
-    const dialog = document.querySelector('#edit-movement-dialog');
-    if (!dialog) return;
-
-    document.querySelector('#edit-movement-kind').value = kind;
-    document.querySelector('#edit-movement-id').value = data.id || '';
-    document.querySelector('#edit-movement-eyebrow').textContent = kind === 'receipt' ? 'EDIT RECEIPT' : 'EDIT ISSUE';
-    document.querySelector('#edit-movement-title').textContent = kind === 'receipt' ? 'แก้ไขรายการรับสินค้า' : 'แก้ไขรายการเบิกสินค้า';
-    document.querySelector('#edit-movement-product').textContent = (data.product_code || '') + ' - ' + (data.product_name || '');
-    document.querySelector('#edit-movement-unit').textContent = data.unit || 'หน่วย';
-    document.querySelector('#edit-movement-date').value = data.movement_date || '';
-    document.querySelector('#edit-movement-doc').value = data.document_no || '';
-    document.querySelector('#edit-movement-qty').value = data.quantity || '';
-    document.querySelector('#edit-movement-dept').value = data.department || '';
-    document.querySelector('#edit-movement-notes').value = data.notes || '';
-
-    const receiptBox = document.querySelector('#receipt-fields');
-    const issueBox = document.querySelector('#issue-fields');
-    const supplierInput = document.querySelector('#edit-movement-supplier');
-    const receivedByInput = document.querySelector('#edit-movement-received-by');
-    const requestedByInput = document.querySelector('#edit-movement-requested-by');
-    const approvedByInput = document.querySelector('#edit-movement-approved-by');
-
-    if (kind === 'receipt') {
-        receiptBox.hidden = false;
-        issueBox.hidden = true;
-        supplierInput.disabled = false;
-        receivedByInput.disabled = false;
-        requestedByInput.disabled = true;
-        approvedByInput.disabled = true;
-        supplierInput.value = data.supplier || '';
-        receivedByInput.value = data.received_by || '';
-    } else {
-        receiptBox.hidden = true;
-        issueBox.hidden = false;
-        supplierInput.disabled = true;
-        receivedByInput.disabled = true;
-        requestedByInput.disabled = false;
-        approvedByInput.disabled = false;
-        requestedByInput.value = data.requested_by || '';
-        approvedByInput.value = data.approved_by || '';
+    // ---- Bulk Select / Delete helpers ----
+    function toggleAll(kind, checked) {
+        document.querySelectorAll('.' + kind + '-row-check').forEach(cb => { cb.checked = checked; });
+        updateBulkToolbar(kind);
     }
 
-    dialog.showModal();
-}
+    function updateBulkToolbar(kind) {
+        const checks = document.querySelectorAll('.' + kind + '-row-check');
+        const checked = document.querySelectorAll('.' + kind + '-row-check:checked');
+        const n = checked.length;
+        const toolbar = document.getElementById(kind + '-bulk-toolbar');
+        const countEl = document.getElementById(kind + '-selected-count');
+        const selectAll = document.getElementById(kind + '-select-all');
+        if (toolbar) toolbar.hidden = n === 0;
+        if (countEl) countEl.textContent = n + ' รายการที่เลือก';
+        if (selectAll) {
+            selectAll.indeterminate = n > 0 && n < checks.length;
+            selectAll.checked = n > 0 && n === checks.length;
+        }
+    }
+
+    function clearSelection(kind) {
+        document.querySelectorAll('.' + kind + '-row-check').forEach(cb => { cb.checked = false; });
+        const selectAll = document.getElementById(kind + '-select-all');
+        if (selectAll) selectAll.checked = false;
+        updateBulkToolbar(kind);
+    }
+
+    // ---- Edit movement dialog ----
+    function openEditMovement(kind, data) {
+        const dialog = document.querySelector('#edit-movement-dialog');
+        if (!dialog) return;
+
+        document.querySelector('#edit-movement-kind').value = kind;
+        document.querySelector('#edit-movement-id').value = data.id || '';
+        document.querySelector('#edit-movement-eyebrow').textContent = kind === 'receipt' ? 'EDIT RECEIPT' : 'EDIT ISSUE';
+        document.querySelector('#edit-movement-title').textContent = kind === 'receipt' ? 'แก้ไขรายการรับสินค้า' : 'แก้ไขรายการเบิกสินค้า';
+        document.querySelector('#edit-movement-product').textContent = (data.product_code || '') + ' - ' + (data.product_name || '');
+        document.querySelector('#edit-movement-unit').textContent = data.unit || 'หน่วย';
+        document.querySelector('#edit-movement-date').value = data.movement_date || '';
+        document.querySelector('#edit-movement-doc').value = data.document_no || '';
+        document.querySelector('#edit-movement-qty').value = data.quantity || '';
+        document.querySelector('#edit-movement-dept').value = data.department || '';
+        document.querySelector('#edit-movement-notes').value = data.notes || '';
+
+        const receiptBox = document.querySelector('#receipt-fields');
+        const issueBox = document.querySelector('#issue-fields');
+        const supplierInput = document.querySelector('#edit-movement-supplier');
+        const receivedByInput = document.querySelector('#edit-movement-received-by');
+        const requestedByInput = document.querySelector('#edit-movement-requested-by');
+        const approvedByInput = document.querySelector('#edit-movement-approved-by');
+
+        if (kind === 'receipt') {
+            receiptBox.hidden = false;
+            issueBox.hidden = true;
+            supplierInput.disabled = false;
+            receivedByInput.disabled = false;
+            requestedByInput.disabled = true;
+            approvedByInput.disabled = true;
+            supplierInput.value = data.supplier || '';
+            receivedByInput.value = data.received_by || '';
+        } else {
+            receiptBox.hidden = true;
+            issueBox.hidden = false;
+            supplierInput.disabled = true;
+            receivedByInput.disabled = true;
+            requestedByInput.disabled = false;
+            approvedByInput.disabled = false;
+            requestedByInput.value = data.requested_by || '';
+            approvedByInput.value = data.approved_by || '';
+        }
+
+        dialog.showModal();
+    }
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>

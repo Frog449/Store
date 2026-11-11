@@ -18,6 +18,22 @@ $output = fopen('php://output', 'w');
 // UTF-8 Byte Order Mark (BOM) for Excel Thai language compatibility
 fwrite($output, "\xEF\xBB\xBF");
 
+/**
+ * Format string as Excel text formula to prevent:
+ * 1. Date column overflow (########) when column width is narrow in Excel
+ * 2. Long numeric codes converting into scientific notation (e.g. 3.2E+11)
+ * 3. Leading zeroes from being stripped (e.g. 00123 -> 123)
+ */
+function csv_excel_text(mixed $value): string
+{
+    $v = (string) ($value ?? '');
+    if ($v === '' || $v === '-') {
+        return $v;
+    }
+    $escaped = str_replace('"', '""', $v);
+    return '="' . $escaped . '"';
+}
+
 if ($type === 'products') {
     fputcsv($output, [
         'รหัสสินค้า',
@@ -37,7 +53,7 @@ if ($type === 'products') {
     foreach ($products as $p) {
         $status = $p['stock'] < 0 ? 'สต๊อกติดลบ' : ($p['stock'] <= $p['minimum'] ? 'ควรสั่งซื้อ' : 'ปกติ');
         fputcsv($output, [
-            $p['id'],
+            csv_excel_text($p['id']),
             $p['name'],
             $p['category'],
             $p['type'],
@@ -69,9 +85,9 @@ if ($type === 'products') {
 
     foreach ($receipts as $r) {
         fputcsv($output, [
-            $r['movement_date'],
-            $r['document_no'],
-            $r['product_code'],
+            csv_excel_text($r['movement_date']),
+            csv_excel_text($r['document_no']),
+            csv_excel_text($r['product_code']),
             $r['product_name'],
             $r['quantity'],
             $r['unit'],
@@ -100,9 +116,9 @@ if ($type === 'products') {
 
     foreach ($issues as $i) {
         fputcsv($output, [
-            $i['movement_date'],
-            $i['document_no'],
-            $i['product_code'],
+            csv_excel_text($i['movement_date']),
+            csv_excel_text($i['document_no']),
+            csv_excel_text($i['product_code']),
             $i['product_name'],
             $i['quantity'],
             $i['unit'],
@@ -167,7 +183,19 @@ if ($type === 'products') {
     usort($all, static fn($a, $b) => strcmp($b['date'], $a['date']));
 
     foreach ($all as $row) {
-        fputcsv($output, array_values($row));
+        fputcsv($output, [
+            $row['type'],
+            csv_excel_text($row['date']),
+            csv_excel_text($row['doc']),
+            csv_excel_text($row['code']),
+            $row['name'],
+            $row['qty'],
+            $row['unit'],
+            $row['person1'],
+            $row['person2'],
+            $row['dept'],
+            $row['notes'],
+        ]);
     }
 
     audit_log('export', 'history', 'ส่งออกประวัติการเคลื่อนไหวรวมเป็น CSV/Excel');
