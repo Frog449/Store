@@ -17,15 +17,16 @@ body { margin: 0; background: var(--cream); color: var(--ink); font-family: var(
 button, input { font: inherit; }
 a { color: inherit; text-decoration: none; }
 .site-header { height: 78px; border-bottom: 1px solid rgba(29,48,51,.07); background: rgba(248,249,245,.94); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); }
-.header-inner { max-width: 1180px; height: 100%; margin: auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; }
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; color: #f3f4ec; border-radius: 12px; background: var(--green); }
+.header-inner { max-width: 1300px; height: 100%; margin: auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; color: #f3f4ec; border-radius: 12px; background: var(--green); flex-shrink: 0; }
 .brand-mark svg { width: 26px; height: 26px; }
-.brand-name { font-size: 19px; line-height: 1; font-weight: 700; letter-spacing: -.5px; }
+.brand-name { font-size: 19px; line-height: 1; font-weight: 700; letter-spacing: -.5px; white-space: nowrap; }
 .brand-name > span, .footer-brand > span { color: #6b8a73; }
 .brand-name small { display: block; margin-top: 5px; color: #899490; font: 600 8px/1 "DM Sans", sans-serif; letter-spacing: 1.65px; }
-.main-nav { display: flex; align-items: center; gap: 19px; min-width: 0; margin-left: 30px; }
-.nav-link { flex: 0 0 auto; font-size: 11px; font-weight: 500; color: #75817e; transition: color .2s; }
+.main-nav { display: flex; align-items: center; gap: 14px; min-width: 0; margin-left: 20px; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+.main-nav::-webkit-scrollbar { display: none; }
+.nav-link { flex: 0 0 auto; font-size: 11px; font-weight: 500; color: #75817e; transition: color .2s; white-space: nowrap; }
 .nav-link:hover, .nav-link.active { color: var(--green); }
 main { max-width: 1180px; margin: auto; padding: 0 28px; }
 .hero { position: relative; min-height: 395px; display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; margin-top: 28px; border-radius: 14px; background: #e9eee7; }
@@ -850,14 +851,74 @@ body {
 }
 
 /* ── User chip & role badges ──────────────────────────────────── */
-.user-chip { display:flex; align-items:center; gap:10px; margin-left:16px; flex-shrink:0; font-size:11px; }
-.user-chip-name { display:flex; align-items:center; gap:7px; color:#74817b; }
-.user-chip-role { padding:2px 7px; border-radius:3px; font-size:9px; font-weight:700; letter-spacing:.5px; }
+.user-chip { display:flex; align-items:center; gap:8px; margin-left:14px; flex-shrink:0; font-size:11px; white-space:nowrap; }
+.user-chip-name { display:flex; align-items:center; gap:6px; color:#74817b; max-width:180px; white-space:nowrap; }
+.user-chip-name-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px; display:inline-block; }
+.user-chip-role { padding:2px 6px; border-radius:3px; font-size:9px; font-weight:700; letter-spacing:.5px; flex-shrink:0; }
 .role-admin   { background:#fde8eb; color:#c0392b; }
 .role-staff   { background:#e8f5e9; color:#2e7d32; }
 .role-viewer  { background:#e3f2fd; color:#1565c0; }
-.logout-link  { font-size:11px; color:#9b6464; text-decoration:none; padding:4px 10px; border:1px solid #e3d8db; border-radius:5px; transition:all .2s; }
+.logout-link  { font-size:11px; color:#9b6464; text-decoration:none; padding:4px 9px; border:1px solid #e3d8db; border-radius:5px; transition:all .2s; white-space:nowrap; flex-shrink:0; }
 .logout-link:hover { background:#fdf0f2; color:#c0392b; }
+
+/* ── Nav Dropdown for Admin Management ───────────────────────── */
+.nav-dropdown { position:relative; display:inline-flex; align-items:center; }
+.nav-dropdown-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: 11px;
+    font-weight: 500;
+    color: #75817e;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: color .2s;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.nav-dropdown-btn:hover,
+.nav-dropdown.active .nav-dropdown-btn,
+.nav-dropdown:hover .nav-dropdown-btn,
+.nav-dropdown:focus-within .nav-dropdown-btn {
+    color: #c9182b;
+}
+.nav-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 14px);
+    right: 0;
+    min-width: 155px;
+    background: #ffffff;
+    border: 1px solid #e8dfe1;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,.09);
+    padding: 6px 0;
+    z-index: 50;
+    display: none;
+    flex-direction: column;
+}
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu {
+    display: flex;
+}
+.nav-dropdown-item {
+    padding: 8px 14px;
+    font-size: 11px;
+    color: #51494c;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background .15s, color .15s;
+    white-space: nowrap;
+}
+.nav-dropdown-item:hover,
+.nav-dropdown-item.active {
+    background: #fdf0f2;
+    color: #c9182b;
+    font-weight: 600;
+}
 
 /* ── Print slip button in history table ──────────────────────── */
 .slip-btn { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:5px; font-size:10px; font-weight:600; background:#f0f4f2; border:1px solid #d2ddd7; color:#2f584b; text-decoration:none; transition:background .15s, color .15s; white-space:nowrap; }
@@ -871,4 +932,20 @@ body {
     .logout-link { border-color:#514044; color:#efb8bd; }
     .slip-btn { background:#2a3630; border-color:#3d5248; color:#8dc9a7; }
     .slip-btn:hover { background:#2f584b; color:#fff; }
+    .nav-dropdown-btn { color:#aaaab2; }
+    .nav-dropdown-btn:hover,
+    .nav-dropdown.active .nav-dropdown-btn,
+    .nav-dropdown:hover .nav-dropdown-btn,
+    .nav-dropdown:focus-within .nav-dropdown-btn { color:#ff5a5f; }
+    .nav-dropdown-menu {
+        background: #1f1b1e;
+        border-color: #3d2f33;
+        box-shadow: 0 10px 25px rgba(0,0,0,.45);
+    }
+    .nav-dropdown-item { color: #cfc5c7; }
+    .nav-dropdown-item:hover,
+    .nav-dropdown-item.active {
+        background: #2c2226;
+        color: #ff5a5f;
+    }
 }
