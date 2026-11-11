@@ -7,8 +7,6 @@ $pageTitle = 'ประวัติรับ–เบิกสินค้า | 
 $pageDescription = 'ประวัติรวมการรับสินค้าเข้าคลังและเบิกสินค้าออก แยกหัวข้อชัดเจน พร้อมระบบค้นหาและกรองข้อมูล';
 $activePage = 'history';
 
-$notice = inventory_flash();
-$noticeType = 'success';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_movement') {
     try {

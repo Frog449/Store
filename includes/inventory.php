@@ -1127,9 +1127,15 @@ function inventory_date(string $key = 'movement_date'): string
     return $value;
 }
 
-function inventory_flash_redirect(string $message, string $location): never
+function inventory_flash(): string
 {
-    $_SESSION['flash_notice'] = ['message' => $message, 'type' => 'success'];
+    global $notice;
+    return $notice ?? '';
+}
+
+function inventory_flash_redirect(string $message, string $location, string $type = 'success'): never
+{
+    $_SESSION['flash_notice'] = ['message' => $message, 'type' => $type];
     header('Location: ' . $location);
     exit;
 }
