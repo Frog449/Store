@@ -20,6 +20,11 @@ if ($movement === null) {
 $isReceipt = ($kind === 'receipt');
 $slipTitle = $isReceipt ? 'ใบสำคัญรับสินค้า (Goods Receipt Slip)' : 'ใบสำคัญเบิกพัสดุ (Material Issue Slip)';
 $refNo = ($isReceipt ? 'REC-' : 'ISS-') . str_pad((string) $id, 6, '0', STR_PAD_LEFT);
+
+// บันทึก audit log การพิมพ์เอกสาร
+$printAction = $isReceipt ? 'print_receipt' : 'print_issue';
+$printLabel  = $isReceipt ? 'พิมพ์ใบรับสินค้า' : 'พิมพ์ใบเบิกสินค้า';
+audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo} - " . ($movement['product_name'] ?? '') . " จำนวน " . ($movement['quantity'] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="th">

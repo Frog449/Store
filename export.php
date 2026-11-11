@@ -33,6 +33,7 @@ if ($type === 'products') {
         'สถานะสต๊อก',
     ]);
 
+    $products = inventory_products();
     foreach ($products as $p) {
         $status = $p['stock'] < 0 ? 'สต๊อกติดลบ' : ($p['stock'] <= $p['minimum'] ? 'ควรสั่งซื้อ' : 'ปกติ');
         fputcsv($output, [

@@ -45,7 +45,9 @@ $activePage = $activePage ?? 'products';
                     </div>
                 </div>
             <?php endif; ?>
-            <a class="nav-link <?= $activePage === 'guide' ? 'active' : '' ?>" href="guide.php">คู่มือ</a>
+            <?php if (!function_exists('auth_is_viewer') || !auth_is_viewer()): ?>
+                <a class="nav-link <?= $activePage === 'guide' ? 'active' : '' ?>" href="guide.php">คู่มือ</a>
+            <?php endif; ?>
             <a class="nav-link <?= $activePage === 'about' ? 'active' : '' ?>" href="about.php">เกี่ยวกับเรา</a>
         </nav>
         <?php if (!empty($currentUser)): ?>

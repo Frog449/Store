@@ -131,6 +131,8 @@ require __DIR__ . '/includes/header.php';
                                 'audit_log_delete' => '🗑️ ลบ Audit Log',
                                 'movement_delete_receipt' => '📥 ลบประวัติรับ',
                                 'movement_delete_issue' => '📤 ลบประวัติเบิก',
+                                'print_receipt' => '🖨️ พิมพ์ใบรับสินค้า',
+                                'print_issue' => '🖨️ พิมพ์ใบเบิกสินค้า',
                                 default => $log['action'],
                             };
                         ?>
