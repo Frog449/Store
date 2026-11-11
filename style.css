@@ -851,24 +851,101 @@ body {
     }
 }
 
-/* ── User chip & role badges ──────────────────────────────────── */
-.user-chip { display:flex; align-items:center; gap:10px; margin-left:10px; padding-left:16px; border-left:1px solid #ece4e5; flex-shrink:0; font-size:11px; white-space:nowrap; }
-.user-chip-name { display:flex; align-items:center; gap:8px; color:#51494c; max-width:205px; white-space:nowrap; }
-.user-chip-name > span:first-child { width:30px; height:30px; display:grid; place-items:center; border-radius:50%; color:#b82b37; background:#fff0f2; font-size:14px; }
-.user-chip-name-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:105px; display:inline-block; font-weight:600; }
-.user-chip-role { padding:3px 7px; border-radius:5px; font-size:9px; font-weight:700; letter-spacing:.5px; flex-shrink:0; }
-.role-admin   { background:#fde8eb; color:#c0392b; }
-.role-staff   { background:#e8f5e9; color:#2e7d32; }
-.role-viewer  { background:#e3f2fd; color:#1565c0; }
-.logout-link  { font-size:10px; font-weight:600; color:#81595d; text-decoration:none; padding:7px 10px; border:1px solid #eadadd; border-radius:6px; transition:all .2s; white-space:nowrap; flex-shrink:0; }
-.logout-link:hover { border-color:#e8b8be; background:#fdf0f2; color:#c0392b; }
+/* ── Modern User Profile Capsule ────────────────────────────── */
+.user-profile-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px 4px 8px;
+    background: rgba(0, 0, 0, .035);
+    border: 1px solid rgba(0, 0, 0, .07);
+    border-radius: 24px;
+    flex-shrink: 0;
+    margin-left: 12px;
+    transition: background .15s, border-color .15s;
+}
+.user-profile-widget:hover {
+    background: rgba(0, 0, 0, .055);
+    border-color: rgba(0, 0, 0, .12);
+}
+.user-avatar-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #eef3ee;
+    color: #2f584b;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+.user-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.user-display-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #241e20;
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.user-badge-role {
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    line-height: 1.3;
+    flex-shrink: 0;
+}
+.role-admin  { background: #fde8eb; color: #c0392b; }
+.role-staff  { background: #e8f5e9; color: #2e7d32; }
+.role-viewer { background: #e3f2fd; color: #1565c0; }
+
+.user-logout-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #6f6266;
+    background: #ffffff;
+    border: 1px solid #e5dbdd;
+    padding: 3px 8px;
+    border-radius: 14px;
+    text-decoration: none;
+    transition: all .15s ease;
+    white-space: nowrap;
+    line-height: 1;
+    cursor: pointer;
+}
+.user-logout-btn:hover {
+    background: #fdf0f2;
+    color: #c9182b;
+    border-color: #f5c4c9;
+    transform: translateY(-1px);
+}
+.user-logout-btn svg {
+    transition: transform .15s ease;
+}
+.user-logout-btn:hover svg {
+    transform: translateX(1px);
+}
 
 /* ── Nav Dropdown for Admin Management ───────────────────────── */
-.nav-dropdown { position:relative; display:inline-flex; align-items:center; }
+.nav-dropdown {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
 .nav-dropdown-btn {
     background: transparent;
     border: none;
-    padding: 0;
+    padding: 6px 8px;
     font-size: 11px;
     font-weight: 500;
     color: #75817e;
@@ -876,43 +953,63 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    transition: color .2s;
+    transition: color .2s, background .2s;
     font-family: inherit;
     white-space: nowrap;
+    border-radius: 6px;
+}
+.nav-dropdown-arrow {
+    font-size: 10px;
+    transition: transform .2s ease;
+}
+.nav-dropdown.open .nav-dropdown-arrow {
+    transform: rotate(180deg);
 }
 .nav-dropdown-btn:hover,
 .nav-dropdown.active .nav-dropdown-btn,
+.nav-dropdown.open .nav-dropdown-btn,
 .nav-dropdown:hover .nav-dropdown-btn,
 .nav-dropdown:focus-within .nav-dropdown-btn {
     color: #c9182b;
+    background: rgba(201, 24, 43, .05);
 }
 .nav-dropdown-menu {
     position: absolute;
-    top: calc(100% + 8px);
+    top: calc(100% + 6px);
     right: 0;
-    min-width: 155px;
+    min-width: 170px;
     background: #ffffff;
-    border: 1px solid #e8dfe1;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0,0,0,.09);
-    padding: 6px 0;
-    z-index: 50;
+    border: 1px solid #ebd9dc;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(48, 20, 27, .12);
+    padding: 6px;
+    z-index: 1000;
     display: none;
     flex-direction: column;
+    gap: 2px;
 }
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu,
 .nav-dropdown.open .nav-dropdown-menu {
     display: flex;
 }
-.nav-dropdown.open::after { content:""; position:absolute; top:100%; right:0; left:0; height:8px; }
-.nav-dropdown-btn:focus-visible { outline:2px solid #d9747d; outline-offset:4px; border-radius:2px; }
+.nav-dropdown::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: 10px;
+}
 .nav-dropdown-item {
-    padding: 8px 14px;
+    padding: 8px 12px;
     font-size: 11px;
-    color: #51494c;
+    color: #453c3f;
     text-decoration: none;
     display: flex;
     align-items: center;
     gap: 8px;
+    border-radius: 6px;
     transition: background .15s, color .15s;
     white-space: nowrap;
 }
@@ -928,23 +1025,47 @@ body {
 .slip-btn:hover { background:#2f584b; color:#fff; border-color:#2f584b; }
 
 @media (prefers-color-scheme: dark) {
-    .user-chip { border-left-color:#3d3437; }
-    .user-chip-name { color:#ded4d6; }
-    .user-chip-name > span:first-child { background:#3d2025; color:#ff7378; }
-    .role-admin  { background:#3d1218; color:#ff7378; }
-    .role-staff  { background:#1a2f1e; color:#66bb6a; }
-    .role-viewer { background:#1a2538; color:#64b5f6; }
-    .logout-link { border-color:#514044; color:#efb8bd; }
-    .slip-btn { background:#2a3630; border-color:#3d5248; color:#8dc9a7; }
-    .slip-btn:hover { background:#2f584b; color:#fff; }
+    .user-profile-widget {
+        background: rgba(255, 255, 255, .05);
+        border-color: rgba(255, 255, 255, .1);
+    }
+    .user-profile-widget:hover {
+        background: rgba(255, 255, 255, .08);
+        border-color: rgba(255, 255, 255, .16);
+    }
+    .user-avatar-circle {
+        background: #3a2227;
+        color: #ff7378;
+    }
+    .user-display-name {
+        color: #f0e6e8;
+    }
+    .role-admin  { background: #3d1218; color: #ff7378; }
+    .role-staff  { background: #1a2f1e; color: #66bb6a; }
+    .role-viewer { background: #1a2538; color: #64b5f6; }
+    .user-logout-btn {
+        background: #231c1f;
+        border-color: #4a383d;
+        color: #d1c0c3;
+    }
+    .user-logout-btn:hover {
+        background: #42161b;
+        color: #ff6b72;
+        border-color: #73262d;
+    }
     .nav-dropdown-btn { color:#aaaab2; }
     .nav-dropdown-btn:hover,
     .nav-dropdown.active .nav-dropdown-btn,
-    .nav-dropdown.open .nav-dropdown-btn { color:#ff5a5f; }
+    .nav-dropdown.open .nav-dropdown-btn,
+    .nav-dropdown:hover .nav-dropdown-btn,
+    .nav-dropdown:focus-within .nav-dropdown-btn {
+        color:#ff5a5f;
+        background: rgba(255, 90, 95, .1);
+    }
     .nav-dropdown-menu {
         background: #1f1b1e;
         border-color: #3d2f33;
-        box-shadow: 0 10px 25px rgba(0,0,0,.45);
+        box-shadow: 0 12px 32px rgba(0,0,0,.5);
     }
     .nav-dropdown-item { color: #cfc5c7; }
     .nav-dropdown-item:hover,
