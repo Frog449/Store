@@ -5,6 +5,34 @@ const resultCount = document.querySelector("#result-count");
 const emptySearch = document.querySelector("#empty-search");
 let activeCategory = "all";
 
+const systemDropdown = document.querySelector(".nav-dropdown");
+if (systemDropdown) {
+    const systemToggle = systemDropdown.querySelector(".nav-dropdown-btn");
+    const mainNav = systemDropdown.closest(".main-nav");
+    const setSystemDropdownOpen = (open) => {
+        systemDropdown.classList.toggle("open", open);
+        mainNav.classList.toggle("dropdown-open", open);
+        systemToggle.setAttribute("aria-expanded", String(open));
+    };
+
+    systemToggle.addEventListener("click", () => {
+        setSystemDropdownOpen(systemToggle.getAttribute("aria-expanded") !== "true");
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!systemDropdown.contains(event.target)) {
+            setSystemDropdownOpen(false);
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && systemToggle.getAttribute("aria-expanded") === "true") {
+            setSystemDropdownOpen(false);
+            systemToggle.focus();
+        }
+    });
+}
+
 function filterProducts() {
     const query = searchInput.value.trim().toLocaleLowerCase("th");
     let visibleCount = 0;

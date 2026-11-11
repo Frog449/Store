@@ -33,8 +33,10 @@ $activePage = $activePage ?? 'products';
             <a class="nav-link <?= $activePage === 'history' ? 'active' : '' ?>" href="history.php">ประวัติรับ–เบิก</a>
             <?php if (function_exists('auth_is_admin') && auth_is_admin()): ?>
                 <div class="nav-dropdown <?= in_array($activePage, ['users', 'audit', 'backup'], true) ? 'active' : '' ?>">
-                    <button class="nav-dropdown-btn <?= in_array($activePage, ['users', 'audit', 'backup'], true) ? 'active' : '' ?>" type="button">จัดการระบบ ▾</button>
-                    <div class="nav-dropdown-menu">
+                    <button class="nav-dropdown-btn <?= in_array($activePage, ['users', 'audit', 'backup'], true) ? 'active' : '' ?>" type="button" aria-expanded="false" aria-controls="system-management-menu">
+                        จัดการระบบ <span aria-hidden="true">▾</span>
+                    </button>
+                    <div class="nav-dropdown-menu" id="system-management-menu">
                         <a class="nav-dropdown-item <?= $activePage === 'users' ? 'active' : '' ?>" href="users.php">👥 ผู้ใช้</a>
                         <a class="nav-dropdown-item <?= $activePage === 'audit' ? 'active' : '' ?>" href="audit.php">📜 Audit Log</a>
                         <a class="nav-dropdown-item <?= $activePage === 'backup' ? 'active' : '' ?>" href="backup.php">💾 สำรองข้อมูล</a>

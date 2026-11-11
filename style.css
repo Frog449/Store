@@ -24,7 +24,8 @@ a { color: inherit; text-decoration: none; }
 .brand-name { font-size: 19px; line-height: 1; font-weight: 700; letter-spacing: -.5px; white-space: nowrap; }
 .brand-name > span, .footer-brand > span { color: #6b8a73; }
 .brand-name small { display: block; margin-top: 5px; color: #899490; font: 600 8px/1 "DM Sans", sans-serif; letter-spacing: 1.65px; }
-.main-nav { display: flex; align-items: center; gap: 14px; min-width: 0; margin-left: 20px; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+.main-nav { display: flex; align-items: center; gap: 14px; min-width: 0; margin-left: 20px; overflow: visible; scrollbar-width: none; white-space: nowrap; }
+.main-nav.dropdown-open { overflow: visible; }
 .main-nav::-webkit-scrollbar { display: none; }
 .nav-link { flex: 0 0 auto; font-size: 11px; font-weight: 500; color: #75817e; transition: color .2s; white-space: nowrap; }
 .nav-link:hover, .nav-link.active { color: var(--green); }
@@ -851,15 +852,16 @@ body {
 }
 
 /* ── User chip & role badges ──────────────────────────────────── */
-.user-chip { display:flex; align-items:center; gap:8px; margin-left:14px; flex-shrink:0; font-size:11px; white-space:nowrap; }
-.user-chip-name { display:flex; align-items:center; gap:6px; color:#74817b; max-width:180px; white-space:nowrap; }
-.user-chip-name-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px; display:inline-block; }
-.user-chip-role { padding:2px 6px; border-radius:3px; font-size:9px; font-weight:700; letter-spacing:.5px; flex-shrink:0; }
+.user-chip { display:flex; align-items:center; gap:10px; margin-left:10px; padding-left:16px; border-left:1px solid #ece4e5; flex-shrink:0; font-size:11px; white-space:nowrap; }
+.user-chip-name { display:flex; align-items:center; gap:8px; color:#51494c; max-width:205px; white-space:nowrap; }
+.user-chip-name > span:first-child { width:30px; height:30px; display:grid; place-items:center; border-radius:50%; color:#b82b37; background:#fff0f2; font-size:14px; }
+.user-chip-name-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:105px; display:inline-block; font-weight:600; }
+.user-chip-role { padding:3px 7px; border-radius:5px; font-size:9px; font-weight:700; letter-spacing:.5px; flex-shrink:0; }
 .role-admin   { background:#fde8eb; color:#c0392b; }
 .role-staff   { background:#e8f5e9; color:#2e7d32; }
 .role-viewer  { background:#e3f2fd; color:#1565c0; }
-.logout-link  { font-size:11px; color:#9b6464; text-decoration:none; padding:4px 9px; border:1px solid #e3d8db; border-radius:5px; transition:all .2s; white-space:nowrap; flex-shrink:0; }
-.logout-link:hover { background:#fdf0f2; color:#c0392b; }
+.logout-link  { font-size:10px; font-weight:600; color:#81595d; text-decoration:none; padding:7px 10px; border:1px solid #eadadd; border-radius:6px; transition:all .2s; white-space:nowrap; flex-shrink:0; }
+.logout-link:hover { border-color:#e8b8be; background:#fdf0f2; color:#c0392b; }
 
 /* ── Nav Dropdown for Admin Management ───────────────────────── */
 .nav-dropdown { position:relative; display:inline-flex; align-items:center; }
@@ -886,7 +888,7 @@ body {
 }
 .nav-dropdown-menu {
     position: absolute;
-    top: calc(100% + 14px);
+    top: calc(100% + 8px);
     right: 0;
     min-width: 155px;
     background: #ffffff;
@@ -898,10 +900,11 @@ body {
     display: none;
     flex-direction: column;
 }
-.nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown:focus-within .nav-dropdown-menu {
+.nav-dropdown.open .nav-dropdown-menu {
     display: flex;
 }
+.nav-dropdown.open::after { content:""; position:absolute; top:100%; right:0; left:0; height:8px; }
+.nav-dropdown-btn:focus-visible { outline:2px solid #d9747d; outline-offset:4px; border-radius:2px; }
 .nav-dropdown-item {
     padding: 8px 14px;
     font-size: 11px;
@@ -925,7 +928,9 @@ body {
 .slip-btn:hover { background:#2f584b; color:#fff; border-color:#2f584b; }
 
 @media (prefers-color-scheme: dark) {
-    .user-chip-name { color:#aaaab2; }
+    .user-chip { border-left-color:#3d3437; }
+    .user-chip-name { color:#ded4d6; }
+    .user-chip-name > span:first-child { background:#3d2025; color:#ff7378; }
     .role-admin  { background:#3d1218; color:#ff7378; }
     .role-staff  { background:#1a2f1e; color:#66bb6a; }
     .role-viewer { background:#1a2538; color:#64b5f6; }
@@ -935,8 +940,7 @@ body {
     .nav-dropdown-btn { color:#aaaab2; }
     .nav-dropdown-btn:hover,
     .nav-dropdown.active .nav-dropdown-btn,
-    .nav-dropdown:hover .nav-dropdown-btn,
-    .nav-dropdown:focus-within .nav-dropdown-btn { color:#ff5a5f; }
+    .nav-dropdown.open .nav-dropdown-btn { color:#ff5a5f; }
     .nav-dropdown-menu {
         background: #1f1b1e;
         border-color: #3d2f33;
