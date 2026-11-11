@@ -172,16 +172,44 @@ function inventory_ensure_schema(PDO $db): void
 
         $initialPassword = password_hash('admin1234', PASSWORD_DEFAULT);
         $stmt = $db->prepare(
-            'INSERT INTO `users` (`username`, `password_hash`, `name`, `role`, `department`)
-             VALUES (:username, :password_hash, :name, :role, :department)'
+            'INSERT INTO `users` (`username`, `password_hash`, `name`, `role`, `department`, `status`)
+             VALUES (:username, :password_hash, :name, :role, :department, :status)'
         );
         $stmt->execute([
             'username' => 'admin',
             'password_hash' => $initialPassword,
-            'name' => 'ผู้ดูแลระบบ (Admin)',
+            'name' => 'ผู้ดูแลระบบ',
             'role' => 'admin',
             'department' => 'คลังสินค้าส่วนกลาง',
+            'status' => 'active',
         ]);
+    }
+
+    if (inventory_table_exists($db, 'users')) {
+        $userCols = inventory_table_columns($db, 'users');
+        if (!isset($userCols['status'])) {
+            $db->exec("ALTER TABLE `users` ADD COLUMN `status` VARCHAR(20) NOT NULL DEFAULT 'active'");
+        }
+    }
+
+    if (inventory_table_exists($db, 'receipts')) {
+        $receiptCols = inventory_table_columns($db, 'receipts');
+        if (!isset($receiptCols['created_by_user_id'])) {
+            $db->exec("ALTER TABLE `receipts` ADD COLUMN `created_by_user_id` BIGINT UNSIGNED NULL");
+        }
+        if (!isset($receiptCols['created_by_name'])) {
+            $db->exec("ALTER TABLE `receipts` ADD COLUMN `created_by_name` VARCHAR(150) NOT NULL DEFAULT ''");
+        }
+    }
+
+    if (inventory_table_exists($db, 'issues')) {
+        $issueCols = inventory_table_columns($db, 'issues');
+        if (!isset($issueCols['created_by_user_id'])) {
+            $db->exec("ALTER TABLE `issues` ADD COLUMN `created_by_user_id` BIGINT UNSIGNED NULL");
+        }
+        if (!isset($issueCols['created_by_name'])) {
+            $db->exec("ALTER TABLE `issues` ADD COLUMN `created_by_name` VARCHAR(150) NOT NULL DEFAULT ''");
+        }
     }
 
     if (!inventory_table_exists($db, 'audit_logs')) {
@@ -701,7 +729,7 @@ function inventory_movements(string $kind, int $limit = 250): array
 
     $statement = inventory_db()->prepare(
         "SELECT m.id, m.movement_date, m.document_no, m.product_code, p.`ชื่อสินค้า` AS product_name,
-                m.quantity, p.`หน่วยนับ` AS unit, {$extraColumns}, m.notes
+                m.quantity, p.`หน่วยนับ` AS unit, {$extraColumns}, m.notes, m.created_by_user_id, m.created_by_name
          FROM {$table} m
          JOIN `product` p ON p.`code` = m.product_code
          ORDER BY m.movement_date DESC, m.id DESC
@@ -739,7 +767,7 @@ function inventory_movement_by_id(string $kind, int $id): ?array
     $statement = inventory_db()->prepare(
         "SELECT m.id, m.movement_date, m.document_no, m.product_code, p.`ชื่อสินค้า` AS product_name,
                 p.`หมวดหมู่` AS category, p.`ตำแหน่งจัดเก็บ` AS location,
-                m.quantity, p.`หน่วยนับ` AS unit, {$extraColumns}, m.notes, m.created_at
+                m.quantity, p.`หน่วยนับ` AS unit, {$extraColumns}, m.notes, m.created_at, m.created_by_user_id, m.created_by_name
          FROM `{$table}` m
          LEFT JOIN `product` p ON p.`code` = m.product_code
          WHERE m.id = :id"
@@ -892,10 +920,14 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
             'image_filename' => $product['image_filename'] ?? null,
         ]);
 
+        $u = function_exists('auth_user') ? auth_user() : null;
+        $receipt['created_by_user_id'] = $u ? $u['id'] : null;
+        $receipt['created_by_name'] = $u ? $u['name'] : '';
+
         $insertReceipt = $db->prepare(
             'INSERT INTO `receipts` (`movement_date`, `document_no`, `product_code`, `quantity`, `supplier`,
-                                     `received_by`, `department`, `notes`)
-             VALUES (:movement_date, :document_no, :product_code, :quantity, :supplier, :received_by, :department, :notes)'
+                                     `received_by`, `department`, `notes`, `created_by_user_id`, `created_by_name`)
+             VALUES (:movement_date, :document_no, :product_code, :quantity, :supplier, :received_by, :department, :notes, :created_by_user_id, :created_by_name)'
         );
         $insertReceipt->execute($receipt);
         inventory_sync_product_summary($db, $product['code']);
@@ -918,15 +950,19 @@ function inventory_record_movement(string $kind, array $values): void
         throw new DomainException('ไม่พบรหัสสินค้าที่เลือก กรุณาเลือกสินค้าใหม่');
     }
 
+    $u = function_exists('auth_user') ? auth_user() : null;
+    $values['created_by_user_id'] = $u ? $u['id'] : null;
+    $values['created_by_name'] = $u ? $u['name'] : '';
+
     if ($kind === 'receipt') {
         $statement = inventory_db()->prepare(
-            'INSERT INTO receipts (movement_date, document_no, product_code, quantity, supplier, received_by, department, notes)
-             VALUES (:movement_date, :document_no, :product_code, :quantity, :supplier, :received_by, :department, :notes)'
+            'INSERT INTO receipts (movement_date, document_no, product_code, quantity, supplier, received_by, department, notes, created_by_user_id, created_by_name)
+             VALUES (:movement_date, :document_no, :product_code, :quantity, :supplier, :received_by, :department, :notes, :created_by_user_id, :created_by_name)'
         );
     } else {
         $statement = inventory_db()->prepare(
-            'INSERT INTO issues (movement_date, document_no, product_code, quantity, requested_by, department, approved_by, notes)
-             VALUES (:movement_date, :document_no, :product_code, :quantity, :requested_by, :department, :approved_by, :notes)'
+            'INSERT INTO issues (movement_date, document_no, product_code, quantity, requested_by, department, approved_by, notes, created_by_user_id, created_by_name)
+             VALUES (:movement_date, :document_no, :product_code, :quantity, :requested_by, :department, :approved_by, :notes, :created_by_user_id, :created_by_name)'
         );
     }
     $statement->execute($values);
@@ -935,6 +971,87 @@ function inventory_record_movement(string $kind, array $values): void
         audit_log('receipt_create', $values['product_code'], "รับสินค้าเข้า: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ") ผู้ส่งมอบ: " . ($values['supplier'] ?: '-') . " ผู้รับ: " . ($values['received_by'] ?: '-'));
     } else {
         audit_log('issue_create', $values['product_code'], "เบิกสินค้าออก: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ") ผู้ขอเบิก: " . ($values['requested_by'] ?: '-') . " แผนก: " . ($values['department'] ?: '-'));
+    }
+}
+
+function inventory_can_edit_movement(array $movement): bool
+{
+    $currentUser = function_exists('auth_user') ? auth_user() : null;
+    if ($currentUser === null) {
+        return false;
+    }
+    if ($currentUser['role'] === 'admin') {
+        return true;
+    }
+    if ($currentUser['role'] === 'staff') {
+        // Staff can edit only if they were the creator
+        return !empty($movement['created_by_user_id']) && (int) $movement['created_by_user_id'] === (int) $currentUser['id'];
+    }
+    return false; // Viewer cannot edit
+}
+
+function inventory_update_movement(string $kind, int $id, array $values): void
+{
+    if (!in_array($kind, ['receipt', 'issue'], true)) {
+        throw new InvalidArgumentException('ประเภทรายการไม่ถูกต้อง');
+    }
+    $existing = inventory_movement_by_id($kind, $id);
+    if ($existing === null) {
+        throw new DomainException('ไม่พบรายการที่ต้องการแก้ไข');
+    }
+    if (!inventory_can_edit_movement($existing)) {
+        throw new DomainException('คุณไม่มีสิทธิ์แก้ไขรายการนี้ (Staff แก้ไขได้เฉพาะรายการที่ตนเองเป็นผู้บันทึกเท่านั้น)');
+    }
+
+    $db = inventory_db();
+    if ($kind === 'receipt') {
+        $stmt = $db->prepare(
+            'UPDATE receipts
+             SET movement_date = :movement_date,
+                 document_no = :document_no,
+                 quantity = :quantity,
+                 supplier = :supplier,
+                 received_by = :received_by,
+                 department = :department,
+                 notes = :notes
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'id' => $id,
+            'movement_date' => $values['movement_date'],
+            'document_no' => $values['document_no'] ?? '',
+            'quantity' => $values['quantity'],
+            'supplier' => $values['supplier'] ?? '',
+            'received_by' => $values['received_by'] ?? '',
+            'department' => $values['department'] ?? '',
+            'notes' => $values['notes'] ?? '',
+        ]);
+        inventory_sync_product_summary($db, $existing['product_code']);
+        audit_log('receipt_update', $existing['product_code'], "แก้ไขรายการรับเข้า #{$id}: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ")");
+    } else {
+        $stmt = $db->prepare(
+            'UPDATE issues
+             SET movement_date = :movement_date,
+                 document_no = :document_no,
+                 quantity = :quantity,
+                 requested_by = :requested_by,
+                 department = :department,
+                 approved_by = :approved_by,
+                 notes = :notes
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'id' => $id,
+            'movement_date' => $values['movement_date'],
+            'document_no' => $values['document_no'] ?? '',
+            'quantity' => $values['quantity'],
+            'requested_by' => $values['requested_by'] ?? '',
+            'department' => $values['department'] ?? '',
+            'approved_by' => $values['approved_by'] ?? '',
+            'notes' => $values['notes'] ?? '',
+        ]);
+        inventory_sync_product_summary($db, $existing['product_code']);
+        audit_log('issue_update', $existing['product_code'], "แก้ไขรายการเบิกออก #{$id}: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ")");
     }
 }
 

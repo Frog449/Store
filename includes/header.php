@@ -14,7 +14,7 @@ $activePage = $activePage ?? 'products';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2.2">
+    <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
 <header class="site-header">
@@ -28,8 +28,10 @@ $activePage = $activePage ?? 'products';
         <nav class="main-nav" aria-label="เมนูหลัก">
             <a class="nav-link <?= $activePage === 'overview' ? 'active' : '' ?>" href="index.php">ภาพรวม</a>
             <a class="nav-link <?= $activePage === 'products' ? 'active' : '' ?>" href="catalog.php">ทะเบียนสินค้า</a>
-            <a class="nav-link <?= $activePage === 'receive' ? 'active' : '' ?>" href="receive.php">รับสินค้า</a>
-            <a class="nav-link <?= $activePage === 'issue' ? 'active' : '' ?>" href="issue.php">เบิกสินค้า</a>
+            <?php if (!function_exists('auth_is_viewer') || !auth_is_viewer()): ?>
+                <a class="nav-link <?= $activePage === 'receive' ? 'active' : '' ?>" href="receive.php">รับสินค้า</a>
+                <a class="nav-link <?= $activePage === 'issue' ? 'active' : '' ?>" href="issue.php">เบิกสินค้า</a>
+            <?php endif; ?>
             <a class="nav-link <?= $activePage === 'history' ? 'active' : '' ?>" href="history.php">ประวัติรับ–เบิก</a>
             <?php if (function_exists('auth_is_admin') && auth_is_admin()): ?>
                 <div class="nav-dropdown <?= in_array($activePage, ['users', 'audit', 'backup'], true) ? 'active' : '' ?>">

@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 require __DIR__ . '/includes/bootstrap.php';
 
+if (auth_is_viewer()) {
+    inventory_flash_redirect('คุณมีสิทธิ์ Viewer (ดูข้อมูลได้อย่างเดียว) ไม่สามารถเข้าหน้าบันทึกเบิกสินค้าได้', 'catalog.php', 'error');
+}
+
 $pageTitle = 'เบิกสินค้าออกจากคลัง | Store Automeation';
 $pageDescription = 'บันทึกเบิกสินค้าออกจากคลังและดูประวัติรายการเบิก';
 $activePage = 'issue';

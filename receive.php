@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 require __DIR__ . '/includes/bootstrap.php';
 
+if (auth_is_viewer()) {
+    inventory_flash_redirect('คุณมีสิทธิ์ Viewer (ดูข้อมูลได้อย่างเดียว) ไม่สามารถเข้าหน้าบันทึกรับสินค้าได้', 'catalog.php', 'error');
+}
+
 $pageTitle = 'รับสินค้าเข้าคลัง | Store Automeation';
 $pageDescription = 'เพิ่มสินค้าใหม่พร้อมรับเข้าครั้งแรก หรือบันทึกรับสินค้าเดิมเข้าคลัง';
 $activePage = 'receive';
@@ -14,8 +18,8 @@ $uploadedProductImage = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_product_receipt') {
     try {
         inventory_require_csrf();
-        if (!auth_can_manage_stock()) {
-            throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถเพิ่มสินค้าและรับเข้าคลังได้');
+        if (!auth_is_admin()) {
+            throw new DomainException('เฉพาะ Admin (ผู้ดูแลระบบ) เท่านั้นที่สามารถเพิ่มสินค้าใหม่เข้าระบบได้ (Staff สามารถบันทึกรับสินค้าเดิมได้)');
         }
         $code = inventory_text('code', 'รหัสสินค้า', 80, true);
         $newProduct = [
@@ -87,7 +91,12 @@ require __DIR__ . '/includes/header.php';
         </div>
     </div>
     <section class="inventory-panel">
-        <div class="panel-heading"><div><h2>รับสินค้าเดิม</h2><p>เลือกรหัสสินค้าที่อยู่ในทะเบียน แล้วกรอกวันที่และจำนวนรับ</p></div><a class="secondary-button" href="#new-product">เพิ่มสินค้าใหม่ ↘</a></div>
+        <div class="panel-heading">
+            <div><h2>รับสินค้าเดิม</h2><p>เลือกรหัสสินค้าที่อยู่ในทะเบียน แล้วกรอกวันที่และจำนวนรับ</p></div>
+            <?php if (auth_is_admin()): ?>
+                <a class="secondary-button" href="#new-product">เพิ่มสินค้าใหม่ ↘</a>
+            <?php endif; ?>
+        </div>
         <form class="inventory-form movement-form" method="post">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>"><input type="hidden" name="action" value="record_receipt">
             <label>วันที่รับ <input type="date" name="movement_date" required value="<?= h((string) ($_POST['movement_date'] ?? date('Y-m-d'))) ?>"></label>
@@ -103,6 +112,7 @@ require __DIR__ . '/includes/header.php';
             <div class="form-actions form-span-2"><button class="primary-button" type="submit">บันทึกรับสินค้า</button></div>
         </form>
     </section>
+    <?php if (auth_is_admin()): ?>
     <details class="inventory-panel new-product-details" id="new-product" <?= $openNewProduct ? 'open' : '' ?>>
         <summary>เพิ่มสินค้าใหม่พร้อมรับเข้าครั้งแรก</summary>
         <p class="new-product-description">กรอกรายละเอียดสินค้าและจำนวนที่รับเข้าครั้งแรก ระบบจะสร้างทะเบียนและบันทึกรับสินค้าไว้พร้อมกัน</p>
@@ -139,6 +149,7 @@ require __DIR__ . '/includes/header.php';
             <div class="form-actions form-span-2"><button class="primary-button" type="submit">เพิ่มสินค้าและบันทึกรับ</button></div>
         </form>
     </details>
+    <?php endif; ?>
     <section class="inventory-panel table-panel">
         <div class="panel-heading"><div><h2>ประวัติรับสินค้า</h2><p>แสดงรายการล่าสุดไม่เกิน 250 รายการ</p></div></div>
         <div class="table-scroll"><table class="inventory-table movement-table">

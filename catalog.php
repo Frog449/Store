@@ -18,8 +18,8 @@ $editProduct = $editCode === null ? null : inventory_product($editCode);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_product') {
     try {
         inventory_require_csrf();
-        if (!auth_can_manage_stock()) {
-            throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถแก้ไขสินค้าได้');
+        if (!auth_is_admin()) {
+            throw new DomainException('เฉพาะ Admin เท่านั้นที่สามารถแก้ไขข้อมูลสินค้าได้');
         }
         $originalCode = trim((string) ($_POST['original_code'] ?? ''));
         if ($originalCode === '' || inventory_product($originalCode) === null) {
@@ -140,14 +140,18 @@ require __DIR__ . '/includes/header.php';
             <div><dt>สถานะสต๊อก</dt><dd data-detail="status"></dd></div>
         </dl>
         <div class="product-detail-actions">
-            <form class="product-delete-form" method="post" data-product-delete-form>
-                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                <input type="hidden" name="action" value="delete_product">
-                <input type="hidden" name="product_code" value="">
-                <button class="danger-button" type="submit">ลบสินค้า</button>
-            </form>
+            <?php if (auth_is_admin()): ?>
+                <form class="product-delete-form" method="post" data-product-delete-form>
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="delete_product">
+                    <input type="hidden" name="product_code" value="">
+                    <button class="danger-button" type="submit">ลบสินค้า</button>
+                </form>
+            <?php endif; ?>
             <button class="secondary-button" type="button" data-close-product-dialog>ปิด</button>
-            <button class="primary-button" type="button" id="product-detail-edit">แก้ไขข้อมูล</button>
+            <?php if (auth_is_admin()): ?>
+                <button class="primary-button" type="button" id="product-detail-edit">แก้ไขข้อมูล</button>
+            <?php endif; ?>
         </div>
     </dialog>
     <dialog class="product-detail-dialog product-edit-dialog" id="product-edit-dialog" aria-labelledby="product-edit-title" data-edit-code="<?= h($editProduct['code'] ?? '') ?>">

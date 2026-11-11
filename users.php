@@ -28,10 +28,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = (string) ($_POST['name'] ?? '');
             $role = (string) ($_POST['role'] ?? 'staff');
             $department = (string) ($_POST['department'] ?? '');
+            $status = (string) ($_POST['status'] ?? 'active');
             $newPassword = isset($_POST['password']) && trim((string) $_POST['password']) !== '' ? (string) $_POST['password'] : null;
 
-            inventory_update_user($id, $name, $role, $department, $newPassword);
+            inventory_update_user($id, $name, $role, $department, $newPassword, $status);
             inventory_flash_redirect('บันทึกการแก้ไขข้อมูลผู้ใช้แล้ว', 'users.php');
+        } elseif ($action === 'toggle_status') {
+            $id = (int) ($_POST['user_id'] ?? 0);
+            $newStatus = inventory_toggle_user_status($id);
+            $msg = $newStatus === 'suspended' ? 'ระงับการใช้งานบัญชีผู้ใช้เรียบร้อยแล้ว' : 'เปิดใช้งานบัญชีผู้ใช้เรียบร้อยแล้ว';
+            inventory_flash_redirect($msg, 'users.php');
         } elseif ($action === 'delete_user') {
             $id = (int) ($_POST['user_id'] ?? 0);
             inventory_delete_user($id);
@@ -77,12 +83,14 @@ require __DIR__ . '/includes/header.php';
                         <th>ชื่อ-นามสกุล</th>
                         <th>บทบาท (Role)</th>
                         <th>แผนก / สังกัด</th>
+                        <th>สถานะ</th>
                         <th>วันที่สร้าง</th>
                         <th style="text-align:right;">การกระทำ</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($userList as $u): ?>
+                        <?php $isSuspended = ($u['status'] ?? 'active') === 'suspended'; ?>
                         <tr>
                             <td>#<?= (int) $u['id'] ?></td>
                             <td><strong><?= h($u['username']) ?></strong></td>
@@ -93,13 +101,26 @@ require __DIR__ . '/includes/header.php';
                                 </span>
                             </td>
                             <td><?= h($u['department'] !== '' ? $u['department'] : '-') ?></td>
+                            <td>
+                                <span class="user-chip-role" style="background:<?= $isSuspended ? '#ffebee;color:#c62828;' : '#e8f5e9;color:#2e7d32;' ?>">
+                                    <?= $isSuspended ? 'ระงับการใช้งาน' : 'ใช้งานปกติ' ?>
+                                </span>
+                            </td>
                             <td><?= h(substr((string) $u['created_at'], 0, 10)) ?></td>
                             <td style="text-align:right;">
                                 <button class="secondary-button" type="button" style="padding:4px 10px;font-size:10px;"
-                                    onclick="editUser(<?= (int) $u['id'] ?>, '<?= h(addslashes($u['username'])) ?>', '<?= h(addslashes($u['name'])) ?>', '<?= h(addslashes($u['role'])) ?>', '<?= h(addslashes($u['department'])) ?>')">
+                                    onclick="editUser(<?= (int) $u['id'] ?>, '<?= h(addslashes($u['username'])) ?>', '<?= h(addslashes($u['name'])) ?>', '<?= h(addslashes($u['role'])) ?>', '<?= h(addslashes($u['department'])) ?>', '<?= h(addslashes($u['status'] ?? 'active')) ?>')">
                                     แก้ไข
                                 </button>
                                 <?php if ($currentUser && $currentUser['id'] !== (int) $u['id']): ?>
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('ยืนยันที่จะ<?= $isSuspended ? 'ปลดการระงับ' : 'ระงับการใช้งาน' ?>ผู้ใช้นี้หรือไม่?')">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="toggle_status">
+                                        <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
+                                        <button class="secondary-button" type="submit" style="padding:4px 8px;font-size:10px;color:<?= $isSuspended ? '#2e7d32' : '#c62828' ?>;">
+                                            <?= $isSuspended ? 'ปลดระงับ' : 'ระงับ' ?>
+                                        </button>
+                                    </form>
                                     <form method="post" style="display:inline;" onsubmit="return confirm('ยืนยันที่จะลบผู้ใช้นี้หรือไม่?')">
                                         <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                                         <input type="hidden" name="action" value="delete_user">
@@ -192,9 +213,17 @@ require __DIR__ . '/includes/header.php';
             <label>
                 บทบาท (Role)
                 <select name="role" id="edit-role" required>
-                    <option value="staff">Staff (บันทึกรับ-เบิกสินค้าได้)</option>
-                    <option value="viewer">Viewer (ดูข้อมูลได้อย่างเดียว)</option>
-                    <option value="admin">Admin (ผู้ดูแลระบบ จัดการได้ทั้งหมด)</option>
+                    <option value="staff">Staff (พนักงานคลังสินค้า: รับ-เบิกสินค้าได้)</option>
+                    <option value="viewer">Viewer (พนักงานทั่วไป: ดูสต๊อก/ตำแหน่งจัดเก็บได้อย่างเดียว)</option>
+                    <option value="admin">Admin (ผู้ดูแลระบบ: จัดการได้ทั้งหมด)</option>
+                </select>
+            </label>
+
+            <label>
+                สถานะบัญชี
+                <select name="status" id="edit-status" required>
+                    <option value="active">ใช้งานปกติ (Active)</option>
+                    <option value="suspended">ระงับการใช้งาน (Suspended)</option>
                 </select>
             </label>
 
@@ -217,12 +246,13 @@ require __DIR__ . '/includes/header.php';
 </section>
 
 <script>
-function editUser(id, username, name, role, department) {
+function editUser(id, username, name, role, department, status) {
     document.querySelector('#edit-user-id').value = id;
     document.querySelector('#edit-username').value = username;
     document.querySelector('#edit-name').value = name;
     document.querySelector('#edit-role').value = role;
     document.querySelector('#edit-department').value = department;
+    document.querySelector('#edit-status').value = status || 'active';
     document.querySelector('#edit-user-title').textContent = 'แก้ไขผู้ใช้: ' + username;
     document.querySelector('#edit-user-dialog').showModal();
 }
