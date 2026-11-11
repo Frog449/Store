@@ -1076,6 +1076,11 @@ function inventory_sync_product_summary(PDO $db, string $code): void
     $statement->execute(['code' => $code]);
 }
 
+function inventory_csrf_token(): string
+{
+    return $_SESSION['csrf_token'] ?? '';
+}
+
 function inventory_require_csrf(): void
 {
     $token = $_POST['csrf_token'] ?? '';

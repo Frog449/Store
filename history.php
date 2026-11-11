@@ -35,7 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     }
 }
 
-$csrfToken = inventory_csrf_token();
 $receipts = inventory_movements('receipt', 500);
 $issues = inventory_movements('issue', 500);
 $movementCounts = inventory_movement_counts();
