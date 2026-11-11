@@ -18,13 +18,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'recor
             throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถบันทึกเบิกสินค้าได้');
         }
         $productCode = inventory_text('product_code', 'รหัสสินค้า', 80, true);
+        $user = auth_user();
+        $requestedBy = inventory_text('requested_by', 'ผู้เบิก', 150);
+        if ($requestedBy === '' && $user) {
+            $requestedBy = (string) $user['name'];
+        }
+        $department = inventory_text('department', 'แผนก/ผู้รับ', 150);
+        if ($department === '' && $user) {
+            $department = (string) $user['department'];
+        }
         inventory_record_movement('issue', [
             'movement_date' => inventory_date(),
             'document_no' => inventory_text('document_no', 'เลขที่เอกสาร', 100),
             'product_code' => $productCode,
             'quantity' => inventory_number('quantity', 'จำนวนเบิก', false),
-            'requested_by' => inventory_text('requested_by', 'ผู้เบิก', 150),
-            'department' => inventory_text('department', 'แผนก/ผู้รับ', 150),
+            'requested_by' => $requestedBy,
+            'department' => $department,
             'approved_by' => inventory_text('approved_by', 'ผู้อนุมัติ', 150, true),
             'notes' => inventory_text('notes', 'หมายเหตุ', 500),
         ]);
@@ -58,8 +67,13 @@ require __DIR__ . '/includes/header.php';
             <label class="form-span-2">ชื่อสินค้า <input id="movement-product-name" readonly placeholder="เลือกสินค้าเพื่อแสดงชื่อ"></label>
             <label>จำนวนเบิก <input type="number" name="quantity" min="0.001" step="0.001" required value="<?= h((string) ($_POST['quantity'] ?? '')) ?>"></label>
             <label>หน่วยนับ <input id="movement-product-unit" readonly placeholder="—"></label>
-            <label>ผู้เบิก <input name="requested_by" maxlength="150" value="<?= h((string) ($_POST['requested_by'] ?? '')) ?>"></label>
-            <label>แผนก/ผู้รับ <input name="department" maxlength="150" value="<?= h((string) ($_POST['department'] ?? '')) ?>"></label>
+            <?php
+                $user = auth_user();
+                $defaultRequester = (string) ($user['name'] ?? '');
+                $defaultDepartment = (string) ($user['department'] ?? '');
+            ?>
+            <label>ผู้เบิก <input name="requested_by" maxlength="150" required value="<?= h((string) ($_POST['requested_by'] ?? $defaultRequester)) ?>"></label>
+            <label>แผนก/ผู้รับ <input name="department" maxlength="150" value="<?= h((string) ($_POST['department'] ?? $defaultDepartment)) ?>"></label>
             <label>ผู้อนุมัติ * <input name="approved_by" maxlength="150" required value="<?= h((string) ($_POST['approved_by'] ?? '')) ?>"></label>
             <label class="form-span-2">หมายเหตุ <input name="notes" maxlength="500" value="<?= h((string) ($_POST['notes'] ?? '')) ?>"></label>
             <div class="form-actions form-span-2"><button class="primary-button" type="submit">บันทึกเบิกสินค้า</button></div>

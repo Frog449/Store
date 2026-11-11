@@ -324,3 +324,66 @@ function inventory_delete_user(int $id): void
     audit_log('user_delete', $user['username'], "ลบผู้ใช้: {$user['name']} ({$user['username']})");
 }
 
+function auth_update_profile(int $userId, string $name, string $department, ?string $currentPassword = null, ?string $newPassword = null): void
+{
+    $name = trim($name);
+    $department = trim($department);
+
+    if ($name === '') {
+        throw new DomainException('กรุณาระบุชื่อ-นามสกุล');
+    }
+
+    $user = inventory_user_by_id($userId);
+    if ($user === null) {
+        throw new DomainException('ไม่พบข้อมูลผู้ใช้');
+    }
+
+    if (!in_array($user['role'], ['admin', 'staff'], true)) {
+        throw new DomainException('สิทธิ์ Viewer ไม่สามารถแก้ไขข้อมูลส่วนตัวได้');
+    }
+
+    $db = inventory_db();
+
+    if ($newPassword !== null && $newPassword !== '') {
+        if ($currentPassword === null || $currentPassword === '') {
+            throw new DomainException('กรุณาระบุรหัสผ่านเดิมเพื่อยืนยันการเปลี่ยนรหัสผ่าน');
+        }
+        $stmt = $db->prepare('SELECT password_hash FROM `users` WHERE id = :id');
+        $stmt->execute(['id' => $userId]);
+        $existingHash = (string) $stmt->fetchColumn();
+
+        if (!password_verify($currentPassword, $existingHash)) {
+            throw new DomainException('รหัสผ่านเดิมไม่ถูกต้อง');
+        }
+
+        if (strlen($newPassword) < 4) {
+            throw new DomainException('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+        }
+
+        $stmt = $db->prepare(
+            'UPDATE `users`
+             SET `name` = :name, `department` = :department, `password_hash` = :hash
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'id' => $userId,
+            'name' => $name,
+            'department' => $department,
+            'hash' => password_hash($newPassword, PASSWORD_DEFAULT),
+        ]);
+        audit_log('profile_update', $user['username'], "แก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน: {$name}");
+    } else {
+        $stmt = $db->prepare(
+            'UPDATE `users`
+             SET `name` = :name, `department` = :department
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'id' => $userId,
+            'name' => $name,
+            'department' => $department,
+        ]);
+        audit_log('profile_update', $user['username'], "แก้ไขข้อมูลโปรไฟล์: {$name}");
+    }
+}
+

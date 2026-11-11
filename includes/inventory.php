@@ -24,7 +24,18 @@ function inventory_db(): PDO
         $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
         $options[PDO::MYSQL_ATTR_SSL_CA] = true;
     }
-    $db = new PDO($dsn, $config['username'], $config['password'], $options);
+    try {
+        $db = new PDO($dsn, $config['username'], $config['password'], $options);
+    } catch (PDOException $e) {
+        if (str_contains($e->getMessage(), 'Unknown database')) {
+            $serverDsn = sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $config['host'], $config['port']);
+            $serverDb = new PDO($serverDsn, $config['username'], $config['password'], $options);
+            $serverDb->exec("CREATE DATABASE IF NOT EXISTS `{$config['database']}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $db = new PDO($dsn, $config['username'], $config['password'], $options);
+        } else {
+            throw $e;
+        }
+    }
     inventory_ensure_schema($db);
 
     $count = (int) $db->query('SELECT COUNT(*) FROM `product`')->fetchColumn();

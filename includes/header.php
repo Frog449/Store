@@ -52,9 +52,14 @@ $activePage = $activePage ?? 'products';
             <?php
                 $displayName = trim((string)($currentUser['name'] ?? 'ผู้ใช้'));
                 $cleanName = preg_replace('/\s*\(Admin\)/i', '', $displayName);
+                $canEditProfile = in_array($currentUser['role'] ?? '', ['admin', 'staff'], true);
             ?>
             <div class="user-profile-widget">
-                <span class="user-display-name" title="<?= h($displayName) ?>"><?= h($cleanName) ?></span>
+                <?php if ($canEditProfile): ?>
+                    <a href="profile.php" class="user-display-name user-display-link" title="คลิกเพื่อแก้ไขข้อมูลโปรไฟล์"><?= h($cleanName) ?></a>
+                <?php else: ?>
+                    <span class="user-display-name" title="<?= h($displayName) ?>"><?= h($cleanName) ?></span>
+                <?php endif; ?>
                 <span class="user-badge-role role-<?= h($currentUser['role'] ?? 'staff') ?>"><?= h(strtoupper($currentUser['role'] ?? 'staff')) ?></span>
                 <a class="user-logout-btn" href="logout.php" title="ออกจากระบบ">ออกจากระบบ</a>
             </div>
