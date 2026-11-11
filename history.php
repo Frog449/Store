@@ -33,6 +33,7 @@ require __DIR__ . '/includes/header.php';
         <div class="page-kpis">
             <span><strong><?= count($receipts) ?></strong> รายการรับเข้า</span>
             <span><strong><?= count($issues) ?></strong> รายการเบิกออก</span>
+            <a class="secondary-button" href="export.php?type=history" style="font-size:11px;">📊 Export ประวัติทั้งหมด</a>
             <a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a>
         </div>
     </div>
@@ -98,6 +99,7 @@ require __DIR__ . '/includes/header.php';
             <div style="display:flex;align-items:center;gap:10px;">
                 <span class="history-badge history-badge-receipt">รับเข้า</span>
                 <span class="result-count section-visible-count"><?= count($receipts) ?> รายการ</span>
+                <a class="secondary-button" href="export.php?type=receipts" style="font-size:10px;padding:4px 10px;">📊 Export</a>
             </div>
         </div>
         <div class="table-scroll">
@@ -114,6 +116,7 @@ require __DIR__ . '/includes/header.php';
                         <th>ผู้รับสินค้า</th>
                         <th>แผนก/หน่วยงาน</th>
                         <th>หมายเหตุ</th>
+                        <th>ใบรับ</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -141,6 +144,7 @@ require __DIR__ . '/includes/header.php';
                             <td><?= h($row['received_by'] !== '' ? $row['received_by'] : '-') ?></td>
                             <td><?= h($row['department'] !== '' ? $row['department'] : '-') ?></td>
                             <td><?= h($row['notes'] !== '' ? $row['notes'] : '-') ?></td>
+                            <td><a class="slip-btn" href="slip.php?type=receipt&id=<?= (int)($row['id'] ?? 0) ?>" target="_blank" title="พิมพ์ใบรับสินค้า">🖨️ พิมพ์</a></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -163,6 +167,7 @@ require __DIR__ . '/includes/header.php';
             <div style="display:flex;align-items:center;gap:10px;">
                 <span class="history-badge history-badge-issue">เบิกออก</span>
                 <span class="result-count section-visible-count"><?= count($issues) ?> รายการ</span>
+                <a class="secondary-button" href="export.php?type=issues" style="font-size:10px;padding:4px 10px;">📊 Export</a>
             </div>
         </div>
         <div class="table-scroll">
@@ -179,6 +184,7 @@ require __DIR__ . '/includes/header.php';
                         <th>แผนก/ผู้รับ</th>
                         <th>ผู้อนุมัติ</th>
                         <th>หมายเหตุ</th>
+                        <th>ใบเบิก</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -206,6 +212,7 @@ require __DIR__ . '/includes/header.php';
                             <td><?= h($row['department'] !== '' ? $row['department'] : '-') ?></td>
                             <td><?= h($row['approved_by'] !== '' ? $row['approved_by'] : '-') ?></td>
                             <td><?= h($row['notes'] !== '' ? $row['notes'] : '-') ?></td>
+                            <td><a class="slip-btn" href="slip.php?type=issue&id=<?= (int)($row['id'] ?? 0) ?>" target="_blank" title="พิมพ์ใบเบิกสินค้า">🖨️ พิมพ์</a></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -218,3 +225,4 @@ require __DIR__ . '/includes/header.php';
     </section>
 </section>
 <?php require __DIR__ . '/includes/footer.php'; ?>
+

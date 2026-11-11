@@ -155,6 +155,55 @@ function inventory_ensure_schema(PDO $db): void
         );
     }
 
+    if (!inventory_table_exists($db, 'users')) {
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS `users` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `username` VARCHAR(60) NOT NULL,
+            `password_hash` VARCHAR(255) NOT NULL,
+            `name` VARCHAR(150) NOT NULL,
+            `role` VARCHAR(30) NOT NULL DEFAULT \'staff\',
+            `department` VARCHAR(150) NOT NULL DEFAULT \'\',
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uq_users_username` (`username`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+
+        $initialPassword = password_hash('admin1234', PASSWORD_DEFAULT);
+        $stmt = $db->prepare(
+            'INSERT INTO `users` (`username`, `password_hash`, `name`, `role`, `department`)
+             VALUES (:username, :password_hash, :name, :role, :department)'
+        );
+        $stmt->execute([
+            'username' => 'admin',
+            'password_hash' => $initialPassword,
+            'name' => 'ผู้ดูแลระบบ (Admin)',
+            'role' => 'admin',
+            'department' => 'คลังสินค้าส่วนกลาง',
+        ]);
+    }
+
+    if (!inventory_table_exists($db, 'audit_logs')) {
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS `audit_logs` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `user_id` BIGINT UNSIGNED NULL,
+            `username` VARCHAR(60) NOT NULL DEFAULT \'system\',
+            `user_name` VARCHAR(150) NOT NULL DEFAULT \'\',
+            `action` VARCHAR(50) NOT NULL,
+            `target` VARCHAR(100) NOT NULL DEFAULT \'\',
+            `details` TEXT NOT NULL,
+            `ip_address` VARCHAR(45) NOT NULL DEFAULT \'\',
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_audit_created` (`created_at`),
+            KEY `idx_audit_user` (`user_id`),
+            KEY `idx_audit_action` (`action`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    }
+
     $legacyProducts = $db->query(
         'SELECT p.`code`, p.`รับเข้ารวม` AS received, p.`เบิกออกรวม` AS issued,
                 r.total AS recorded_receipts, i.total AS recorded_issues
@@ -675,6 +724,58 @@ function inventory_movement_counts(): array
     ];
 }
 
+function inventory_movement_by_id(string $kind, int $id): ?array
+{
+    if ($kind === 'receipt') {
+        $table = 'receipts';
+        $extraColumns = 'm.supplier, m.received_by, m.department';
+    } elseif ($kind === 'issue') {
+        $table = 'issues';
+        $extraColumns = 'm.requested_by, m.department, m.approved_by';
+    } else {
+        throw new InvalidArgumentException('ประเภทรายการเคลื่อนไหวไม่ถูกต้อง');
+    }
+
+    $statement = inventory_db()->prepare(
+        "SELECT m.id, m.movement_date, m.document_no, m.product_code, p.`ชื่อสินค้า` AS product_name,
+                p.`หมวดหมู่` AS category, p.`ตำแหน่งจัดเก็บ` AS location,
+                m.quantity, p.`หน่วยนับ` AS unit, {$extraColumns}, m.notes, m.created_at
+         FROM `{$table}` m
+         LEFT JOIN `product` p ON p.`code` = m.product_code
+         WHERE m.id = :id"
+    );
+    $statement->execute(['id' => $id]);
+    $row = $statement->fetch();
+    return $row === false ? null : $row;
+}
+
+function audit_log(string $action, string $target = '', string $details = ''): void
+{
+    try {
+        $user = function_exists('auth_user') ? auth_user() : null;
+        $userId = $user['id'] ?? null;
+        $username = $user['username'] ?? 'system';
+        $userName = $user['name'] ?? ($user ? 'User' : 'Guest/System');
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+
+        $stmt = inventory_db()->prepare(
+            'INSERT INTO `audit_logs` (`user_id`, `username`, `user_name`, `action`, `target`, `details`, `ip_address`)
+             VALUES (:user_id, :username, :user_name, :action, :target, :details, :ip)'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'username' => $username,
+            'user_name' => $userName,
+            'action' => $action,
+            'target' => $target,
+            'details' => $details,
+            'ip' => $ip,
+        ]);
+    } catch (Throwable $e) {
+        error_log('Audit log error: ' . $e->getMessage());
+    }
+}
+
 function inventory_save_product(array $values, ?string $originalCode = null): void
 {
     $db = inventory_db();
@@ -714,6 +815,11 @@ function inventory_save_product(array $values, ?string $originalCode = null): vo
         }
         inventory_sync_product_summary($db, $originalCode ?? $values['code']);
         $db->commit();
+        if ($originalCode === null) {
+            audit_log('product_create', $values['code'], "เพิ่มสินค้าใหม่: {$values['name']} (จุดสั่งซื้อ: {$values['reorder_point']} {$values['unit']})");
+        } else {
+            audit_log('product_update', $values['code'], "แก้ไขข้อมูลสินค้า: {$values['name']} (จุดสั่งซื้อ: {$values['reorder_point']} {$values['unit']})");
+        }
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
             $db->rollBack();
@@ -750,6 +856,7 @@ function inventory_delete_product(string $code): ?string
         }
 
         $db->commit();
+        audit_log('product_delete', $code, "ลบสินค้าและประวัติที่เกี่ยวข้อง รหัส {$code}");
         return $product['image_filename'] === null ? null : (string) $product['image_filename'];
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -793,6 +900,7 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
         $insertReceipt->execute($receipt);
         inventory_sync_product_summary($db, $product['code']);
         $db->commit();
+        audit_log('product_create', $product['code'], "เพิ่มสินค้าพร้อมรับเข้าครั้งแรก: {$product['name']} จำนวน {$receipt['quantity']} {$product['unit']} (เอกสาร: {$receipt['document_no']})");
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
             $db->rollBack();
@@ -823,6 +931,11 @@ function inventory_record_movement(string $kind, array $values): void
     }
     $statement->execute($values);
     inventory_sync_product_summary(inventory_db(), $values['product_code']);
+    if ($kind === 'receipt') {
+        audit_log('receipt_create', $values['product_code'], "รับสินค้าเข้า: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ") ผู้ส่งมอบ: " . ($values['supplier'] ?: '-') . " ผู้รับ: " . ($values['received_by'] ?: '-'));
+    } else {
+        audit_log('issue_create', $values['product_code'], "เบิกสินค้าออก: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ") ผู้ขอเบิก: " . ($values['requested_by'] ?: '-') . " แผนก: " . ($values['department'] ?: '-'));
+    }
 }
 
 function inventory_sync_product_summary(PDO $db, string $code): void

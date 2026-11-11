@@ -31,9 +31,20 @@ $activePage = $activePage ?? 'products';
             <a class="nav-link <?= $activePage === 'receive' ? 'active' : '' ?>" href="receive.php">รับสินค้า</a>
             <a class="nav-link <?= $activePage === 'issue' ? 'active' : '' ?>" href="issue.php">เบิกสินค้า</a>
             <a class="nav-link <?= $activePage === 'history' ? 'active' : '' ?>" href="history.php">ประวัติรับ–เบิก</a>
+            <?php if (function_exists('auth_is_admin') && auth_is_admin()): ?>
+                <a class="nav-link <?= $activePage === 'users' ? 'active' : '' ?>" href="users.php">ผู้ใช้</a>
+                <a class="nav-link <?= $activePage === 'audit' ? 'active' : '' ?>" href="audit.php">Audit Log</a>
+                <a class="nav-link <?= $activePage === 'backup' ? 'active' : '' ?>" href="backup.php">สำรองข้อมูล</a>
+            <?php endif; ?>
             <a class="nav-link <?= $activePage === 'guide' ? 'active' : '' ?>" href="guide.php">คู่มือ</a>
             <a class="nav-link <?= $activePage === 'about' ? 'active' : '' ?>" href="about.php">เกี่ยวกับเรา</a>
         </nav>
+        <?php if (!empty($currentUser)): ?>
+            <div class="user-chip">
+                <span class="user-chip-name">👤 <?= h($currentUser['name'] ?? 'ผู้ใช้') ?> <small class="user-chip-role role-<?= h($currentUser['role'] ?? 'staff') ?>"><?= h(strtoupper($currentUser['role'] ?? 'staff')) ?></small></span>
+                <a class="logout-link" href="logout.php" title="ออกจากระบบ">ออกจากระบบ</a>
+            </div>
+        <?php endif; ?>
     </div>
 </header>
 <main>

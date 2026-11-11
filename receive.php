@@ -14,6 +14,9 @@ $uploadedProductImage = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_product_receipt') {
     try {
         inventory_require_csrf();
+        if (!auth_can_manage_stock()) {
+            throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถเพิ่มสินค้าและรับเข้าคลังได้');
+        }
         $code = inventory_text('code', 'รหัสสินค้า', 80, true);
         $newProduct = [
             'code' => $code,
@@ -47,6 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'record_receipt') {
     try {
         inventory_require_csrf();
+        if (!auth_can_manage_stock()) {
+            throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถบันทึกรับสินค้าเข้าคลังได้');
+        }
         $productCode = inventory_text('product_code', 'รหัสสินค้า', 80, true);
         inventory_record_movement('receipt', [
             'movement_date' => inventory_date(),
@@ -74,7 +80,11 @@ require __DIR__ . '/includes/header.php';
 <section class="inventory-page">
     <div class="page-heading">
         <div><div class="eyebrow section-eyebrow">STOCK IN</div><h1>รับสินค้า<span class="heading-period">.</span></h1><p>รับสินค้าเดิมเข้าคลัง หรือเพิ่มทะเบียนสินค้าใหม่พร้อมบันทึกรับเข้าครั้งแรก</p></div>
-        <div class="page-kpis"><span><strong><?= count($history) ?></strong> รายการรับ</span><a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a></div>
+        <div class="page-kpis">
+            <span><strong><?= count($history) ?></strong> รายการรับ</span>
+            <a class="secondary-button" href="export.php?type=receipts" style="font-size:11px;">📊 Export ประวัติรับสินค้า</a>
+            <a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a>
+        </div>
     </div>
     <section class="inventory-panel">
         <div class="panel-heading"><div><h2>รับสินค้าเดิม</h2><p>เลือกรหัสสินค้าที่อยู่ในทะเบียน แล้วกรอกวันที่และจำนวนรับ</p></div><a class="secondary-button" href="#new-product">เพิ่มสินค้าใหม่ ↘</a></div>

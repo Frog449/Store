@@ -10,6 +10,9 @@ $activePage = 'issue';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'record_issue') {
     try {
         inventory_require_csrf();
+        if (!auth_can_manage_stock()) {
+            throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถบันทึกเบิกสินค้าได้');
+        }
         $productCode = inventory_text('product_code', 'รหัสสินค้า', 80, true);
         inventory_record_movement('issue', [
             'movement_date' => inventory_date(),
@@ -35,7 +38,11 @@ require __DIR__ . '/includes/header.php';
 <section class="inventory-page">
     <div class="page-heading">
         <div><div class="eyebrow section-eyebrow">STOCK OUT</div><h1>บันทึกเบิกสินค้า<span class="heading-period">.</span></h1><p>บันทึกการเบิกหรือจ่ายสินค้าออก พร้อมระบุผู้เบิกและผู้อนุมัติ</p></div>
-        <div class="page-kpis"><span><strong><?= count($history) ?></strong> รายการเบิก</span><a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a></div>
+        <div class="page-kpis">
+            <span><strong><?= count($history) ?></strong> รายการเบิก</span>
+            <a class="secondary-button" href="export.php?type=issues" style="font-size:11px;">📊 Export ประวัติเบิกสินค้า</a>
+            <a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a>
+        </div>
     </div>
     <section class="inventory-panel">
         <div class="panel-heading"><div><h2>เพิ่มรายการเบิกสินค้า</h2><p>เลือกสินค้าแล้วกรอกวันที่ จำนวนเบิก และข้อมูลผู้เบิก</p></div></div>

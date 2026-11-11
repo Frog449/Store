@@ -1,11 +1,20 @@
 <?php
 declare(strict_types=1);
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 unset($_SESSION['quote']);
 
 require_once __DIR__ . '/inventory.php';
+require_once __DIR__ . '/auth.php';
 
+// Enforce authentication on all protected pages unless explicitly marked public
+if (!defined('PUBLIC_PAGE') || PUBLIC_PAGE !== true) {
+    auth_require_login();
+}
+
+$currentUser = auth_user();
 $products = inventory_products();
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));

@@ -18,6 +18,9 @@ $editProduct = $editCode === null ? null : inventory_product($editCode);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_product') {
     try {
         inventory_require_csrf();
+        if (!auth_can_manage_stock()) {
+            throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถแก้ไขสินค้าได้');
+        }
         $originalCode = trim((string) ($_POST['original_code'] ?? ''));
         if ($originalCode === '' || inventory_product($originalCode) === null) {
             throw new DomainException('ไม่พบสินค้าที่ต้องการแก้ไข');
@@ -61,6 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_product') {
     try {
         inventory_require_csrf();
+        if (!auth_is_admin()) {
+            throw new DomainException('เฉพาะ Admin เท่านั้นที่สามารถลบสินค้าได้');
+        }
         $code = inventory_text('product_code', 'รหัสสินค้า', 80, true);
         $imageFilename = inventory_delete_product($code);
         inventory_delete_product_image($imageFilename);
@@ -89,11 +95,14 @@ require __DIR__ . '/includes/header.php';
             <h1>ทะเบียนสินค้า<span class="heading-period">.</span></h1>
             <p>คลิกการ์ดสินค้าเพื่อดูรายละเอียด รูปสินค้าเพิ่มหรือเปลี่ยนได้ในหน้าต่างแก้ไข</p>
         </div>
-        <label class="search-box">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            <input id="product-search" type="search" placeholder="ค้นหาชื่อหรือรหัสสินค้า..." autocomplete="off">
-            <kbd>/</kbd>
-        </label>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <a class="secondary-button" href="export.php?type=products" style="font-size:11px;">📊 Export ทะเบียนสินค้า (.csv)</a>
+            <label class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <input id="product-search" type="search" placeholder="ค้นหาชื่อหรือรหัสสินค้า..." autocomplete="off">
+                <kbd>/</kbd>
+            </label>
+        </div>
     </div>
     <div class="catalog-toolbar">
         <div class="category-filters" role="group" aria-label="กรองตามหมวดหมู่">
