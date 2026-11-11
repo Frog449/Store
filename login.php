@@ -144,26 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: linear-gradient(105deg, #d90429, #8d1124);
             transform: translateY(-1px);
         }
-        .login-hint {
-            margin-top: 24px;
-            padding: 12px 14px;
-            border-radius: 7px;
-            border: 1px dashed #d66b77;
-            background: #fff5f6;
-            color: #70202c;
-            font-size: 11px;
-            line-height: 1.6;
-            text-align: center;
-        }
-        .login-hint code {
-            font-weight: 700;
-            color: #ef233c;
-            background: #ffe3e6;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: monospace;
-        }
-        .login-error {
+.login-error {
             margin-bottom: 18px;
             padding: 10px 14px;
             border-radius: 6px;
@@ -245,10 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </label>
         </form>
 
-        <div class="login-hint">
-            <div>🔑 บัญชีเริ่มต้น: <code>admin</code> / รหัสผ่าน: <code>admin1234</code></div>
-            <div style="margin-top:4px;opacity:0.85;font-size:10px;">(เฉพาะเจ้าหน้าที่ภายใน กรุณาเปลี่ยนรหัสผ่านหลังเข้าสู่ระบบ)</div>
-        </div>
+
     </div>
 </div>
 </body>
