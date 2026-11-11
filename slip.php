@@ -194,8 +194,19 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
             color: #888;
         }
 
+        @page {
+            size: A4 portrait;
+            margin: 0; /* ซ่อน Header และ Footer อัตโนมัติของเบราว์เซอร์ เช่น URL ด้านล่าง และ วันที่ด้านบน */
+        }
+
         @media print {
-            body { background: #fff; padding: 0; }
+            body {
+                background: #fff;
+                margin: 0;
+                padding: 12mm 15mm;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
             .slip-actions { display: none !important; }
             .slip-container {
                 border: none;
