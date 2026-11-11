@@ -65,9 +65,24 @@ require __DIR__ . '/includes/header.php';
         <section class="dashboard-panel" aria-labelledby="dashboard-status">
             <h2 class="dashboard-panel-heading" id="dashboard-status">สถานะสินค้า</h2>
             <div class="dashboard-rows">
-                <div class="dashboard-row"><span>ปกติ</span><strong><?= $statusCounts['normal'] ?></strong></div>
-                <div class="dashboard-row"><span>ควรสั่งซื้อ</span><strong><?= $statusCounts['reorder'] ?></strong></div>
-                <div class="dashboard-row"><span>สต๊อกติดลบ</span><strong><?= $statusCounts['negative'] ?></strong></div>
+                <div class="dashboard-row">
+                    <span style="display:flex;align-items:center;gap:7px;">
+                        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>ปกติ
+                    </span>
+                    <strong style="color:#16a34a;"><?= $statusCounts['normal'] ?></strong>
+                </div>
+                <div class="dashboard-row" style="<?= $statusCounts['reorder'] > 0 ? 'background:#fffbeb;' : '' ?>">
+                    <span style="display:flex;align-items:center;gap:7px;">
+                        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>ควรสั่งซื้อ
+                    </span>
+                    <strong style="color:<?= $statusCounts['reorder'] > 0 ? '#d97706' : '#292326' ?>;"><?= $statusCounts['reorder'] ?></strong>
+                </div>
+                <div class="dashboard-row" style="<?= $statusCounts['negative'] > 0 ? 'background:#fff1f2;' : '' ?>">
+                    <span style="display:flex;align-items:center;gap:7px;">
+                        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:<?= $statusCounts['negative'] > 0 ? '#ef233c' : '#d1d5db' ?>;flex-shrink:0;"></span>สต๊อกติดลบ
+                    </span>
+                    <strong style="color:<?= $statusCounts['negative'] > 0 ? '#dc2626' : '#292326' ?>;"><?= $statusCounts['negative'] ?></strong>
+                </div>
             </div>
         </section>
     </div>
