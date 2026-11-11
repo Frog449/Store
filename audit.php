@@ -9,6 +9,22 @@ $pageTitle = 'ประวัติการใช้งานระบบ (Audi
 $pageDescription = 'บันทึกประวัติการกระทำ การเข้าสู่ระบบ และการแก้ไขข้อมูลในระบบคลังสินค้า';
 $activePage = 'audit';
 
+// --- POST: ลบ Audit Log ที่เลือก ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_audit_logs') {
+    try {
+        inventory_require_csrf();
+        $ids = $_POST['delete_ids'] ?? [];
+        if (!is_array($ids) || $ids === []) {
+            throw new DomainException('กรุณาเลือกรายการที่ต้องการลบ');
+        }
+        inventory_delete_audit_logs($ids);
+        inventory_flash_redirect('ลบรายการ Audit Log เรียบร้อยแล้ว ' . count($ids) . ' รายการ', 'audit.php');
+    } catch (Throwable $e) {
+        $notice = $e->getMessage();
+        $noticeType = 'error';
+    }
+}
+
 $db = inventory_db();
 $actionFilter = isset($_GET['action']) && is_string($_GET['action']) ? trim($_GET['action']) : '';
 $search = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']) : '';
@@ -73,9 +89,20 @@ require __DIR__ . '/includes/header.php';
 
     <section class="inventory-panel table-panel">
         <div class="table-scroll">
+            <form method="post" id="audit-bulk-form">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="delete_audit_logs">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;margin-bottom:12px;" id="audit-bulk-toolbar" hidden>
+                    <span id="audit-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0 รายการที่เลือก</span>
+                    <button class="primary-button" type="submit" style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:32px;padding:0 14px;font-size:12px;" onclick="return confirm('ยืนยันการลบรายการ Audit Log ที่เลือก?\nการดำเนินการนี้ไม่สามารถย้อนกลับได้')">ลบรายการที่เลือก</button>
+                    <button class="secondary-button" type="button" style="min-height:32px;padding:0 14px;font-size:12px;" onclick="auditClearSelection()">ยกเลิกการเลือก</button>
+                </div>
             <table class="inventory-table">
                 <thead>
                     <tr>
+                        <th style="width:36px;text-align:center;">
+                            <input type="checkbox" id="audit-select-all" title="เลือกทั้งหมด" style="accent-color:#ef233c;cursor:pointer;">
+                        </th>
                         <th style="width:130px;">วัน-เวลา</th>
                         <th>ผู้ใช้งาน</th>
                         <th>การกระทำ (Action)</th>
@@ -101,10 +128,17 @@ require __DIR__ . '/includes/header.php';
                                 'user_delete' => '❌ ลบผู้ใช้',
                                 'export' => '📊 ส่งออก CSV',
                                 'backup' => '💾 สำรองข้อมูล',
+                                'audit_log_delete' => '🗑️ ลบ Audit Log',
+                                'movement_delete_receipt' => '📥 ลบประวัติรับ',
+                                'movement_delete_issue' => '📤 ลบประวัติเบิก',
                                 default => $log['action'],
                             };
                         ?>
                         <tr>
+                            <td style="text-align:center;">
+                                <input type="checkbox" name="delete_ids[]" value="<?= (int)$log['id'] ?>"
+                                       class="audit-row-check" style="accent-color:#ef233c;cursor:pointer;">
+                            </td>
                             <td style="font-size:11px;color:#666;"><?= h((string) $log['created_at']) ?></td>
                             <td>
                                 <strong><?= h($log['user_name'] ?: $log['username']) ?></strong>
@@ -118,11 +152,43 @@ require __DIR__ . '/includes/header.php';
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            </form>
         </div>
         <?php if ($logs === []): ?>
             <p class="table-empty">ไม่พบประวัติการใช้งานที่ตรงกับเงื่อนไข</p>
         <?php endif; ?>
     </section>
 </section>
+<script>
+(function() {
+    const selectAll = document.getElementById('audit-select-all');
+    const toolbar = document.getElementById('audit-bulk-toolbar');
+    const countEl = document.getElementById('audit-selected-count');
+
+    function updateToolbar() {
+        const checked = document.querySelectorAll('.audit-row-check:checked');
+        const n = checked.length;
+        toolbar.hidden = n === 0;
+        countEl.textContent = n + ' รายการที่เลือก';
+        selectAll.indeterminate = n > 0 && n < document.querySelectorAll('.audit-row-check').length;
+        selectAll.checked = n > 0 && n === document.querySelectorAll('.audit-row-check').length;
+    }
+
+    selectAll.addEventListener('change', function() {
+        document.querySelectorAll('.audit-row-check').forEach(cb => { cb.checked = selectAll.checked; });
+        updateToolbar();
+    });
+
+    document.querySelectorAll('.audit-row-check').forEach(cb => {
+        cb.addEventListener('change', updateToolbar);
+    });
+
+    window.auditClearSelection = function() {
+        document.querySelectorAll('.audit-row-check').forEach(cb => { cb.checked = false; });
+        selectAll.checked = false;
+        updateToolbar();
+    };
+})();
+</script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
 

@@ -360,12 +360,205 @@ function inventory_store_product_image(?array $upload): ?string
     return $filename;
 }
 
-function inventory_product_image_url(?string $filename): ?string
+function inventory_has_custom_image(?string $filename): bool
 {
-    if ($filename === null || !preg_match('/\A[a-f0-9]{32}\.(?:jpg|png|webp)\z/', $filename)) {
-        return null;
+    return $filename !== null && preg_match('/\A[a-f0-9]{32}\.(?:jpg|png|webp)\z/', $filename);
+}
+
+function inventory_product_image_url(?string $filename, ?string $category = null): string
+{
+    if (inventory_has_custom_image($filename)) {
+        return 'image.php?file=' . rawurlencode((string) $filename);
     }
-    return 'image.php?file=' . rawurlencode($filename);
+    $cat = $category !== null && trim($category) !== '' ? trim($category) : 'สินค้าทั่วไป';
+    return 'image.php?cat=' . rawurlencode($cat);
+}
+
+function inventory_category_placeholder_svg(string $category): string
+{
+    $cleanCat = trim($category);
+
+    if (str_contains($cleanCat, 'อะไหล่') || str_contains($cleanCat, 'เครื่องจักร')) {
+        return <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg_mach" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#edf2f7"/>
+    </linearGradient>
+    <filter id="sh_mach" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg_mach)"/>
+  <g opacity="0.18" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 3">
+    <line x1="0" y1="75" x2="400" y2="75"/><line x1="0" y1="150" x2="400" y2="150"/><line x1="0" y1="225" x2="400" y2="225"/>
+    <line x1="100" y1="0" x2="100" y2="300"/><line x1="200" y1="0" x2="200" y2="300"/><line x1="300" y1="0" x2="300" y2="300"/>
+  </g>
+  <g filter="url(#sh_mach)" transform="translate(195, 122)">
+    <circle cx="-16" cy="-8" r="54" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2"/>
+    <g fill="#94a3b8">
+      <rect x="-22" y="-72" width="12" height="18" rx="3"/>
+      <rect x="-22" y="36" width="12" height="18" rx="3"/>
+      <rect x="-80" y="-14" width="18" height="12" rx="3"/>
+      <rect x="28" y="-14" width="18" height="12" rx="3"/>
+      <rect x="-63" y="-55" width="16" height="12" rx="3" transform="rotate(45 -55 -49)"/>
+      <rect x="23" y="31" width="16" height="12" rx="3" transform="rotate(45 31 37)"/>
+      <rect x="23" y="-55" width="16" height="12" rx="3" transform="rotate(-45 31 -49)"/>
+      <rect x="-63" y="31" width="16" height="12" rx="3" transform="rotate(-45 -55 37)"/>
+    </g>
+    <circle cx="-16" cy="-8" r="30" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2.5"/>
+    <circle cx="-16" cy="-8" r="14" fill="#64748b"/>
+    <circle cx="36" cy="24" r="40" fill="#ffffff" stroke="#93c5fd" stroke-width="2"/>
+    <g fill="#2563eb">
+      <rect x="31" y="-22" width="10" height="14" rx="2.5"/>
+      <rect x="31" y="56" width="10" height="14" rx="2.5"/>
+      <rect x="-10" y="19" width="14" height="10" rx="2.5"/>
+      <rect x="68" y="19" width="14" height="10" rx="2.5"/>
+      <rect x="2" y="-10" width="12" height="10" rx="2.5" transform="rotate(45 8 -5)"/>
+      <rect x="58" y="46" width="12" height="10" rx="2.5" transform="rotate(45 64 51)"/>
+      <rect x="58" y="-10" width="12" height="10" rx="2.5" transform="rotate(-45 64 -5)"/>
+      <rect x="2" y="46" width="12" height="10" rx="2.5" transform="rotate(-45 8 51)"/>
+    </g>
+    <circle cx="36" cy="24" r="22" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+    <circle cx="36" cy="24" r="9" fill="#1d4ed8"/>
+  </g>
+  <rect x="115" y="228" width="170" height="30" rx="15" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#sh_mach)"/>
+  <circle cx="132" cy="243" r="5" fill="#2563eb"/>
+  <text x="146" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#1e293b">อะไหล่เครื่องจักร</text>
+  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#64748b">SPARE PARTS</text>
+</svg>
+SVG;
+    } elseif (str_contains($cleanCat, 'สิ้นเปลือง')) {
+        return <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg_cons" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="100%" stop-color="#fef3c7"/>
+    </linearGradient>
+    <filter id="sh_cons" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#78350f" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg_cons)"/>
+  <g filter="url(#sh_cons)" transform="translate(195, 120)">
+    <ellipse cx="45" cy="42" rx="46" ry="16" fill="#78350f" opacity="0.15"/>
+    <ellipse cx="45" cy="38" rx="42" ry="14" fill="#374151"/>
+    <ellipse cx="45" cy="38" rx="26" ry="9" fill="#fef3c7"/>
+    <ellipse cx="-20" cy="30" rx="58" ry="22" fill="#78350f" opacity="0.12"/>
+    <path d="M-68, -10 C-68, -35 28, -35 28, -10 L28, 16 C28, 41 -68, 41 -68, 16 Z" fill="#d97706" stroke="#b45309" stroke-width="2"/>
+    <ellipse cx="-20" cy="-10" rx="48" ry="20" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
+    <ellipse cx="-20" cy="-10" rx="26" ry="11" fill="#78350f"/>
+    <ellipse cx="-20" cy="-10" rx="21" ry="8" fill="#fffbeb"/>
+    <path d="M28, 10 C48, 14 62, 28 66, 38 L48, 44 C44, 34 32, 22 18, 18 Z" fill="#fbbf24" stroke="#d97706" stroke-width="1.5"/>
+  </g>
+  <rect x="120" y="228" width="160" height="30" rx="15" fill="#ffffff" stroke="#fcd34d" stroke-width="1.2" filter="url(#sh_cons)"/>
+  <circle cx="137" cy="243" r="5" fill="#d97706"/>
+  <text x="151" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#78350f">วัสดุสิ้นเปลือง</text>
+  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#b45309">CONSUMABLES</text>
+</svg>
+SVG;
+    } elseif (str_contains($cleanCat, 'เครื่องมือ')) {
+        return <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg_tool" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0fdfa"/>
+      <stop offset="100%" stop-color="#ccfbf1"/>
+    </linearGradient>
+    <filter id="sh_tool" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#134e4a" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg_tool)"/>
+  <g filter="url(#sh_tool)" transform="translate(200, 120)">
+    <g transform="rotate(45)">
+      <rect x="-8" y="10" width="16" height="58" rx="6" fill="#0f766e" stroke="#115e59" stroke-width="2"/>
+      <line x1="-3" y1="20" x2="-3" y2="58" stroke="#2dd4bf" stroke-width="2"/>
+      <line x1="3" y1="20" x2="3" y2="58" stroke="#134e4a" stroke-width="2"/>
+      <rect x="-4" y="-48" width="8" height="58" fill="#94a3b8" stroke="#64748b" stroke-width="1.5"/>
+      <polygon points="-5,-48 5,-48 2,-58 -2,-58" fill="#475569"/>
+    </g>
+    <g transform="rotate(-45)">
+      <rect x="-8" y="-36" width="16" height="72" rx="4" fill="#cbd5e1" stroke="#64748b" stroke-width="2"/>
+      <circle cx="0" cy="26" r="4.5" fill="#0f766e"/>
+      <path d="M-18,-36 C-22,-48 0,-62 18,-36 C10,-42 -10,-42 -18,-36 Z" fill="#94a3b8" stroke="#64748b" stroke-width="2"/>
+      <circle cx="0" cy="-44" r="15" fill="#f0fdfa" stroke="#64748b" stroke-width="2"/>
+      <rect x="-7" y="-58" width="14" height="18" fill="#f0fdfa"/>
+    </g>
+  </g>
+  <rect x="122" y="228" width="156" height="30" rx="15" fill="#ffffff" stroke="#99f6e4" stroke-width="1.2" filter="url(#sh_tool)"/>
+  <circle cx="139" cy="243" r="5" fill="#0f766e"/>
+  <text x="153" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#134e4a">เครื่องมือช่าง</text>
+  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#0f766e">HARDWARE TOOLS</text>
+</svg>
+SVG;
+    } elseif (str_contains($cleanCat, 'วัตถุดิบ')) {
+        return <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg_raw" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eef2ff"/>
+      <stop offset="100%" stop-color="#e0e7ff"/>
+    </linearGradient>
+    <filter id="sh_raw" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#312e81" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg_raw)"/>
+  <g filter="url(#sh_raw)" transform="translate(195, 120)">
+    <polygon points="-75,25 35,55 85,25 -25,-5" fill="#94a3b8" stroke="#64748b" stroke-width="1.5"/>
+    <polygon points="-75,25 35,55 35,68 -75,38" fill="#64748b"/>
+    <polygon points="35,55 85,25 85,38 35,68" fill="#475569"/>
+    <ellipse cx="-20" cy="10" rx="16" ry="16" fill="#818cf8" stroke="#4f46e5" stroke-width="2"/>
+    <path d="M-20,-6 L50,-24 L50,8 L-20,26 Z" fill="#a5b4fc" stroke="#4f46e5" stroke-width="1.5"/>
+    <ellipse cx="50" cy="-8" rx="16" ry="16" fill="#c7d2fe" stroke="#4f46e5" stroke-width="2"/>
+    <ellipse cx="-45" cy="18" rx="14" ry="14" fill="#6366f1" stroke="#4338ca" stroke-width="2"/>
+    <path d="M-45,4 L25,-14 L25,14 L-45,32 Z" fill="#818cf8" stroke="#4338ca" stroke-width="1.5"/>
+    <ellipse cx="25" cy="0" rx="14" ry="14" fill="#a5b4fc" stroke="#4338ca" stroke-width="2"/>
+  </g>
+  <rect x="135" y="228" width="130" height="30" rx="15" fill="#ffffff" stroke="#c7d2fe" stroke-width="1.2" filter="url(#sh_raw)"/>
+  <circle cx="152" cy="243" r="5" fill="#4f46e5"/>
+  <text x="166" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#312e81">วัตถุดิบ</text>
+  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#4f46e5">RAW MATERIALS</text>
+</svg>
+SVG;
+    } else {
+        return <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg_gen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff1f2"/>
+      <stop offset="100%" stop-color="#ffe4e6"/>
+    </linearGradient>
+    <filter id="sh_gen" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#881337" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg_gen)"/>
+  <g filter="url(#sh_gen)" transform="translate(195, 118)">
+    <polygon points="-70,42 20,64 75,42 -15,20" fill="#d1d5db"/>
+    <polygon points="-70,42 20,64 20,72 -70,50" fill="#9ca3af"/>
+    <polygon points="20,64 75,42 75,50 20,72" fill="#6b7280"/>
+    <polygon points="-55,-8 15,16 15,48 -55,24" fill="#fb7185" stroke="#e11d48" stroke-width="1.5"/>
+    <polygon points="15,16 65,-6 65,26 15,48" fill="#e11d48" stroke="#be123c" stroke-width="1.5"/>
+    <polygon points="-55,-8 15,16 65,-6 -5,-30" fill="#fecdd3" stroke="#e11d48" stroke-width="1.5"/>
+    <polygon points="-22,-20 38,4 43,1 -17,-23" fill="#e11d48"/>
+    <rect x="-42" y="5" width="28" height="14" rx="2" fill="#ffffff" transform="skewY(18)"/>
+    <line x1="-38" y1="18" x2="-38" y2="28" stroke="#1e293b" stroke-width="1.5"/>
+    <line x1="-34" y1="19" x2="-34" y2="29" stroke="#1e293b" stroke-width="1"/>
+    <line x1="-30" y1="20" x2="-30" y2="30" stroke="#1e293b" stroke-width="2"/>
+    <line x1="-24" y1="22" x2="-24" y2="32" stroke="#1e293b" stroke-width="1.5"/>
+    <line x1="-18" y1="24" x2="-18" y2="34" stroke="#1e293b" stroke-width="1"/>
+  </g>
+  <rect x="125" y="228" width="150" height="30" rx="15" fill="#ffffff" stroke="#fecdd3" stroke-width="1.2" filter="url(#sh_gen)"/>
+  <circle cx="142" cy="243" r="5" fill="#e11d48"/>
+  <text x="156" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#881337">สินค้าทั่วไป</text>
+  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#be123c">GENERAL SUPPLY</text>
+</svg>
+SVG;
+    }
 }
 
 function inventory_delete_product_image(?string $filename): void
@@ -1173,4 +1366,98 @@ function inventory_quantity(float|int|string $quantity): string
         return number_format($number, 0);
     }
     return rtrim(rtrim(number_format($number, 3, '.', ','), '0'), '.');
+}
+
+/**
+ * ลบรายการรับ/เบิกสินค้าหลายรายการพร้อมกัน และ sync ยอดสต๊อก
+ * Admin ลบได้ทุกรายการ, Staff ลบได้เฉพาะของตัวเอง
+ */
+function inventory_delete_movements(string $kind, array $ids): void
+{
+    if ($ids === []) {
+        return;
+    }
+    if ($kind === 'receipt') {
+        $table = 'receipts';
+    } elseif ($kind === 'issue') {
+        $table = 'issues';
+    } else {
+        throw new InvalidArgumentException('ประเภทรายการไม่ถูกต้อง');
+    }
+
+    $user = auth_user();
+    if ($user === null) {
+        throw new DomainException('กรุณาเข้าสู่ระบบก่อน');
+    }
+
+    $db = inventory_db();
+    $intIds = array_map('intval', $ids);
+    $intIds = array_filter($intIds, fn($v) => $v > 0);
+    if ($intIds === []) {
+        return;
+    }
+
+    // Staff ลบได้เฉพาะของตัวเอง
+    if (!auth_is_admin()) {
+        $placeholders = implode(',', array_fill(0, count($intIds), '?'));
+        $stmt = $db->prepare("SELECT id FROM `{$table}` WHERE id IN ({$placeholders}) AND created_by_user_id = ?");
+        $params = array_values($intIds);
+        $params[] = (int)$user['id'];
+        $stmt->execute($params);
+        $allowed = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $intIds = array_map('intval', $allowed);
+        if ($intIds === []) {
+            throw new DomainException('คุณไม่มีสิทธิ์ลบรายการที่เลือก');
+        }
+    }
+
+    // ดึง product_code ก่อนลบ เพื่อ sync ยอดทีหลัง
+    $placeholders = implode(',', array_fill(0, count($intIds), '?'));
+    $stmt = $db->prepare("SELECT DISTINCT product_code FROM `{$table}` WHERE id IN ({$placeholders})");
+    $stmt->execute(array_values($intIds));
+    $affectedCodes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $stmt = $db->prepare("DELETE FROM `{$table}` WHERE id IN ({$placeholders})");
+    $stmt->execute(array_values($intIds));
+    $deletedCount = $stmt->rowCount();
+
+    foreach ($affectedCodes as $code) {
+        inventory_sync_product_summary($db, (string)$code);
+    }
+
+    $kindLabel = $kind === 'receipt' ? 'รับเข้าคลัง' : 'เบิกออก';
+    audit_log("movement_delete_{$kind}", '', "ลบประวัติ{$kindLabel} {$deletedCount} รายการ (ID: " . implode(', ', $intIds) . ")");
+}
+
+/**
+ * ลบ audit log หลายรายการพร้อมกัน (Admin เท่านั้น)
+ */
+function inventory_delete_audit_logs(array $ids): void
+{
+    if ($ids === []) {
+        return;
+    }
+    if (!auth_is_admin()) {
+        throw new DomainException('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถลบ Audit Log ได้');
+    }
+    $intIds = array_map('intval', $ids);
+    $intIds = array_filter($intIds, fn($v) => $v > 0);
+    if ($intIds === []) {
+        return;
+    }
+    $db = inventory_db();
+    $placeholders = implode(',', array_fill(0, count($intIds), '?'));
+    $stmt = $db->prepare("DELETE FROM `audit_logs` WHERE id IN ({$placeholders})");
+    $stmt->execute(array_values($intIds));
+    $deletedCount = $stmt->rowCount();
+    // บันทึก audit ว่าลบ log (ใช้ SQL direct เพื่อไม่เกิด loop)
+    $db->prepare("INSERT INTO `audit_logs` (user_id, username, user_name, action, target, details, ip_address)
+                  VALUES (:uid, :uname, :unamefull, 'audit_log_delete', '', :details, :ip)")
+       ->execute([
+           'uid'      => auth_user()['id'] ?? 0,
+           'uname'    => auth_user()['username'] ?? '',
+           'unamefull'=> auth_user()['name'] ?? '',
+           'details'  => "ลบ Audit Log {$deletedCount} รายการ (ID: " . implode(', ', $intIds) . ")",
+           'ip'       => $_SERVER['REMOTE_ADDR'] ?? '',
+       ]);
 }

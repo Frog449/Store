@@ -136,7 +136,7 @@ require __DIR__ . '/includes/header.php';
             <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="0.001" min="0" required value="<?= h((string) ($_POST['reorder_point'] ?? '0')) ?>"></label>
             <label class="product-image-upload-field form-span-2">รูปสินค้า
                 <input class="product-image-upload" type="file" name="product_image" accept="image/jpeg,image/png,image/webp">
-                <small>JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB</small>
+                <small>JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB (หากไม่ใส่จะใช้รูปตัวอย่างตามหมวดหมู่โดยอัตโนมัติ)</small>
                 <span class="product-image-preview"><img alt="ตัวอย่างรูปสินค้า" hidden><span>ยังไม่ได้เลือกรูปสินค้า</span></span>
             </label>
             <label>วันที่รับ <input type="date" name="movement_date" required value="<?= h((string) ($_POST['movement_date'] ?? date('Y-m-d'))) ?>"></label>

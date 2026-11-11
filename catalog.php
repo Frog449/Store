@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
 $categoryOptions = inventory_category_options();
 $typeOptions = inventory_type_options();
 $unitOptions = inventory_unit_options();
-$editProductImageUrl = inventory_product_image_url($editProduct['image_filename'] ?? null);
+$editProductImageUrl = inventory_product_image_url($editProduct['image_filename'] ?? null, $editProduct['category'] ?? null);
 $categoryCounts = [];
 foreach ($products as $product) {
     $category = trim($product['category']) !== '' ? $product['category'] : 'ไม่ระบุหมวดหมู่';

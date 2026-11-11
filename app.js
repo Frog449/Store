@@ -159,10 +159,30 @@ if (productDetailDialog) {
         editForm.elements.reorder_point.value = values.minimum;
         editImagePreview.dataset.currentImage = values.image;
         resetEditImage(values.image);
+
+        const hasCustom = values.hasCustomImage === "1";
+        const removeWrap = removeImageToggle ? removeImageToggle.closest(".product-image-remove") : null;
+        if (removeWrap) {
+            removeWrap.hidden = !hasCustom;
+        }
+
         editDialog.querySelector("#product-edit-code").textContent = `รหัสสินค้า ${values.code}`;
         productDetailDialog.close();
         editDialog.showModal();
     });
+
+    if (editForm.elements.category) {
+        editForm.elements.category.addEventListener("change", () => {
+            const hasUploadedFile = editImageInput && editImageInput.files && editImageInput.files.length > 0;
+            const hasCustom = activeProductCard && activeProductCard.dataset.hasCustomImage === "1";
+            if (!hasUploadedFile && !hasCustom) {
+                const cat = editForm.elements.category.value || "สินค้าทั่วไป";
+                const catUrl = "image.php?cat=" + encodeURIComponent(cat);
+                editImagePreview.dataset.currentImage = catUrl;
+                setEditImagePreview(catUrl);
+            }
+        });
+    }
 
     deleteForm.addEventListener("submit", (event) => {
         const productName = activeProductCard.dataset.name;

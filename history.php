@@ -35,6 +35,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     }
 }
 
+// --- POST: ลบประวัติรับ/เบิก ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_movements') {
+    try {
+        inventory_require_csrf();
+        $kind = (string)($_POST['movement_kind'] ?? '');
+        $ids = $_POST['delete_ids'] ?? [];
+        if (!is_array($ids) || $ids === []) {
+            throw new DomainException('กรุณาเลือกรายการที่ต้องการลบ');
+        }
+        inventory_delete_movements($kind, $ids);
+        $kindLabel = $kind === 'receipt' ? 'รับสินค้าเข้า' : 'เบิกสินค้าออก';
+        inventory_flash_redirect("ลบประวัติ{$kindLabel} " . count($ids) . " รายการเรียบร้อยแล้ว", 'history.php');
+    } catch (Throwable $e) {
+        $notice = inventory_handle_error($e);
+        $noticeType = 'error';
+    }
+}
+
 $receipts = inventory_movements('receipt', 500);
 $issues = inventory_movements('issue', 500);
 $movementCounts = inventory_movement_counts();
@@ -132,10 +150,29 @@ require __DIR__ . '/includes/header.php';
                 <a class="secondary-button" href="export.php?type=receipts" style="font-size:10px;padding:4px 10px;">Export</a>
             </div>
         </div>
+
+        <?php if (!auth_is_viewer()): ?>
+        <form method="post" id="receipt-bulk-form" style="margin:0 0 10px;">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="delete_movements">
+            <input type="hidden" name="movement_kind" value="receipt">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;" id="receipt-bulk-toolbar" hidden>
+                <span id="receipt-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0 รายการที่เลือก</span>
+                <button class="primary-button" type="submit" style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:30px;padding:0 12px;font-size:11px;" onclick="return confirm('ยืนยันการลบประวัติรับสินค้าที่เลือก?\nยอดสต๊อกจะถูกอัปเดตโดยอัตโนมัติ')">ลบรายการที่เลือก</button>
+                <button class="secondary-button" type="button" style="min-height:30px;padding:0 12px;font-size:11px;" onclick="clearSelection('receipt')">ยกเลิก</button>
+            </div>
+        </form>
+        <?php endif; ?>
+
         <div class="table-scroll">
             <table class="inventory-table movement-table">
                 <thead>
                     <tr>
+                        <?php if (!auth_is_viewer()): ?>
+                        <th style="width:36px;text-align:center;">
+                            <input type="checkbox" id="receipt-select-all" title="เลือกทั้งหมด" style="accent-color:#ef233c;cursor:pointer;" onchange="toggleAll('receipt', this.checked)">
+                        </th>
+                        <?php endif; ?>
                         <th>วันที่รับ</th>
                         <th>เลขที่เอกสาร</th>
                         <th>รหัสสินค้า</th>
@@ -166,6 +203,14 @@ require __DIR__ . '/includes/header.php';
                             ]));
                         ?>
                         <tr class="history-row" data-type="receipt" data-search="<?= h($searchText) ?>">
+                            <?php if (!auth_is_viewer()): ?>
+                            <td style="text-align:center;">
+                                <input type="checkbox" name="delete_ids[]" value="<?= (int)($row['id'] ?? 0) ?>"
+                                       form="receipt-bulk-form" class="receipt-row-check"
+                                       style="accent-color:#ef233c;cursor:pointer;"
+                                       onchange="updateBulkToolbar('receipt')">
+                            </td>
+                            <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>
                             <td><?= h($row['document_no'] !== '' ? $row['document_no'] : '-') ?></td>
                             <td class="code-cell"><?= h($row['product_code']) ?></td>
@@ -210,10 +255,29 @@ require __DIR__ . '/includes/header.php';
                 <a class="secondary-button" href="export.php?type=issues" style="font-size:10px;padding:4px 10px;">Export</a>
             </div>
         </div>
+
+        <?php if (!auth_is_viewer()): ?>
+        <form method="post" id="issue-bulk-form" style="margin:0 0 10px;">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="delete_movements">
+            <input type="hidden" name="movement_kind" value="issue">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;" id="issue-bulk-toolbar" hidden>
+                <span id="issue-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0 รายการที่เลือก</span>
+                <button class="primary-button" type="submit" style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:30px;padding:0 12px;font-size:11px;" onclick="return confirm('ยืนยันการลบประวัติเบิกสินค้าที่เลือก?\nยอดสต๊อกจะถูกอัปเดตโดยอัตโนมัติ')">ลบรายการที่เลือก</button>
+                <button class="secondary-button" type="button" style="min-height:30px;padding:0 12px;font-size:11px;" onclick="clearSelection('issue')">ยกเลิก</button>
+            </div>
+        </form>
+        <?php endif; ?>
+
         <div class="table-scroll">
             <table class="inventory-table movement-table">
                 <thead>
                     <tr>
+                        <?php if (!auth_is_viewer()): ?>
+                        <th style="width:36px;text-align:center;">
+                            <input type="checkbox" id="issue-select-all" title="เลือกทั้งหมด" style="accent-color:#ef233c;cursor:pointer;" onchange="toggleAll('issue', this.checked)">
+                        </th>
+                        <?php endif; ?>
                         <th>วันที่เบิก</th>
                         <th>เลขที่เอกสาร</th>
                         <th>รหัสสินค้า</th>
@@ -244,6 +308,14 @@ require __DIR__ . '/includes/header.php';
                             ]));
                         ?>
                         <tr class="history-row" data-type="issue" data-search="<?= h($searchText) ?>">
+                            <?php if (!auth_is_viewer()): ?>
+                            <td style="text-align:center;">
+                                <input type="checkbox" name="delete_ids[]" value="<?= (int)($row['id'] ?? 0) ?>"
+                                       form="issue-bulk-form" class="issue-row-check"
+                                       style="accent-color:#ef233c;cursor:pointer;"
+                                       onchange="updateBulkToolbar('issue')">
+                            </td>
+                            <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>
                             <td><?= h($row['document_no'] !== '' ? $row['document_no'] : '-') ?></td>
                             <td class="code-cell"><?= h($row['product_code']) ?></td>
@@ -352,6 +424,35 @@ require __DIR__ . '/includes/header.php';
 </section>
 
 <script>
+// ---- Bulk Select / Delete helpers ----
+function toggleAll(kind, checked) {
+    document.querySelectorAll('.' + kind + '-row-check').forEach(cb => { cb.checked = checked; });
+    updateBulkToolbar(kind);
+}
+
+function updateBulkToolbar(kind) {
+    const checks = document.querySelectorAll('.' + kind + '-row-check');
+    const checked = document.querySelectorAll('.' + kind + '-row-check:checked');
+    const n = checked.length;
+    const toolbar = document.getElementById(kind + '-bulk-toolbar');
+    const countEl = document.getElementById(kind + '-selected-count');
+    const selectAll = document.getElementById(kind + '-select-all');
+    if (toolbar) toolbar.hidden = n === 0;
+    if (countEl) countEl.textContent = n + ' รายการที่เลือก';
+    if (selectAll) {
+        selectAll.indeterminate = n > 0 && n < checks.length;
+        selectAll.checked = n > 0 && n === checks.length;
+    }
+}
+
+function clearSelection(kind) {
+    document.querySelectorAll('.' + kind + '-row-check').forEach(cb => { cb.checked = false; });
+    const selectAll = document.getElementById(kind + '-select-all');
+    if (selectAll) selectAll.checked = false;
+    updateBulkToolbar(kind);
+}
+
+// ---- Edit movement dialog ----
 function openEditMovement(kind, data) {
     const dialog = document.querySelector('#edit-movement-dialog');
     if (!dialog) return;

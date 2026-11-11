@@ -23,6 +23,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($username === '' || $password === '') {
             $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
         } elseif (auth_login($username, $password)) {
+            // จดจำฉัน: ขยาย lifetime cookie session เป็น 30 วัน
+            if (!empty($_POST['remember_me'])) {
+                $cookieParams = session_get_cookie_params();
+                setcookie(
+                    session_name(),
+                    session_id(),
+                    time() + 30 * 24 * 3600,
+                    $cookieParams['path'],
+                    $cookieParams['domain'],
+                    $cookieParams['secure'],
+                    $cookieParams['httponly']
+                );
+            }
             $redirectTo = $_SESSION['redirect_after_login'] ?? 'index.php';
             unset($_SESSION['redirect_after_login']);
             header('Location: ' . $redirectTo);
@@ -172,6 +185,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 600;
             margin-bottom: 14px;
         }
+        .login-remember {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #625b5e;
+            cursor: pointer;
+            margin-top: -4px;
+        }
+        .login-remember input[type=checkbox] {
+            width: 15px;
+            height: 15px;
+            accent-color: #ef233c;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -208,6 +238,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </label>
 
             <button class="login-submit" type="submit">เข้าสู่ระบบ</button>
+
+            <label class="login-remember">
+                <input type="checkbox" name="remember_me" value="1">
+                จดจำฉัน (30 วัน)
+            </label>
         </form>
 
         <div class="login-hint">
