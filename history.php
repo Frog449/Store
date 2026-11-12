@@ -192,16 +192,10 @@ require __DIR__ . '/includes/header.php';
                             </th>
                         <?php endif; ?>
                         <th>วันที่รับ</th>
-                        <th>เลขที่เอกสาร</th>
                         <th>รหัสสินค้า</th>
                         <th>ชื่อสินค้า</th>
+                        <th>ชื่อคนรับ</th>
                         <th class="numeric">จำนวนรับ</th>
-                        <th>หน่วยนับ</th>
-                        <th>ผู้ส่งมอบ</th>
-                        <th>ผู้รับสินค้า</th>
-                        <th>แผนก/หน่วยงาน</th>
-                        <th>ผู้บันทึก</th>
-                        <th>หมายเหตุ</th>
                         <th>จัดการ</th>
                     </tr>
                 </thead>
@@ -229,19 +223,16 @@ require __DIR__ . '/includes/header.php';
                                 </td>
                             <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>
-                            <td><?= h($row['document_no'] !== '' ? $row['document_no'] : '-') ?></td>
                             <td class="code-cell"><?= h($row['product_code']) ?></td>
                             <td class="name-cell"><strong><?= h($row['product_name']) ?></strong></td>
+                            <td><?= h((string)($row['received_by'] ?? '') !== '' ? $row['received_by'] : '—') ?></td>
                             <td class="numeric" style="color:#2b773c;font-weight:700;">
                                 +<?= inventory_quantity($row['quantity']) ?></td>
-                            <td><?= h($row['unit']) ?></td>
-                            <td><?= h($row['supplier'] !== '' ? $row['supplier'] : '-') ?></td>
-                            <td><?= h($row['received_by'] !== '' ? $row['received_by'] : '-') ?></td>
-                            <td><?= h($row['department'] !== '' ? $row['department'] : '-') ?></td>
-                            <td><?= h($row['created_by_name'] !== '' ? $row['created_by_name'] : '-') ?></td>
-                            <td><?= h($row['notes'] !== '' ? $row['notes'] : '-') ?></td>
                             <td style="white-space:nowrap;">
                                 <div style="display:inline-flex;gap:5px;align-items:center;">
+                                    <button class="secondary-button" type="button"
+                                        style="min-height:28px;padding:0 8px;font-size:11px;"
+                                        onclick="openMovementDetails('receipt', <?= htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8') ?>)">รายละเอียด</button>
                                     <a class="secondary-button"
                                         href="slip.php?type=receipt&id=<?= (int) ($row['id'] ?? 0) ?>" target="_blank"
                                         style="min-height:28px;padding:0 8px;font-size:11px;"
@@ -258,6 +249,11 @@ require __DIR__ . '/includes/header.php';
                 </tbody>
             </table>
         </div>
+        <nav class="history-pagination" data-history-pagination="receipt" aria-label="แบ่งหน้าประวัติรับสินค้า" hidden>
+            <button class="secondary-button" type="button" data-page-direction="-1">ก่อนหน้า</button>
+            <span data-page-status aria-live="polite"></span>
+            <button class="secondary-button" type="button" data-page-direction="1">ถัดไป</button>
+        </nav>
         <p class="history-empty-search" style="padding:22px;text-align:center;color:#888;" hidden>
             ไม่พบรายการรับสินค้าที่ตรงกับคำค้นหา</p>
         <?php if ($receipts === []): ?>
@@ -311,16 +307,10 @@ require __DIR__ . '/includes/header.php';
                             </th>
                         <?php endif; ?>
                         <th>วันที่เบิก</th>
-                        <th>เลขที่เอกสาร</th>
                         <th>รหัสสินค้า</th>
                         <th>ชื่อสินค้า</th>
+                        <th>ชื่อผู้เบิก</th>
                         <th class="numeric">จำนวนเบิก</th>
-                        <th>หน่วยนับ</th>
-                        <th>ผู้เบิก</th>
-                        <th>แผนก/ผู้รับ</th>
-                        <th>ผู้อนุมัติ</th>
-                        <th>ผู้บันทึก</th>
-                        <th>หมายเหตุ</th>
                         <th>จัดการ</th>
                     </tr>
                 </thead>
@@ -348,19 +338,16 @@ require __DIR__ . '/includes/header.php';
                                 </td>
                             <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>
-                            <td><?= h($row['document_no'] !== '' ? $row['document_no'] : '-') ?></td>
                             <td class="code-cell"><?= h($row['product_code']) ?></td>
                             <td class="name-cell"><strong><?= h($row['product_name']) ?></strong></td>
+                            <td><?= h((string)($row['requested_by'] ?? '') !== '' ? $row['requested_by'] : '—') ?></td>
                             <td class="numeric" style="color:#c53030;font-weight:700;">
                                 -<?= inventory_quantity($row['quantity']) ?></td>
-                            <td><?= h($row['unit']) ?></td>
-                            <td><?= h($row['requested_by'] !== '' ? $row['requested_by'] : '-') ?></td>
-                            <td><?= h($row['department'] !== '' ? $row['department'] : '-') ?></td>
-                            <td><?= h($row['approved_by'] !== '' ? $row['approved_by'] : '-') ?></td>
-                            <td><?= h($row['created_by_name'] !== '' ? $row['created_by_name'] : '-') ?></td>
-                            <td><?= h($row['notes'] !== '' ? $row['notes'] : '-') ?></td>
                             <td style="white-space:nowrap;">
                                 <div style="display:inline-flex;gap:5px;align-items:center;">
+                                    <button class="secondary-button" type="button"
+                                        style="min-height:28px;padding:0 8px;font-size:11px;"
+                                        onclick="openMovementDetails('issue', <?= htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8') ?>)">รายละเอียด</button>
                                     <a class="secondary-button" href="slip.php?type=issue&id=<?= (int) ($row['id'] ?? 0) ?>"
                                         target="_blank" style="min-height:28px;padding:0 8px;font-size:11px;"
                                         title="พิมพ์ใบเบิกสินค้า">พิมพ์</a>
@@ -376,12 +363,34 @@ require __DIR__ . '/includes/header.php';
                 </tbody>
             </table>
         </div>
+        <nav class="history-pagination" data-history-pagination="issue" aria-label="แบ่งหน้าประวัติเบิกสินค้า" hidden>
+            <button class="secondary-button" type="button" data-page-direction="-1">ก่อนหน้า</button>
+            <span data-page-status aria-live="polite"></span>
+            <button class="secondary-button" type="button" data-page-direction="1">ถัดไป</button>
+        </nav>
         <p class="history-empty-search" style="padding:22px;text-align:center;color:#888;" hidden>
             ไม่พบรายการเบิกสินค้าที่ตรงกับคำค้นหา</p>
         <?php if ($issues === []): ?>
             <p class="table-empty">ยังไม่มีประวัติเบิกสินค้า</p>
         <?php endif; ?>
     </section>
+
+    <dialog class="product-detail-dialog movement-detail-dialog" id="movement-detail-dialog"
+        aria-labelledby="movement-detail-title">
+        <div class="product-detail-heading">
+            <div>
+                <div class="eyebrow section-eyebrow" id="movement-detail-eyebrow">MOVEMENT DETAILS</div>
+                <h2 id="movement-detail-title">รายละเอียดรายการ</h2>
+            </div>
+            <button class="product-detail-close" type="button" aria-label="ปิดรายละเอียด"
+                onclick="document.querySelector('#movement-detail-dialog').close()">×</button>
+        </div>
+        <dl class="product-detail-list" id="movement-detail-list"></dl>
+        <div class="product-detail-actions">
+            <button class="secondary-button" type="button"
+                onclick="document.querySelector('#movement-detail-dialog').close()">ปิด</button>
+        </div>
+    </dialog>
 
     <!-- Dialog: แก้ไขรายการรับ/เบิกสินค้า -->
     <dialog class="product-detail-dialog" id="edit-movement-dialog" style="max-width:560px;">
@@ -469,6 +478,52 @@ require __DIR__ . '/includes/header.php';
 </section>
 
 <script>
+    function openMovementDetails(kind, data) {
+        const dialog = document.querySelector('#movement-detail-dialog');
+        const title = document.querySelector('#movement-detail-title');
+        const eyebrow = document.querySelector('#movement-detail-eyebrow');
+        const list = document.querySelector('#movement-detail-list');
+        const details = kind === 'receipt'
+            ? [
+                ['วันที่รับ', data.movement_date],
+                ['เลขที่เอกสาร', data.document_no],
+                ['รหัสสินค้า', data.product_code],
+                ['ชื่อสินค้า', data.product_name],
+                ['จำนวนรับ', `+${data.quantity} ${data.unit}`],
+                ['ผู้ส่งมอบ', data.supplier],
+                ['ผู้รับสินค้า', data.received_by],
+                ['แผนก/หน่วยงาน', data.department],
+                ['ผู้บันทึก', data.created_by_name],
+                ['หมายเหตุ', data.notes],
+            ]
+            : [
+                ['วันที่เบิก', data.movement_date],
+                ['เลขที่เอกสาร', data.document_no],
+                ['รหัสสินค้า', data.product_code],
+                ['ชื่อสินค้า', data.product_name],
+                ['จำนวนเบิก', `-${data.quantity} ${data.unit}`],
+                ['ผู้เบิก', data.requested_by],
+                ['แผนก/ผู้รับ', data.department],
+                ['ผู้อนุมัติ', data.approved_by],
+                ['ผู้บันทึก', data.created_by_name],
+                ['หมายเหตุ', data.notes],
+            ];
+
+        title.textContent = kind === 'receipt' ? 'รายละเอียดรับสินค้า' : 'รายละเอียดเบิกสินค้า';
+        eyebrow.textContent = kind === 'receipt' ? 'RECEIPT DETAILS' : 'ISSUE DETAILS';
+        list.replaceChildren();
+        details.forEach(([label, value]) => {
+            const item = document.createElement('div');
+            const term = document.createElement('dt');
+            const description = document.createElement('dd');
+            term.textContent = label;
+            description.textContent = value || '-';
+            item.append(term, description);
+            list.append(item);
+        });
+        dialog.showModal();
+    }
+
     // ---- Bulk Select / Delete helpers ----
     function toggleAll(kind, checked) {
         document.querySelectorAll('.' + kind + '-row-check').forEach(cb => { cb.checked = checked; });

@@ -108,9 +108,9 @@ require __DIR__ . '/includes/header.php';
                     <input type="hidden" name="action" value="update_profile">
 
                     <label>
-                        ชื่อผู้ใช้ (Username)
-                        <input type="text" value="<?= h($currentUser['username']) ?>" disabled style="background:#f4f5f2;color:#666;">
-                        <small style="color:#888;font-size:9px;">ชื่อผู้ใช้ไม่สามารถเปลี่ยนแปลงได้</small>
+                        ชื่อ-นามสกุล
+                        <input type="text" value="<?= h($currentUser['name']) ?>" disabled style="background:#f4f5f2;color:#666;">
+                        <small style="color:#888;font-size:9px;">ชื่อ-นามสกุลไม่สามารถเปลี่ยนแปลงได้</small>
                     </label>
 
                     <label>

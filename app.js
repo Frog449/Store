@@ -304,45 +304,70 @@ const historyResultCount = document.querySelector("#history-result-count");
 
 if (historySearch || historyTabs.length > 0) {
     let currentTab = "all";
+    const historyPageSize = 10;
+    const currentPages = { receipt: 0, issue: 0 };
 
-    const filterHistory = () => {
+    const filterHistory = (resetPages = false) => {
         const query = historySearch ? historySearch.value.trim().toLocaleLowerCase("th") : "";
-        let visibleReceipts = 0;
-        let visibleIssues = 0;
+        if (resetPages) {
+            currentPages.receipt = 0;
+            currentPages.issue = 0;
+        }
 
+        const matchingRows = { receipt: [], issue: [] };
         historyRows.forEach((row) => {
             const rowType = row.dataset.type;
-            const rowSearch = row.dataset.search || "";
-            const matchesQuery = query === "" || rowSearch.includes(query);
-            const matchesTab = currentTab === "all" || currentTab === rowType;
-
-            const visible = matchesQuery && matchesTab;
-            row.hidden = !visible;
-
-            if (visible) {
-                if (rowType === "receipt") visibleReceipts++;
-                if (rowType === "issue") visibleIssues++;
+            const matchesQuery = query === "" || (row.dataset.search || "").includes(query);
+            row.hidden = true;
+            if (matchesQuery && matchingRows[rowType]) {
+                matchingRows[rowType].push(row);
             }
         });
+
+        Object.keys(matchingRows).forEach((type) => {
+            const rows = matchingRows[type];
+            const pageCount = Math.ceil(rows.length / historyPageSize);
+            currentPages[type] = Math.min(currentPages[type], Math.max(0, pageCount - 1));
+            const start = currentPages[type] * historyPageSize;
+            rows.forEach((row, index) => {
+                const visible = index >= start && index < start + historyPageSize;
+                row.hidden = !visible;
+            });
+
+            const pagination = document.querySelector(`[data-history-pagination="${type}"]`);
+            if (pagination) {
+                const pageStatus = pagination.querySelector("[data-page-status]");
+                const previousButton = pagination.querySelector('[data-page-direction="-1"]');
+                const nextButton = pagination.querySelector('[data-page-direction="1"]');
+                const sectionHidden = currentTab !== "all" && currentTab !== type;
+                pagination.hidden = sectionHidden || pageCount <= 1;
+                pageStatus.textContent = `หน้า ${currentPages[type] + 1} / ${pageCount}`;
+                previousButton.disabled = currentPages[type] === 0;
+                nextButton.disabled = currentPages[type] >= pageCount - 1;
+            }
+        });
+
+        const visibleReceipts = currentTab === "issue" ? 0 : matchingRows.receipt.length;
+        const visibleIssues = currentTab === "receipt" ? 0 : matchingRows.issue.length;
 
         if (receiptSection) {
             receiptSection.hidden = currentTab === "issue";
             const emptyEl = receiptSection.querySelector(".history-empty-search");
             if (emptyEl) {
-                emptyEl.hidden = visibleReceipts > 0 || currentTab === "issue";
+                emptyEl.hidden = matchingRows.receipt.length > 0 || currentTab === "issue";
             }
             const countEl = receiptSection.querySelector(".section-visible-count");
-            if (countEl) countEl.textContent = `${visibleReceipts} รายการ`;
+            if (countEl) countEl.textContent = `${matchingRows.receipt.length} รายการ`;
         }
 
         if (issueSection) {
             issueSection.hidden = currentTab === "receipt";
             const emptyEl = issueSection.querySelector(".history-empty-search");
             if (emptyEl) {
-                emptyEl.hidden = visibleIssues > 0 || currentTab === "receipt";
+                emptyEl.hidden = matchingRows.issue.length > 0 || currentTab === "receipt";
             }
             const countEl = issueSection.querySelector(".section-visible-count");
-            if (countEl) countEl.textContent = `${visibleIssues} รายการ`;
+            if (countEl) countEl.textContent = `${matchingRows.issue.length} รายการ`;
         }
 
         if (historyResultCount) {
@@ -351,7 +376,7 @@ if (historySearch || historyTabs.length > 0) {
     };
 
     if (historySearch) {
-        historySearch.addEventListener("input", filterHistory);
+        historySearch.addEventListener("input", () => filterHistory(true));
 
         document.addEventListener("keydown", (event) => {
             if (event.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
@@ -365,7 +390,19 @@ if (historySearch || historyTabs.length > 0) {
         tab.addEventListener("click", () => {
             currentTab = tab.dataset.historyTab;
             historyTabs.forEach((t) => t.classList.toggle("selected", t === tab));
-            filterHistory();
+            filterHistory(true);
         });
     });
+
+    document.querySelectorAll("[data-history-pagination]").forEach((pagination) => {
+        const type = pagination.dataset.historyPagination;
+        pagination.querySelectorAll("[data-page-direction]").forEach((button) => {
+            button.addEventListener("click", () => {
+                currentPages[type] += Number(button.dataset.pageDirection);
+                filterHistory();
+            });
+        });
+    });
+
+    filterHistory();
 }

@@ -181,6 +181,9 @@ main { max-width: 1180px; margin: auto; padding: 0 28px; }
 .inventory-table { width: 100%; border-collapse: collapse; color: #586860; font-size: 10px; white-space: nowrap; }
 .inventory-table th { padding: 10px 11px; color: #f7f8f4; background: #24463d; text-align: left; font-weight: 600; }
 .inventory-table td { max-width: 280px; padding: 9px 11px; border-bottom: 1px solid #edf0eb; }
+.audit-table { white-space: normal; }
+.audit-table th, .audit-table td { word-break: break-word; overflow-wrap: anywhere; }
+.audit-table td { min-width: 110px; }
 .inventory-table tbody tr:last-child td { border-bottom: 0; }
 .inventory-table tbody tr:hover { background: #f8faf6; }
 .inventory-table .numeric { text-align: right; font-variant-numeric: tabular-nums; }
@@ -839,6 +842,26 @@ body {
 .history-toolbar .search-box {
     margin-left: auto;
 }
+.history-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 10px;
+}
+.history-pagination button {
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 10px;
+}
+.history-pagination button:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+.history-pagination span {
+    color: var(--muted);
+    font-size: 10px;
+}
 @media (max-width: 860px) {
     .history-toolbar {
         flex-direction: column;
@@ -997,3 +1020,154 @@ body {
 /* ── Print slip button in history table ──────────────────────── */
 .slip-btn { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:5px; font-size:10px; font-weight:600; background:#f0f4f2; border:1px solid #d2ddd7; color:#2f584b; text-decoration:none; transition:background .15s, color .15s; white-space:nowrap; }
 .slip-btn:hover { background:#2f584b; color:#fff; border-color:#2f584b; }
+
+/* ── Guide PDF Section ──────────────────────── */
+.guide-pdf-section {
+    margin-top: 24px;
+    border: 1px solid #e8dfe1;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 7px 22px rgba(48,20,27,.055);
+    overflow: hidden;
+}
+
+.guide-pdf-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 24px;
+    border-bottom: 1px solid #eee5e7;
+    background: linear-gradient(180deg, #fff 0%, #fffbfb 100%);
+    flex-wrap: wrap;
+}
+
+.guide-pdf-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.guide-pdf-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #fdebed;
+    color: #c9182b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.guide-pdf-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #292326;
+    line-height: 1.3;
+}
+
+.guide-pdf-desc {
+    margin: 3px 0 0;
+    font-size: 13px;
+    color: #625b5e;
+}
+
+.guide-pdf-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.guide-pdf-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all .2s;
+    cursor: pointer;
+}
+
+.guide-pdf-btn-outline {
+    border: 1px solid #e4d9dc;
+    background: #fff;
+    color: #40383b;
+}
+
+.guide-pdf-btn-outline:hover {
+    border-color: #c9182b;
+    color: #c9182b;
+    background: #fff5f6;
+}
+
+.guide-pdf-btn-primary {
+    border: 1px solid #c9182b;
+    background: linear-gradient(105deg, #ef233c, #b5172b);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(239,35,60,.2);
+}
+
+.guide-pdf-btn-primary:hover {
+    background: linear-gradient(105deg, #d91830, #9f1224);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(239,35,60,.28);
+    color: #fff;
+}
+
+.guide-pdf-viewer {
+    width: 100%;
+    height: 820px;
+    background: #4a4d50;
+    position: relative;
+}
+
+.guide-pdf-viewer iframe,
+.guide-pdf-viewer object {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+.guide-pdf-fallback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 30px;
+    text-align: center;
+    color: #f3e7e9;
+    background: #2b2527;
+}
+
+.guide-pdf-fallback p {
+    margin: 0 0 14px;
+    font-size: 14px;
+    color: #d4c2c5;
+}
+
+@media (max-width: 600px) {
+    .guide-pdf-header {
+        padding: 14px 16px;
+    }
+    .guide-pdf-actions {
+        width: 100%;
+    }
+    .guide-pdf-btn {
+        flex: 1 1 auto;
+        justify-content: center;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+    .guide-pdf-viewer {
+        height: 520px;
+    }
+}

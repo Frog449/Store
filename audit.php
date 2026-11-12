@@ -6,7 +6,7 @@ require __DIR__ . '/includes/bootstrap.php';
 auth_require_role('admin');
 
 $pageTitle = 'ประวัติการใช้งานระบบ (Audit Log) | Store Automeation';
-$pageDescription = 'บันทึกประวัติการกระทำ การเข้าสู่ระบบ และการแก้ไขข้อมูลในระบบคลังสินค้า';
+$pageDescription = 'แสดงประวัติกิจกรรมล่าสุดไม่เกิน 500 รายการ การเข้าสู่ระบบ และการแก้ไขข้อมูลในระบบคลังสินค้า';
 $activePage = 'audit';
 
 // --- POST: ลบ Audit Log ที่เลือก ---
@@ -44,7 +44,7 @@ if ($search !== '') {
     $params['q'] = '%' . $search . '%';
 }
 
-$sql .= ' ORDER BY id DESC LIMIT 300';
+$sql .= ' ORDER BY id DESC LIMIT 500';
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $logs = $stmt->fetchAll();
@@ -63,7 +63,7 @@ require __DIR__ . '/includes/header.php';
             <p>บันทึกประวัติกิจกรรม ตรวจสอบความเคลื่อนไหว การเข้าสู่ระบบ และการแก้ไขข้อมูลย้อนหลัง</p>
         </div>
         <div class="page-kpis">
-            <span><strong><?= count($logs) ?></strong> รายการล่าสุด</span>
+            <span><strong><?= count($logs) ?></strong> รายการล่าสุด (สูงสุด 500)</span>
             <a class="secondary-button" href="backup.php">สำรองข้อมูลระบบ ↗</a>
         </div>
     </div>
@@ -97,7 +97,7 @@ require __DIR__ . '/includes/header.php';
                     <button class="primary-button" type="submit" style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:32px;padding:0 14px;font-size:12px;" onclick="return confirm('ยืนยันการลบรายการ Audit Log ที่เลือก?\nการดำเนินการนี้ไม่สามารถย้อนกลับได้')">ลบรายการที่เลือก</button>
                     <button class="secondary-button" type="button" style="min-height:32px;padding:0 14px;font-size:12px;" onclick="auditClearSelection()">ยกเลิกการเลือก</button>
                 </div>
-            <table class="inventory-table">
+            <table class="inventory-table audit-table">
                 <thead>
                     <tr>
                         <th style="width:36px;text-align:center;">
@@ -193,4 +193,3 @@ require __DIR__ . '/includes/header.php';
 })();
 </script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
-
