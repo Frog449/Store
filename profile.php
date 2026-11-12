@@ -100,7 +100,7 @@ require __DIR__ . '/includes/header.php';
             <div style="border-top:1px solid #edf0eb;padding-top:16px;text-align:left;font-size:12px;">
                 <div style="display:flex;justify-content:space-between;padding:6px 0;">
                     <span style="color:#777;">รหัสพนักงาน:</span>
-                    <strong style="color:#292326;"><?= h(!empty($currentUser['employee_id']) ? $currentUser['employee_id'] : 'ไม่ระบุ') ?></strong>
+                    <strong style="color:#292326;"><?= (int) $currentUser['id'] ?></strong>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;">
                     <span style="color:#777;">อีเมล:</span>
@@ -146,11 +146,11 @@ require __DIR__ . '/includes/header.php';
                 </label>
 
                 <label>
-                    รหัสพนักงาน (Employee ID)
-                    <input type="text" name="employee_id" maxlength="50"
-                        value="<?= h((string) ($_POST['employee_id'] ?? ($currentUser['employee_id'] ?? ''))) ?>"
-                        placeholder="เช่น EMP-001 หรือ 650123">
-                    <small style="color:#888;font-size:9px;">ใช้สำหรับเข้าสู่ระบบแทน Username หรือ Email ได้</small>
+                    รหัสพนักงาน (ID)
+                    <input type="text" name="employee_id" required inputmode="numeric" pattern="[0-9]+" maxlength="20"
+                        value="<?= h((string) ($_POST['employee_id'] ?? $currentUser['id'])) ?>"
+                        placeholder="เช่น 623382">
+                    <small style="color:#888;font-size:9px;">ตัวเลขเท่านั้น ใช้เข้าสู่ระบบแทน Username หรือ Email ได้</small>
                 </label>
 
                 <label>

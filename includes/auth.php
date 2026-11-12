@@ -74,18 +74,24 @@ function auth_login(string $identity, string $password): bool
     }
 
     try {
-        $stmt = inventory_db()->prepare(
-            'SELECT id, employee_id, username, email, name, password_hash, role, department, status
-             FROM `users`
-             WHERE username = :identity 
-                OR (email IS NOT NULL AND email != \'\' AND email = :identity_email)
-                OR (employee_id IS NOT NULL AND employee_id != \'\' AND employee_id = :identity_emp)'
-        );
-        $stmt->execute([
+        $isNumericId = preg_match('/^\d+$/', $identity) === 1;
+        $sql = 'SELECT id, employee_id, username, email, name, password_hash, role, department, status
+                FROM `users`
+                WHERE username = :identity
+                   OR (email IS NOT NULL AND email != \'\' AND email = :identity_email)
+                   OR (employee_id IS NOT NULL AND employee_id != \'\' AND employee_id = :identity_emp)';
+        $params = [
             'identity' => $identity,
             'identity_email' => $identity,
             'identity_emp' => $identity,
-        ]);
+        ];
+        if ($isNumericId) {
+            $sql .= ' OR id = :identity_id';
+            $params['identity_id'] = (int) $identity;
+        }
+
+        $stmt = inventory_db()->prepare($sql);
+        $stmt->execute($params);
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, (string) $user['password_hash'])) {
@@ -192,14 +198,17 @@ function inventory_create_user(string $username, string $password, string $name,
         throw new DomainException('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
     }
 
-    $empVal = null;
+    $customId = null;
     if ($employeeId !== '') {
-        $checkEmp = $db->prepare('SELECT COUNT(*) FROM `users` WHERE employee_id = :emp');
-        $checkEmp->execute(['emp' => $employeeId]);
-        if ((int) $checkEmp->fetchColumn() > 0) {
+        if (!preg_match('/^\d+$/', $employeeId) || (int) $employeeId <= 0) {
+            throw new DomainException('รหัสพนักงานต้องเป็นตัวเลขจำนวนเต็มบวก เช่น 623384');
+        }
+        $customId = (int) $employeeId;
+        $checkId = $db->prepare('SELECT COUNT(*) FROM `users` WHERE id = :id');
+        $checkId->execute(['id' => $customId]);
+        if ((int) $checkId->fetchColumn() > 0) {
             throw new DomainException('รหัสพนักงานนี้ถูกใช้งานแล้วในระบบ');
         }
-        $empVal = $employeeId;
     }
 
     $emailVal = null;
@@ -215,23 +224,40 @@ function inventory_create_user(string $username, string $password, string $name,
         $emailVal = strtolower($email);
     }
 
-    $stmt = $db->prepare(
-        'INSERT INTO `users` (`employee_id`, `username`, `email`, `password_hash`, `name`, `role`, `department`, `status`)
-         VALUES (:employee_id, :username, :email, :password_hash, :name, :role, :department, :status)'
-    );
-    $stmt->execute([
-        'employee_id' => $empVal,
-        'username' => $username,
-        'email' => $emailVal,
-        'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-        'name' => $name,
-        'role' => $role,
-        'department' => $department,
-        'status' => $status,
-    ]);
+    if ($customId !== null) {
+        $stmt = $db->prepare(
+            'INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `name`, `role`, `department`, `status`)
+             VALUES (:id, :username, :email, :password_hash, :name, :role, :department, :status)'
+        );
+        $stmt->execute([
+            'id' => $customId,
+            'username' => $username,
+            'email' => $emailVal,
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'name' => $name,
+            'role' => $role,
+            'department' => $department,
+            'status' => $status,
+        ]);
+        $newId = $customId;
+    } else {
+        $stmt = $db->prepare(
+            'INSERT INTO `users` (`username`, `email`, `password_hash`, `name`, `role`, `department`, `status`)
+             VALUES (:username, :email, :password_hash, :name, :role, :department, :status)'
+        );
+        $stmt->execute([
+            'username' => $username,
+            'email' => $emailVal,
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'name' => $name,
+            'role' => $role,
+            'department' => $department,
+            'status' => $status,
+        ]);
+        $newId = (int) $db->lastInsertId();
+    }
 
-    $newId = (int) $db->lastInsertId();
-    audit_log('user_create', $username, "เพิ่มผู้ใช้ใหม่: {$name} ({$role}) รหัสพนักงาน: " . ($empVal ?? '-') . " อีเมล: " . ($emailVal ?? '-') . " แผนก {$department} สถานะ {$status}");
+    audit_log('user_create', $username, "เพิ่มผู้ใช้ใหม่: {$name} ({$role}) รหัสพนักงาน: {$newId} อีเมล: " . ($emailVal ?? '-') . " แผนก {$department} สถานะ {$status}");
     return $newId;
 }
 
@@ -281,15 +307,20 @@ function inventory_update_user(int $id, string $name, string $role, string $depa
         }
     }
 
-    $empVal = null;
+    $targetId = $id;
     if ($employeeId !== null && trim($employeeId) !== '') {
         $emp = trim($employeeId);
-        $checkEmp = $db->prepare('SELECT COUNT(*) FROM `users` WHERE employee_id = :emp AND id != :id');
-        $checkEmp->execute(['emp' => $emp, 'id' => $id]);
-        if ((int) $checkEmp->fetchColumn() > 0) {
-            throw new DomainException('รหัสพนักงานนี้ถูกใช้งานแล้วในระบบ');
+        if (!preg_match('/^\d+$/', $emp) || (int) $emp <= 0) {
+            throw new DomainException('รหัสพนักงานต้องเป็นตัวเลขจำนวนเต็มบวก เช่น 623384');
         }
-        $empVal = $emp;
+        $targetId = (int) $emp;
+        if ($targetId !== $id) {
+            $checkId = $db->prepare('SELECT COUNT(*) FROM `users` WHERE id = :new_id AND id != :old_id');
+            $checkId->execute(['new_id' => $targetId, 'old_id' => $id]);
+            if ((int) $checkId->fetchColumn() > 0) {
+                throw new DomainException('รหัสพนักงานนี้ถูกใช้งานแล้วในระบบ');
+            }
+        }
     }
 
     $emailVal = null;
@@ -306,44 +337,70 @@ function inventory_update_user(int $id, string $name, string $role, string $depa
         $emailVal = $em;
     }
 
-    if ($newPassword !== null && trim($newPassword) !== '') {
-        if (strlen($newPassword) < 4) {
-            throw new DomainException('รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร');
+    if ($newPassword !== null && trim($newPassword) !== '' && strlen($newPassword) < 4) {
+        throw new DomainException('รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร');
+    }
+
+    $db->beginTransaction();
+    try {
+        if ($newPassword !== null && trim($newPassword) !== '') {
+            $stmt = $db->prepare(
+                'UPDATE `users`
+                 SET `id` = :new_id, `username` = :username, `email` = :email, `name` = :name, `role` = :role, `department` = :department, `status` = :status, `password_hash` = :hash
+                 WHERE id = :old_id'
+            );
+            $stmt->execute([
+                'old_id' => $id,
+                'new_id' => $targetId,
+                'username' => $newUsername,
+                'email' => $emailVal,
+                'name' => $name,
+                'role' => $role,
+                'department' => $department,
+                'status' => $status,
+                'hash' => password_hash($newPassword, PASSWORD_DEFAULT),
+            ]);
+        } else {
+            $stmt = $db->prepare(
+                'UPDATE `users`
+                 SET `id` = :new_id, `username` = :username, `email` = :email, `name` = :name, `role` = :role, `department` = :department, `status` = :status
+                 WHERE id = :old_id'
+            );
+            $stmt->execute([
+                'old_id' => $id,
+                'new_id' => $targetId,
+                'username' => $newUsername,
+                'email' => $emailVal,
+                'name' => $name,
+                'role' => $role,
+                'department' => $department,
+                'status' => $status,
+            ]);
         }
-        $stmt = $db->prepare(
-            'UPDATE `users`
-             SET `employee_id` = :employee_id, `username` = :username, `email` = :email, `name` = :name, `role` = :role, `department` = :department, `status` = :status, `password_hash` = :hash
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            'id' => $id,
-            'employee_id' => $empVal,
-            'username' => $newUsername,
-            'email' => $emailVal,
-            'name' => $name,
-            'role' => $role,
-            'department' => $department,
-            'status' => $status,
-            'hash' => password_hash($newPassword, PASSWORD_DEFAULT),
-        ]);
-        audit_log('user_update', "user#{$id}", "แก้ไขข้อมูลและเปลี่ยนรหัสผ่านผู้ใช้: {$name} ({$newUsername}, {$role}) สถานะ: {$status}");
+
+        if ($targetId !== $id) {
+            $db->prepare('UPDATE `receipts` SET `created_by_user_id` = :new_id WHERE `created_by_user_id` = :old_id')
+                ->execute(['new_id' => $targetId, 'old_id' => $id]);
+            $db->prepare('UPDATE `issues` SET `created_by_user_id` = :new_id WHERE `created_by_user_id` = :old_id')
+                ->execute(['new_id' => $targetId, 'old_id' => $id]);
+            $db->prepare('UPDATE `audit_logs` SET `user_id` = :new_id WHERE `user_id` = :old_id')
+                ->execute(['new_id' => $targetId, 'old_id' => $id]);
+            if ($currentUser && $currentUser['id'] === $id) {
+                $_SESSION['user_id'] = $targetId;
+            }
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $e;
+    }
+
+    if ($newPassword !== null && trim($newPassword) !== '') {
+        audit_log('user_update', "user#{$targetId}", "แก้ไขข้อมูลและเปลี่ยนรหัสผ่านผู้ใช้: {$name} ({$newUsername}, {$role}) รหัสพนักงาน: {$targetId} สถานะ: {$status}");
     } else {
-        $stmt = $db->prepare(
-            'UPDATE `users`
-             SET `employee_id` = :employee_id, `username` = :username, `email` = :email, `name` = :name, `role` = :role, `department` = :department, `status` = :status
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            'id' => $id,
-            'employee_id' => $empVal,
-            'username' => $newUsername,
-            'email' => $emailVal,
-            'name' => $name,
-            'role' => $role,
-            'department' => $department,
-            'status' => $status,
-        ]);
-        audit_log('user_update', "user#{$id}", "แก้ไขข้อมูลผู้ใช้: {$name} ({$newUsername}, {$role}) สถานะ: {$status}");
+        audit_log('user_update', "user#{$targetId}", "แก้ไขข้อมูลผู้ใช้: {$name} ({$newUsername}, {$role}) รหัสพนักงาน: {$targetId} สถานะ: {$status}");
     }
 }
 
@@ -445,16 +502,21 @@ function auth_update_profile(
         }
     }
 
-    // ตรวจสอบความถูกต้องและความซ้ำของ employee_id
-    $empVal = null;
+    // ตรวจสอบความถูกต้องและความซ้ำของรหัสพนักงาน (id)
+    $targetId = $userId;
     if ($employeeId !== null && trim($employeeId) !== '') {
         $emp = trim($employeeId);
-        $checkEmp = $db->prepare('SELECT COUNT(*) FROM `users` WHERE employee_id = :emp AND id != :id');
-        $checkEmp->execute(['emp' => $emp, 'id' => $userId]);
-        if ((int) $checkEmp->fetchColumn() > 0) {
-            throw new DomainException('รหัสพนักงานนี้ถูกใช้งานแล้วในระบบ');
+        if (!preg_match('/^\d+$/', $emp) || (int) $emp <= 0) {
+            throw new DomainException('รหัสพนักงานต้องเป็นตัวเลขจำนวนเต็มบวก เช่น 623384');
         }
-        $empVal = $emp;
+        $targetId = (int) $emp;
+        if ($targetId !== $userId) {
+            $checkId = $db->prepare('SELECT COUNT(*) FROM `users` WHERE id = :new_id AND id != :old_id');
+            $checkId->execute(['new_id' => $targetId, 'old_id' => $userId]);
+            if ((int) $checkId->fetchColumn() > 0) {
+                throw new DomainException('รหัสพนักงานนี้ถูกใช้งานแล้วในระบบ');
+            }
+        }
     }
 
     // ตรวจสอบความถูกต้องและความซ้ำของ email
@@ -472,6 +534,7 @@ function auth_update_profile(
         $emailVal = $em;
     }
 
+    $newHash = null;
     if ($newPassword !== null && $newPassword !== '') {
         if ($currentPassword === null || $currentPassword === '') {
             throw new DomainException('กรุณาระบุรหัสผ่านเดิมเพื่อยืนยันการเปลี่ยนรหัสผ่าน');
@@ -487,37 +550,63 @@ function auth_update_profile(
         if (strlen($newPassword) < 4) {
             throw new DomainException('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
         }
+        $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+    }
 
-        $stmt = $db->prepare(
-            'UPDATE `users`
-             SET `employee_id` = :employee_id, `username` = :username, `email` = :email, `name` = :name, `department` = :department, `password_hash` = :hash
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            'id' => $userId,
-            'employee_id' => $empVal,
-            'username' => $username,
-            'email' => $emailVal,
-            'name' => $name,
-            'department' => $department,
-            'hash' => password_hash($newPassword, PASSWORD_DEFAULT),
-        ]);
-        audit_log('profile_update', $username, "แก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน: {$name}");
+    $db->beginTransaction();
+    try {
+        if ($newHash !== null) {
+            $stmt = $db->prepare(
+                'UPDATE `users`
+                 SET `id` = :new_id, `username` = :username, `email` = :email, `name` = :name, `department` = :department, `password_hash` = :hash
+                 WHERE id = :old_id'
+            );
+            $stmt->execute([
+                'old_id' => $userId,
+                'new_id' => $targetId,
+                'username' => $username,
+                'email' => $emailVal,
+                'name' => $name,
+                'department' => $department,
+                'hash' => $newHash,
+            ]);
+        } else {
+            $stmt = $db->prepare(
+                'UPDATE `users`
+                 SET `id` = :new_id, `username` = :username, `email` = :email, `name` = :name, `department` = :department
+                 WHERE id = :old_id'
+            );
+            $stmt->execute([
+                'old_id' => $userId,
+                'new_id' => $targetId,
+                'username' => $username,
+                'email' => $emailVal,
+                'name' => $name,
+                'department' => $department,
+            ]);
+        }
+
+        if ($targetId !== $userId) {
+            $db->prepare('UPDATE `receipts` SET `created_by_user_id` = :new_id WHERE `created_by_user_id` = :old_id')
+                ->execute(['new_id' => $targetId, 'old_id' => $userId]);
+            $db->prepare('UPDATE `issues` SET `created_by_user_id` = :new_id WHERE `created_by_user_id` = :old_id')
+                ->execute(['new_id' => $targetId, 'old_id' => $userId]);
+            $db->prepare('UPDATE `audit_logs` SET `user_id` = :new_id WHERE `user_id` = :old_id')
+                ->execute(['new_id' => $targetId, 'old_id' => $userId]);
+            $_SESSION['user_id'] = $targetId;
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $e;
+    }
+
+    if ($newHash !== null) {
+        audit_log('profile_update', $username, "แก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน: {$name} (รหัสพนักงาน: {$targetId})");
     } else {
-        $stmt = $db->prepare(
-            'UPDATE `users`
-             SET `employee_id` = :employee_id, `username` = :username, `email` = :email, `name` = :name, `department` = :department
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            'id' => $userId,
-            'employee_id' => $empVal,
-            'username' => $username,
-            'email' => $emailVal,
-            'name' => $name,
-            'department' => $department,
-        ]);
-        audit_log('profile_update', $username, "แก้ไขข้อมูลโปรไฟล์: {$name}");
+        audit_log('profile_update', $username, "แก้ไขข้อมูลโปรไฟล์: {$name} (รหัสพนักงาน: {$targetId})");
     }
 }
 

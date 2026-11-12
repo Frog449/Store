@@ -228,7 +228,7 @@ require __DIR__ . '/includes/header.php';
                             <td><?= h($row['movement_date']) ?></td>
                             <td class="code-cell"><?= h($row['product_code']) ?></td>
                             <td class="name-cell"><strong><?= h($row['product_name']) ?></strong></td>
-                            <td><?= h((string)($row['received_by'] ?? '') !== '' ? $row['received_by'] : '—') ?></td>
+                            <td><?= h((string) ($row['received_by'] ?? '') !== '' ? $row['received_by'] : '—') ?></td>
                             <td class="numeric" style="color:#2b773c;font-weight:700;">
                                 +<?= inventory_quantity($row['quantity']) ?></td>
                             <td style="white-space:nowrap;">
@@ -343,7 +343,7 @@ require __DIR__ . '/includes/header.php';
                             <td><?= h($row['movement_date']) ?></td>
                             <td class="code-cell"><?= h($row['product_code']) ?></td>
                             <td class="name-cell"><strong><?= h($row['product_name']) ?></strong></td>
-                            <td><?= h((string)($row['requested_by'] ?? '') !== '' ? $row['requested_by'] : '—') ?></td>
+                            <td><?= h((string) ($row['requested_by'] ?? '') !== '' ? $row['requested_by'] : '—') ?></td>
                             <td class="numeric" style="color:#c53030;font-weight:700;">
                                 -<?= inventory_quantity($row['quantity']) ?></td>
                             <td style="white-space:nowrap;">
@@ -430,7 +430,7 @@ require __DIR__ . '/includes/header.php';
 
             <label>
                 จำนวน (<span id="edit-movement-unit">หน่วย</span>)
-                <input type="number" step="0.01" min="0.01" name="quantity" id="edit-movement-qty" required>
+                <input type="number" step="1" min="0" name="quantity" id="edit-movement-qty" required>
             </label>
 
             <label>

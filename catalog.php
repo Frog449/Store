@@ -210,7 +210,7 @@ require __DIR__ . '/includes/header.php';
                 <?php foreach ($unitOptions as $option): ?><option value="<?= h($option) ?>" <?= ($_POST['unit'] ?? $editProduct['unit'] ?? '') === $option ? 'selected' : '' ?>><?= h($option) ?></option><?php endforeach; ?>
             </select></label>
             <label>ตำแหน่งจัดเก็บ <input name="location" maxlength="80" value="<?= h((string) ($_POST['location'] ?? $editProduct['location'] ?? '')) ?>"></label>
-            <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="0.001" min="0" required value="<?= h((string) ($_POST['reorder_point'] ?? $editProduct['reorder_point'] ?? '')) ?>"></label>
+            <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="1" min="0" required value="<?= h((string) ($_POST['reorder_point'] ?? $editProduct['reorder_point'] ?? '')) ?>"></label>
             <label class="product-image-upload-field form-span-2">รูปสินค้า
                 <input class="product-image-upload" type="file" name="product_image" accept="image/jpeg,image/png,image/webp">
                 <small>JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB</small>

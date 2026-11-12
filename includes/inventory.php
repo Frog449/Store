@@ -661,7 +661,7 @@ function inventory_type_options(): array
 
 function inventory_unit_options(): array
 {
-    return ['pcs (ชิ้น)', 'Roll (ม้วน)', 'Sheet (แผ่น)', 'm. (เมตร)'];
+    return ['PCS', 'SHT', 'ROL', 'M.', 'PCK', 'Bag'];
 }
 
 function inventory_choice(string $key, string $label, array $options): string
@@ -1467,7 +1467,7 @@ function inventory_delete_movements(string $kind, array $ids): void
     $deletedCount = $stmt->rowCount();
 
     foreach ($affectedCodes as $code) {
-        inventory_sync_product_summary($db, (string)$code);
+        inventory_sync_product_summary($db, (string) $code);
     }
 
     $kindLabel = $kind === 'receipt' ? 'รับเข้าคลัง' : 'เบิกออก';
@@ -1498,11 +1498,11 @@ function inventory_delete_audit_logs(array $ids): void
     // บันทึก audit ว่าลบ log (ใช้ SQL direct เพื่อไม่เกิด loop)
     $db->prepare("INSERT INTO `audit_logs` (user_id, username, user_name, action, target, details, ip_address)
                   VALUES (:uid, :uname, :unamefull, 'audit_log_delete', '', :details, :ip)")
-       ->execute([
-           'uid'      => auth_user()['id'] ?? 0,
-           'uname'    => auth_user()['username'] ?? '',
-           'unamefull'=> auth_user()['name'] ?? '',
-           'details'  => "ลบ Audit Log {$deletedCount} รายการ (ID: " . implode(', ', $intIds) . ")",
-           'ip'       => $_SERVER['REMOTE_ADDR'] ?? '',
-       ]);
+        ->execute([
+            'uid' => auth_user()['id'] ?? 0,
+            'uname' => auth_user()['username'] ?? '',
+            'unamefull' => auth_user()['name'] ?? '',
+            'details' => "ลบ Audit Log {$deletedCount} รายการ (ID: " . implode(', ', $intIds) . ")",
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+        ]);
 }

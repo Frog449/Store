@@ -199,7 +199,7 @@ require __DIR__ . '/includes/header.php';
                     </select></label>
                 <label>ตำแหน่งจัดเก็บ <input name="location" maxlength="80"
                         value="<?= h((string) ($_POST['location'] ?? '')) ?>" placeholder="เช่น A1"></label>
-                <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="0.001" min="0" required
+                <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="1" min="0" required
                         value="<?= h((string) ($_POST['reorder_point'] ?? '0')) ?>"></label>
                 <label class="product-image-upload-field form-span-2">รูปสินค้า
                     <input class="product-image-upload" type="file" name="product_image"
@@ -212,7 +212,7 @@ require __DIR__ . '/includes/header.php';
                         value="<?= h((string) ($_POST['movement_date'] ?? date('Y-m-d'))) ?>"></label>
                 <label>เลขที่เอกสาร <input name="document_no" maxlength="100"
                         value="<?= h((string) ($_POST['document_no'] ?? '')) ?>" placeholder="ถ้ามี"></label>
-                <label>จำนวนรับครั้งแรก <input type="number" name="quantity" min="0.001" step="0.001" required
+                <label>จำนวนรับครั้งแรก <input type="number" name="quantity" min="0" step="1" required
                         value="<?= h((string) ($_POST['quantity'] ?? '')) ?>"></label>
                 <label>ผู้รับสินค้า <input name="received_by" maxlength="150"
                         value="<?= h((string) ($_POST['received_by'] ?? '')) ?>"></label>

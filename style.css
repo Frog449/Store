@@ -1316,3 +1316,44 @@ body {
     font-size: 12px;
     color: #64748b;
 }
+
+/* Users Management Table */
+.users-table {
+    white-space: normal;
+}
+.users-table th,
+.users-table td {
+    padding: 12px 14px;
+    vertical-align: middle;
+}
+.user-emp-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 6px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #0758b4;
+    font: 700 12px "DM Sans", var(--font);
+    letter-spacing: .2px;
+    white-space: nowrap;
+}
+.users-action-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+.users-action-group form {
+    display: inline-flex;
+    margin: 0;
+}
+.users-action-btn {
+    min-height: 28px !important;
+    height: 28px;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+    font-weight: 600;
+    border-radius: 5px;
+    white-space: nowrap;
+}

@@ -99,63 +99,66 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <div class="table-scroll">
-            <table class="inventory-table">
+            <table class="inventory-table users-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>รหัสพนักงาน</th>
-                        <th>Username</th>
-                        <th>ชื่อ-นามสกุล</th>
+                        <th style="width:105px;">รหัสพนักงาน</th>
+                        <th>ผู้ใช้งาน</th>
                         <th>อีเมล</th>
-                        <th>บทบาท (Role)</th>
+                        <th style="width:88px;">บทบาท</th>
                         <th>แผนก / สังกัด</th>
-                        <th>สถานะ</th>
-                        <th>วันที่สร้าง</th>
-                        <th style="text-align:right;">การกระทำ</th>
+                        <th style="width:110px;">สถานะ</th>
+                        <th style="width:96px;">วันที่สร้าง</th>
+                        <th style="text-align:right;width:170px;">การกระทำ</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($userList as $u): ?>
                         <?php $isSuspended = ($u['status'] ?? 'active') === 'suspended'; ?>
                         <tr>
-                            <td>#<?= (int) $u['id'] ?></td>
-                            <td><?= h(!empty($u['employee_id']) ? $u['employee_id'] : '—') ?></td>
-                            <td><strong><?= h($u['username']) ?></strong></td>
-                            <td><?= h($u['name']) ?></td>
-                            <td><?= h(!empty($u['email']) ? $u['email'] : '-') ?></td>
+                            <td class="code-cell">
+                                <span class="user-emp-badge"><?= (int) $u['id'] ?></span>
+                            </td>
+                            <td>
+                                <strong style="display:block;color:#1e293b;"><?= h($u['name']) ?></strong>
+                                <small style="display:block;color:#64748b;font-size:11px;">@<?= h($u['username']) ?></small>
+                            </td>
+                            <td style="word-break:break-word;"><?= h(!empty($u['email']) ? $u['email'] : '—') ?></td>
                             <td>
                                 <span class="user-chip-role role-<?= h($u['role']) ?>">
                                     <?= h(strtoupper($u['role'])) ?>
                                 </span>
                             </td>
-                            <td><?= h($u['department'] !== '' ? $u['department'] : '-') ?></td>
-                            <td>
-                                <span class="user-chip-role" style="background:<?= $isSuspended ? '#ffebee;color:#c62828;' : '#e8f5e9;color:#2e7d32;' ?>">
+                            <td><?= h($u['department'] !== '' ? $u['department'] : '—') ?></td>
+                            <td style="white-space:nowrap;">
+                                <span class="user-chip-role" style="background:<?= $isSuspended ? '#fee2e2;color:#b91c1c;' : '#dcfce7;color:#15803d;' ?>">
                                     <?= $isSuspended ? 'ระงับการใช้งาน' : 'ใช้งานปกติ' ?>
                                 </span>
                             </td>
-                            <td><?= h(substr((string) $u['created_at'], 0, 10)) ?></td>
-                            <td style="text-align:right;">
-                                <button class="secondary-button" type="button" style="padding:4px 10px;font-size:10px;"
-                                    onclick="editUser(<?= (int) $u['id'] ?>, '<?= h(addslashes($u['username'])) ?>', '<?= h(addslashes($u['employee_id'] ?? '')) ?>', '<?= h(addslashes($u['email'] ?? '')) ?>', '<?= h(addslashes($u['name'])) ?>', '<?= h(addslashes($u['role'])) ?>', '<?= h(addslashes($u['department'])) ?>', '<?= h(addslashes($u['status'] ?? 'active')) ?>')">
-                                    แก้ไข
-                                </button>
-                                <?php if ($currentUser && $currentUser['id'] !== (int) $u['id']): ?>
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('ยืนยันที่จะ<?= $isSuspended ? 'ปลดการระงับ' : 'ระงับการใช้งาน' ?>ผู้ใช้นี้หรือไม่?')">
-                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                                        <input type="hidden" name="action" value="toggle_status">
-                                        <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
-                                        <button class="secondary-button" type="submit" style="padding:4px 8px;font-size:10px;color:<?= $isSuspended ? '#2e7d32' : '#c62828' ?>;">
-                                            <?= $isSuspended ? 'ปลดระงับ' : 'ระงับ' ?>
-                                        </button>
-                                    </form>
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('ยืนยันที่จะลบผู้ใช้นี้หรือไม่?')">
-                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                                        <input type="hidden" name="action" value="delete_user">
-                                        <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
-                                        <button class="danger-button" type="submit" style="padding:4px 10px;font-size:10px;">ลบ</button>
-                                    </form>
-                                <?php endif; ?>
+                            <td style="white-space:nowrap;font-size:11px;color:#64748b;"><?= h(substr((string) $u['created_at'], 0, 10)) ?></td>
+                            <td style="text-align:right;white-space:nowrap;">
+                                <div class="users-action-group">
+                                    <button class="secondary-button users-action-btn" type="button"
+                                        onclick="editUser(<?= (int) $u['id'] ?>, '<?= h(addslashes($u['username'])) ?>', '<?= h(addslashes($u['email'] ?? '')) ?>', '<?= h(addslashes($u['name'])) ?>', '<?= h(addslashes($u['role'])) ?>', '<?= h(addslashes($u['department'])) ?>', '<?= h(addslashes($u['status'] ?? 'active')) ?>')">
+                                        แก้ไข
+                                    </button>
+                                    <?php if ($currentUser && $currentUser['id'] !== (int) $u['id']): ?>
+                                        <form method="post" onsubmit="return confirm('ยืนยันที่จะ<?= $isSuspended ? 'ปลดการระงับ' : 'ระงับการใช้งาน' ?>ผู้ใช้นี้หรือไม่?')">
+                                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                            <input type="hidden" name="action" value="toggle_status">
+                                            <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
+                                            <button class="secondary-button users-action-btn" type="submit" style="color:<?= $isSuspended ? '#15803d' : '#b91c1c' ?>;border-color:<?= $isSuspended ? '#bbf7d0' : '#fecaca' ?>;">
+                                                <?= $isSuspended ? 'ปลดระงับ' : 'ระงับ' ?>
+                                            </button>
+                                        </form>
+                                        <form method="post" onsubmit="return confirm('ยืนยันที่จะลบผู้ใช้นี้หรือไม่?')">
+                                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                            <input type="hidden" name="action" value="delete_user">
+                                            <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
+                                            <button class="danger-button users-action-btn" type="submit">ลบ</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -184,9 +187,9 @@ require __DIR__ . '/includes/header.php';
             </label>
 
             <label>
-                รหัสพนักงาน (Employee ID)
-                <input type="text" name="employee_id" placeholder="เช่น EMP-001 หรือ 650123 (ใช้เข้าสู่ระบบได้)">
-                <small style="color:#888;">ไม่บังคับ หรือระบุเพื่อใช้เข้าสู่ระบบแทนชื่อผู้ใช้ได้</small>
+                รหัสพนักงาน (ID)
+                <input type="text" name="employee_id" inputmode="numeric" pattern="[0-9]+" placeholder="เช่น 623384 (เว้นว่างเพื่อสร้างรหัสอัตโนมัติ)">
+                <small style="color:#888;">ตัวเลขเท่านั้น ใช้เข้าสู่ระบบแทนชื่อผู้ใช้ได้</small>
             </label>
 
             <label>
@@ -246,9 +249,9 @@ require __DIR__ . '/includes/header.php';
             </label>
 
             <label>
-                รหัสพนักงาน (Employee ID)
-                <input type="text" name="employee_id" id="edit-employee-id" placeholder="เช่น EMP-001 หรือ 650123 (ใช้เข้าสู่ระบบได้)">
-                <small style="color:#888;">ไม่บังคับ หรือระบุเพื่อใช้เข้าสู่ระบบแทนชื่อผู้ใช้ได้</small>
+                รหัสพนักงาน (ID)
+                <input type="text" name="employee_id" id="edit-employee-id" required inputmode="numeric" pattern="[0-9]+" placeholder="เช่น 623382">
+                <small style="color:#888;">ตัวเลขเท่านั้น ใช้เข้าสู่ระบบแทนชื่อผู้ใช้ได้</small>
             </label>
 
             <label>
@@ -297,10 +300,10 @@ require __DIR__ . '/includes/header.php';
 </section>
 
 <script>
-function editUser(id, username, employeeId, email, name, role, department, status) {
+function editUser(id, username, email, name, role, department, status) {
     document.querySelector('#edit-user-id').value = id;
     document.querySelector('#edit-username').value = username;
-    document.querySelector('#edit-employee-id').value = employeeId || '';
+    document.querySelector('#edit-employee-id').value = id || '';
     document.querySelector('#edit-email').value = email || '';
     document.querySelector('#edit-name').value = name;
     document.querySelector('#edit-role').value = role;
