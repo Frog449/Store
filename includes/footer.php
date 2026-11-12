@@ -4,6 +4,6 @@
     <span>INDUSTRIAL SUPPLY · INVENTORY</span>
     <span>ข้อมูลสต๊อกอ้างอิงจากทะเบียนสินค้า</span>
 </footer>
-<script src="app.js?v=2.1" defer></script>
+<script src="app.js?v=2.3" defer></script>
 </body>
 </html>

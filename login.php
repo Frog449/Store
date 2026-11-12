@@ -17,12 +17,12 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         inventory_require_csrf();
-        $username = trim((string) ($_POST['username'] ?? ''));
+        $identity = trim((string) ($_POST['username'] ?? ''));
         $password = (string) ($_POST['password'] ?? '');
 
-        if ($username === '' || $password === '') {
-            $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
-        } elseif (auth_login($username, $password)) {
+        if ($identity === '' || $password === '') {
+            $error = 'กรุณากรอกชื่อผู้ใช้ รหัสพนักงาน หรืออีเมล และรหัสผ่าน';
+        } elseif (auth_login($identity, $password)) {
             // จดจำฉัน: ขยาย lifetime cookie session เป็น 30 วัน
             if (!empty($_POST['remember_me'])) {
                 $cookieParams = session_get_cookie_params();
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $redirectTo);
             exit;
         } else {
-            $error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+            $error = 'ชื่อผู้ใช้ รหัสพนักงาน อีเมล หรือรหัสผ่านไม่ถูกต้อง';
         }
     } catch (Throwable $e) {
         $error = $e->getMessage();
@@ -67,16 +67,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             align-items: center;
             justify-content: center;
             padding: 30px 16px;
-            background: linear-gradient(135deg, #fbf5f6 0%, #f6e8ea 100%);
+            background: linear-gradient(135deg, #f0f5fc 0%, #e6effa 100%);
         }
         .login-card {
             width: 100%;
             max-width: 420px;
             padding: 36px 32px 30px;
-            border: 1px solid #e8dfe1;
+            border: 1px solid #d4e2f4;
             border-radius: 14px;
             background: #ffffff;
-            box-shadow: 0 16px 45px rgba(153, 28, 47, 0.08);
+            box-shadow: 0 16px 45px rgba(7, 88, 180, 0.08);
             animation: rise-in 0.4s both;
         }
         .login-brand {
@@ -87,16 +87,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-decoration: none;
             color: inherit;
         }
+        .login-brand img {
+            height: 42px;
+            width: auto;
+            object-fit: contain;
+        }
         .login-header h1 {
             margin: 0 0 6px;
             font-size: 22px;
             font-weight: 700;
-            color: #292326;
+            color: #1e293b;
         }
         .login-header p {
             margin: 0 0 24px;
             font-size: 12px;
-            color: #625b5e;
+            color: #64748b;
             line-height: 1.6;
         }
         .login-form {
@@ -110,22 +115,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             gap: 6px;
             font-size: 11px;
             font-weight: 600;
-            color: #40383b;
+            color: #334155;
         }
         .login-form input {
             height: 44px;
             padding: 0 14px;
-            border: 1px solid #e3d8db;
+            border: 1px solid #cbd5e1;
             border-radius: 7px;
             font-size: 13px;
             background: #fff;
-            color: #292326;
+            color: #1e293b;
             transition: all 0.2s;
         }
         .login-form input:focus {
             outline: none;
-            border-color: #ef233c;
-            box-shadow: 0 0 0 3px rgba(239, 35, 60, 0.15);
+            border-color: #0758b4;
+            box-shadow: 0 0 0 3px rgba(7, 88, 180, 0.15);
         }
         .login-submit {
             height: 44px;
@@ -133,26 +138,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border: none;
             border-radius: 7px;
             color: #fff;
-            background: linear-gradient(105deg, #ef233c, #b5172b);
+            background: linear-gradient(105deg, #0758b4, #05448c);
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            box-shadow: 0 6px 18px rgba(239, 35, 60, 0.22);
+            box-shadow: 0 6px 18px rgba(7, 88, 180, 0.22);
             transition: all 0.2s;
         }
         .login-submit:hover {
-            background: linear-gradient(105deg, #d90429, #8d1124);
+            background: linear-gradient(105deg, #05448c, #032d5e);
             transform: translateY(-1px);
         }
-.login-error {
+        .login-error {
             margin-bottom: 18px;
             padding: 10px 14px;
             border-radius: 6px;
-            background: #ffebee;
-            color: #c62828;
+            background: #fee2e2;
+            color: #b91c1c;
             font-size: 12px;
             font-weight: 500;
-            border: 1px solid #ffcdd2;
+            border: 1px solid #fecaca;
         }
         .login-security-tag {
             display: inline-flex;
@@ -160,8 +165,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             gap: 6px;
             padding: 4px 9px;
             border-radius: 4px;
-            background: #f0edef;
-            color: #625b5e;
+            background: #e2e8f0;
+            color: #475569;
             font-size: 10px;
             font-weight: 600;
             margin-bottom: 14px;
@@ -172,14 +177,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             gap: 8px;
             font-size: 12px;
             font-weight: 500;
-            color: #625b5e;
+            color: #64748b;
             cursor: pointer;
             margin-top: -4px;
         }
         .login-remember input[type=checkbox] {
             width: 15px;
             height: 15px;
-            accent-color: #ef233c;
+            accent-color: #0758b4;
             cursor: pointer;
             flex-shrink: 0;
         }
@@ -189,16 +194,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="login-wrap">
     <div class="login-card">
         <a class="login-brand" href="login.php">
-            <span class="brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 32 32" fill="none"><path d="M4 13.5 16 6l12 7.5v13H4v-13Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M11 26.5v-9h10v9M4.5 13.5h23" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M13.5 10.5h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-            </span>
+            <img src="assets/logo.png" alt="AUT Automation Logo">
             <span class="brand-name">Store <span>Automeation</span><small>INDUSTRIAL SUPPLY</small></span>
         </a>
 
         <div class="login-header">
             <span class="login-security-tag">🔒 INTERNAL ACCESS ONLY</span>
             <h1>เข้าสู่ระบบคลังสินค้า</h1>
-            <p>กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
+            <p>กรุณากรอกชื่อผู้ใช้ รหัสพนักงาน หรืออีเมล และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
         </div>
 
         <?php if ($error !== ''): ?>
@@ -209,8 +212,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
 
             <label>
-                ชื่อผู้ใช้งาน (Username)
-                <input type="text" name="username" placeholder="ระบุ username..." required autofocus value="<?= h((string) ($_POST['username'] ?? '')) ?>">
+                ชื่อผู้ใช้งาน, รหัสพนักงาน หรือ อีเมล
+                <input type="text" name="username" placeholder="ระบุ username, รหัสพนักงาน หรือ อีเมล..." required autofocus value="<?= h((string) ($_POST['username'] ?? '')) ?>">
             </label>
 
             <label>

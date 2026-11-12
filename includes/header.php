@@ -14,15 +14,13 @@ $activePage = $activePage ?? 'products';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3.0">
+    <link rel="stylesheet" href="style.css?v=3.1">
 </head>
 <body>
 <header class="site-header">
     <div class="header-inner">
         <a class="brand" href="index.php" aria-label="Store Automeation หน้าแรก">
-            <span class="brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 32 32" fill="none"><path d="M4 13.5 16 6l12 7.5v13H4v-13Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M11 26.5v-9h10v9M4.5 13.5h23" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M13.5 10.5h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-            </span>
+            <img src="assets/logo.png" alt="AUT Automation" class="brand-logo-img" style="height:36px;width:auto;object-fit:contain;display:block;">
             <span class="brand-name">Store <span>Automeation</span><small>INDUSTRIAL SUPPLY</small></span>
         </a>
         <nav class="main-nav" aria-label="เมนูหลัก">
@@ -54,7 +52,7 @@ $activePage = $activePage ?? 'products';
             <?php
                 $displayName = trim((string)($currentUser['name'] ?? 'ผู้ใช้'));
                 $cleanName = preg_replace('/\s*\(Admin\)/i', '', $displayName);
-                $canEditProfile = in_array($currentUser['role'] ?? '', ['admin', 'staff'], true);
+                $canEditProfile = true;
             ?>
             <div class="user-profile-widget">
                 <?php if ($canEditProfile): ?>

@@ -6,7 +6,7 @@ require __DIR__ . '/includes/bootstrap.php';
 auth_require_role('admin');
 
 $pageTitle = 'ประวัติการใช้งานระบบ (Audit Log) | Store Automeation';
-$pageDescription = 'แสดงประวัติกิจกรรมล่าสุดไม่เกิน 500 รายการ การเข้าสู่ระบบ และการแก้ไขข้อมูลในระบบคลังสินค้า';
+$pageDescription = 'แสดงประวัติกิจกรรมล่าสุดไม่เกิน 500 รายการ และการแก้ไขข้อมูลในระบบคลังสินค้า';
 $activePage = 'audit';
 
 // --- POST: ลบ Audit Log ที่เลือก ---
@@ -31,7 +31,7 @@ $search = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']) : '';
 
 $sql = 'SELECT id, user_id, username, user_name, action, target, details, ip_address, created_at
         FROM `audit_logs`
-        WHERE 1=1';
+        WHERE `action` NOT IN (\'login\', \'login_failed\', \'login_blocked\', \'logout\')';
 $params = [];
 
 if ($actionFilter !== '') {
@@ -50,7 +50,7 @@ $stmt->execute($params);
 $logs = $stmt->fetchAll();
 
 $actionCounts = $db->query(
-    'SELECT `action`, COUNT(*) as total FROM `audit_logs` GROUP BY `action` ORDER BY total DESC'
+    'SELECT `action`, COUNT(*) as total FROM `audit_logs` WHERE `action` NOT IN (\'login\', \'login_failed\', \'login_blocked\', \'logout\') GROUP BY `action` ORDER BY total DESC'
 )->fetchAll();
 
 require __DIR__ . '/includes/header.php';
@@ -60,7 +60,7 @@ require __DIR__ . '/includes/header.php';
         <div>
             <div class="eyebrow section-eyebrow">SECURITY & AUDIT TRAIL</div>
             <h1>ประวัติการใช้งานระบบ (Audit Log)<span class="heading-period">.</span></h1>
-            <p>บันทึกประวัติกิจกรรม ตรวจสอบความเคลื่อนไหว การเข้าสู่ระบบ และการแก้ไขข้อมูลย้อนหลัง</p>
+            <p>บันทึกประวัติกิจกรรม ตรวจสอบความเคลื่อนไหว และการแก้ไขข้อมูลย้อนหลัง</p>
         </div>
         <div class="page-kpis">
             <span><strong><?= count($logs) ?></strong> รายการล่าสุด (สูงสุด 500)</span>
@@ -71,12 +71,12 @@ require __DIR__ . '/includes/header.php';
     <div class="catalog-toolbar" style="margin-bottom:18px;">
         <div class="category-filters" role="group" aria-label="กรองประเภทกิจกรรม">
             <a class="filter-chip <?= $actionFilter === '' ? 'selected' : '' ?>" href="audit.php">ทั้งหมด</a>
-            <a class="filter-chip <?= $actionFilter === 'login' ? 'selected' : '' ?>" href="audit.php?action=login">เข้าสู่ระบบ</a>
             <a class="filter-chip <?= $actionFilter === 'product_create' ? 'selected' : '' ?>" href="audit.php?action=product_create">เพิ่มสินค้า</a>
             <a class="filter-chip <?= $actionFilter === 'product_update' ? 'selected' : '' ?>" href="audit.php?action=product_update">แก้ไขสินค้า</a>
             <a class="filter-chip <?= $actionFilter === 'product_delete' ? 'selected' : '' ?>" href="audit.php?action=product_delete">ลบสินค้า</a>
             <a class="filter-chip <?= $actionFilter === 'receipt_create' ? 'selected' : '' ?>" href="audit.php?action=receipt_create">รับเข้า</a>
             <a class="filter-chip <?= $actionFilter === 'issue_create' ? 'selected' : '' ?>" href="audit.php?action=issue_create">เบิกออก</a>
+            <a class="filter-chip <?= in_array($actionFilter, ['user_create', 'user_update', 'user_delete'], true) ? 'selected' : '' ?>" href="audit.php?action=user_update">จัดการผู้ใช้</a>
         </div>
         <form method="get" class="search-box" style="min-width:280px;">
             <?php if ($actionFilter !== ''): ?>
@@ -92,16 +92,16 @@ require __DIR__ . '/includes/header.php';
             <form method="post" id="audit-bulk-form">
                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                 <input type="hidden" name="action" value="delete_audit_logs">
-                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;margin-bottom:12px;" id="audit-bulk-toolbar" hidden>
-                    <span id="audit-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0 รายการที่เลือก</span>
-                    <button class="primary-button" type="submit" style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:32px;padding:0 14px;font-size:12px;" onclick="return confirm('ยืนยันการลบรายการ Audit Log ที่เลือก?\nการดำเนินการนี้ไม่สามารถย้อนกลับได้')">ลบรายการที่เลือก</button>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0f5fc;border:1px solid #d0e1f7;border-radius:8px;margin-bottom:12px;" id="audit-bulk-toolbar" hidden>
+                    <span id="audit-selected-count" style="font-size:12px;color:#074080;font-weight:600;">0 รายการที่เลือก</span>
+                    <button class="primary-button" type="submit" style="background:linear-gradient(105deg,#0758b4,#05448c);min-height:32px;padding:0 14px;font-size:12px;" onclick="return confirm('ยืนยันการลบรายการ Audit Log ที่เลือก?\nการดำเนินการนี้ไม่สามารถย้อนกลับได้')">ลบรายการที่เลือก</button>
                     <button class="secondary-button" type="button" style="min-height:32px;padding:0 14px;font-size:12px;" onclick="auditClearSelection()">ยกเลิกการเลือก</button>
                 </div>
             <table class="inventory-table audit-table">
                 <thead>
                     <tr>
                         <th style="width:36px;text-align:center;">
-                            <input type="checkbox" id="audit-select-all" title="เลือกทั้งหมด" style="accent-color:#ef233c;cursor:pointer;">
+                            <input type="checkbox" id="audit-select-all" title="เลือกทั้งหมด" style="accent-color:#0758b4;cursor:pointer;">
                         </th>
                         <th style="width:130px;">วัน-เวลา</th>
                         <th>ผู้ใช้งาน</th>
@@ -115,9 +115,6 @@ require __DIR__ . '/includes/header.php';
                     <?php foreach ($logs as $log): ?>
                         <?php
                             $actionLabel = match ($log['action']) {
-                                'login' => '🟢 เข้าสู่ระบบ',
-                                'login_failed' => '🔴 ล็อกอินล้มเหลว',
-                                'logout' => '⚪ ออกจากระบบ',
                                 'product_create' => '📦 เพิ่มสินค้า',
                                 'product_update' => '✏️ แก้ไขสินค้า',
                                 'product_delete' => '🗑️ ลบสินค้า',
@@ -126,6 +123,8 @@ require __DIR__ . '/includes/header.php';
                                 'user_create' => '👤 สร้างผู้ใช้',
                                 'user_update' => '🔧 แก้ไขผู้ใช้',
                                 'user_delete' => '❌ ลบผู้ใช้',
+                                'profile_update' => '👤 แก้ไขโปรไฟล์',
+                                'user_status_change' => '🔒 เปลี่ยนสถานะผู้ใช้',
                                 'export' => '📊 ส่งออก CSV',
                                 'backup' => '💾 สำรองข้อมูล',
                                 'audit_log_delete' => '🗑️ ลบ Audit Log',
@@ -139,7 +138,7 @@ require __DIR__ . '/includes/header.php';
                         <tr>
                             <td style="text-align:center;">
                                 <input type="checkbox" name="delete_ids[]" value="<?= (int)$log['id'] ?>"
-                                       class="audit-row-check" style="accent-color:#ef233c;cursor:pointer;">
+                                       class="audit-row-check" style="accent-color:#0758b4;cursor:pointer;">
                             </td>
                             <td style="font-size:11px;color:#666;"><?= h((string) $log['created_at']) ?></td>
                             <td>

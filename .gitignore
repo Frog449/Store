@@ -4,3 +4,4 @@
 /storage/inventory.sqlite
 /storage/product-images/*
 !/storage/product-images/.htaccess
+/docs/*.csv

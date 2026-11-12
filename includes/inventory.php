@@ -170,14 +170,19 @@ function inventory_ensure_schema(PDO $db): void
         $db->exec(
             'CREATE TABLE IF NOT EXISTS `users` (
             `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `employee_id` VARCHAR(50) NULL DEFAULT NULL,
             `username` VARCHAR(60) NOT NULL,
+            `email` VARCHAR(191) NULL DEFAULT NULL,
             `password_hash` VARCHAR(255) NOT NULL,
             `name` VARCHAR(150) NOT NULL,
             `role` VARCHAR(30) NOT NULL DEFAULT \'staff\',
             `department` VARCHAR(150) NOT NULL DEFAULT \'\',
+            `status` VARCHAR(20) NOT NULL DEFAULT \'active\',
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
-            UNIQUE KEY `uq_users_username` (`username`)
+            UNIQUE KEY `uq_users_username` (`username`),
+            UNIQUE KEY `uq_users_email` (`email`),
+            UNIQUE KEY `uq_users_employee_id` (`employee_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
         );
 
@@ -198,8 +203,24 @@ function inventory_ensure_schema(PDO $db): void
 
     if (inventory_table_exists($db, 'users')) {
         $userCols = inventory_table_columns($db, 'users');
+        if (!isset($userCols['employee_id'])) {
+            $db->exec("ALTER TABLE `users` ADD COLUMN `employee_id` VARCHAR(50) NULL DEFAULT NULL AFTER `id`");
+            try {
+                $db->exec("ALTER TABLE `users` ADD UNIQUE KEY `uq_users_employee_id` (`employee_id`)");
+            } catch (Throwable $e) {
+                // Ignore if index already exists
+            }
+        }
         if (!isset($userCols['status'])) {
             $db->exec("ALTER TABLE `users` ADD COLUMN `status` VARCHAR(20) NOT NULL DEFAULT 'active'");
+        }
+        if (!isset($userCols['email'])) {
+            $db->exec("ALTER TABLE `users` ADD COLUMN `email` VARCHAR(191) NULL DEFAULT NULL AFTER `username`");
+            try {
+                $db->exec("ALTER TABLE `users` ADD UNIQUE KEY `uq_users_email` (`email`)");
+            } catch (Throwable $e) {
+                // Ignore if index already exists
+            }
         }
     }
 
@@ -282,6 +303,9 @@ function inventory_ensure_schema(PDO $db): void
         inventory_migrate_opening_stock($db);
         $db->exec('ALTER TABLE `product` DROP COLUMN `opening_stock`');
     }
+
+    // Migrate legacy Thai units ('ชิ้น', 'อัน') to 'pcs (ชิ้น)'
+    $db->exec("UPDATE `product` SET `หน่วยนับ` = 'pcs (ชิ้น)' WHERE `หน่วยนับ` IN ('ชิ้น', 'อัน')");
 }
 
 function inventory_store_product_image(?array $upload): ?string
@@ -637,7 +661,7 @@ function inventory_type_options(): array
 
 function inventory_unit_options(): array
 {
-    return ['ชิ้น', 'อัน'];
+    return ['pcs (ชิ้น)', 'Roll (ม้วน)', 'Sheet (แผ่น)', 'm. (เมตร)'];
 }
 
 function inventory_choice(string $key, string $label, array $options): string
@@ -954,6 +978,36 @@ function inventory_movement_counts(): array
         'receipts' => (int) $counts['receipts'],
         'issues' => (int) $counts['issues'],
     ];
+}
+
+function inventory_category_round_stats(): array
+{
+    $db = inventory_db();
+    $stats = [];
+
+    $receiptRows = $db->query(
+        'SELECT p.`หมวดหมู่` AS category, COUNT(r.id) AS rounds
+         FROM `receipts` r
+         JOIN `product` p ON p.`code` = r.product_code
+         GROUP BY p.`หมวดหมู่`'
+    )->fetchAll();
+    foreach ($receiptRows as $row) {
+        $cat = trim((string) ($row['category'] ?? '')) !== '' ? (string) $row['category'] : 'ไม่ระบุหมวดหมู่';
+        $stats[$cat]['receipt_rounds'] = (int) $row['rounds'];
+    }
+
+    $issueRows = $db->query(
+        'SELECT p.`หมวดหมู่` AS category, COUNT(i.id) AS rounds
+         FROM `issues` i
+         JOIN `product` p ON p.`code` = i.product_code
+         GROUP BY p.`หมวดหมู่`'
+    )->fetchAll();
+    foreach ($issueRows as $row) {
+        $cat = trim((string) ($row['category'] ?? '')) !== '' ? (string) $row['category'] : 'ไม่ระบุหมวดหมู่';
+        $stats[$cat]['issue_rounds'] = (int) $row['rounds'];
+    }
+
+    return $stats;
 }
 
 function inventory_movement_by_id(string $kind, int $id): ?array
@@ -1397,18 +1451,9 @@ function inventory_delete_movements(string $kind, array $ids): void
         return;
     }
 
-    // Staff ลบได้เฉพาะของตัวเอง
+    // เฉพาะ Admin เท่านั้นที่สามารถลบประวัติรับ-เบิกได้
     if (!auth_is_admin()) {
-        $placeholders = implode(',', array_fill(0, count($intIds), '?'));
-        $stmt = $db->prepare("SELECT id FROM `{$table}` WHERE id IN ({$placeholders}) AND created_by_user_id = ?");
-        $params = array_values($intIds);
-        $params[] = (int)$user['id'];
-        $stmt->execute($params);
-        $allowed = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        $intIds = array_map('intval', $allowed);
-        if ($intIds === []) {
-            throw new DomainException('คุณไม่มีสิทธิ์ลบรายการที่เลือก');
-        }
+        throw new DomainException('เฉพาะ Admin เท่านั้นที่สามารถลบประวัติรับ-เบิกสินค้าได้');
     }
 
     // ดึง product_code ก่อนลบ เพื่อ sync ยอดทีหลัง

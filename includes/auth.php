@@ -14,7 +14,7 @@ function auth_user(): ?array
 
     try {
         $stmt = inventory_db()->prepare(
-            'SELECT id, username, name, role, department, status, created_at
+            'SELECT id, employee_id, username, email, name, role, department, status, created_at
              FROM `users`
              WHERE id = :id'
         );
@@ -27,7 +27,9 @@ function auth_user(): ?array
 
         $cachedUser = [
             'id' => (int) $user['id'],
+            'employee_id' => (string) ($user['employee_id'] ?? ''),
             'username' => (string) $user['username'],
+            'email' => (string) ($user['email'] ?? ''),
             'name' => (string) $user['name'],
             'role' => (string) $user['role'],
             'department' => (string) $user['department'],
@@ -64,34 +66,37 @@ function auth_require_role(string ...$allowedRoles): array
     return $user;
 }
 
-function auth_login(string $username, string $password): bool
+function auth_login(string $identity, string $password): bool
 {
-    $username = trim($username);
-    if ($username === '' || $password === '') {
+    $identity = trim($identity);
+    if ($identity === '' || $password === '') {
         return false;
     }
 
     try {
         $stmt = inventory_db()->prepare(
-            'SELECT id, username, name, password_hash, role, department, status
+            'SELECT id, employee_id, username, email, name, password_hash, role, department, status
              FROM `users`
-             WHERE username = :username'
+             WHERE username = :identity 
+                OR (email IS NOT NULL AND email != \'\' AND email = :identity_email)
+                OR (employee_id IS NOT NULL AND employee_id != \'\' AND employee_id = :identity_emp)'
         );
-        $stmt->execute(['username' => $username]);
+        $stmt->execute([
+            'identity' => $identity,
+            'identity_email' => $identity,
+            'identity_emp' => $identity,
+        ]);
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, (string) $user['password_hash'])) {
             if (($user['status'] ?? 'active') === 'suspended') {
-                audit_log('login_blocked', $username, 'เข้าสู่ระบบไม่สำเร็จ: บัญชีถูกระงับการใช้งาน');
                 throw new DomainException('บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อหัวหน้าคลังสินค้าหรือผู้ดูแลระบบ');
             }
             session_regenerate_id(true);
             $_SESSION['user_id'] = (int) $user['id'];
-            audit_log('login', $user['username'], 'เข้าสู่ระบบสำเร็จ (IP: ' . ($_SERVER['REMOTE_ADDR'] ?? '-') . ')');
             return true;
         }
 
-        audit_log('login_failed', $username, 'เข้าสู่ระบบไม่สำเร็จ (รหัสผ่านไม่ถูกต้อง)');
         return false;
     } catch (DomainException $e) {
         throw $e;
@@ -103,10 +108,6 @@ function auth_login(string $username, string $password): bool
 
 function auth_logout(): void
 {
-    $user = auth_user();
-    if ($user !== null) {
-        audit_log('logout', $user['username'], 'ออกจากระบบ');
-    }
     unset($_SESSION['user_id']);
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_regenerate_id(true);
@@ -140,7 +141,7 @@ function auth_is_viewer(): bool
 function inventory_users(): array
 {
     $stmt = inventory_db()->query(
-        'SELECT id, username, name, role, department, status, created_at
+        'SELECT id, employee_id, username, email, name, role, department, status, created_at
          FROM `users`
          ORDER BY id ASC'
     );
@@ -150,7 +151,7 @@ function inventory_users(): array
 function inventory_user_by_id(int $id): ?array
 {
     $stmt = inventory_db()->prepare(
-        'SELECT id, username, name, role, department, status, created_at
+        'SELECT id, employee_id, username, email, name, role, department, status, created_at
          FROM `users`
          WHERE id = :id'
     );
@@ -159,9 +160,11 @@ function inventory_user_by_id(int $id): ?array
     return $row === false ? null : $row;
 }
 
-function inventory_create_user(string $username, string $password, string $name, string $role, string $department, string $status = 'active'): int
+function inventory_create_user(string $username, string $password, string $name, string $role, string $department, string $status = 'active', ?string $email = null, ?string $employeeId = null): int
 {
     $username = trim($username);
+    $email = $email !== null ? trim($email) : '';
+    $employeeId = $employeeId !== null ? trim($employeeId) : '';
     $name = trim($name);
     $department = trim($department);
     $status = in_array($status, ['active', 'suspended'], true) ? $status : 'active';
@@ -189,12 +192,37 @@ function inventory_create_user(string $username, string $password, string $name,
         throw new DomainException('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
     }
 
+    $empVal = null;
+    if ($employeeId !== '') {
+        $checkEmp = $db->prepare('SELECT COUNT(*) FROM `users` WHERE employee_id = :emp');
+        $checkEmp->execute(['emp' => $employeeId]);
+        if ((int) $checkEmp->fetchColumn() > 0) {
+            throw new DomainException('รหัสพนักงานนี้ถูกใช้งานแล้วในระบบ');
+        }
+        $empVal = $employeeId;
+    }
+
+    $emailVal = null;
+    if ($email !== '') {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new DomainException('รูปแบบอีเมลไม่ถูกต้อง');
+        }
+        $checkEmail = $db->prepare('SELECT COUNT(*) FROM `users` WHERE email = :email');
+        $checkEmail->execute(['email' => $email]);
+        if ((int) $checkEmail->fetchColumn() > 0) {
+            throw new DomainException('อีเมลนี้ถูกใช้งานแล้วในระบบ');
+        }
+        $emailVal = strtolower($email);
+    }
+
     $stmt = $db->prepare(
-        'INSERT INTO `users` (`username`, `password_hash`, `name`, `role`, `department`, `status`)
-         VALUES (:username, :password_hash, :name, :role, :department, :status)'
+        'INSERT INTO `users` (`employee_id`, `username`, `email`, `password_hash`, `name`, `role`, `department`, `status`)
+         VALUES (:employee_id, :username, :email, :password_hash, :name, :role, :department, :status)'
     );
     $stmt->execute([
+        'employee_id' => $empVal,
         'username' => $username,
+        'email' => $emailVal,
         'password_hash' => password_hash($password, PASSWORD_DEFAULT),
         'name' => $name,
         'role' => $role,
@@ -203,11 +231,11 @@ function inventory_create_user(string $username, string $password, string $name,
     ]);
 
     $newId = (int) $db->lastInsertId();
-    audit_log('user_create', $username, "เพิ่มผู้ใช้ใหม่: {$name} ({$role}) แผนก {$department} สถานะ {$status}");
+    audit_log('user_create', $username, "เพิ่มผู้ใช้ใหม่: {$name} ({$role}) รหัสพนักงาน: " . ($empVal ?? '-') . " อีเมล: " . ($emailVal ?? '-') . " แผนก {$department} สถานะ {$status}");
     return $newId;
 }
 
-function inventory_update_user(int $id, string $name, string $role, string $department, ?string $newPassword = null, string $status = 'active'): void
+function inventory_update_user(int $id, string $name, string $role, string $department, ?string $newPassword = null, string $status = 'active', ?string $email = null, ?string $username = null, ?string $employeeId = null): void
 {
     $name = trim($name);
     $department = trim($department);
@@ -218,6 +246,11 @@ function inventory_update_user(int $id, string $name, string $role, string $depa
     }
     if (!in_array($role, ['admin', 'staff', 'viewer'], true)) {
         throw new DomainException('บทบาทไม่ถูกต้อง');
+    }
+
+    $existing = inventory_user_by_id($id);
+    if ($existing === null) {
+        throw new DomainException('ไม่พบผู้ใช้ที่ต้องการแก้ไข');
     }
 
     $currentUser = auth_user();
@@ -231,38 +264,86 @@ function inventory_update_user(int $id, string $name, string $role, string $depa
     }
 
     $db = inventory_db();
+
+    $newUsername = $existing['username'];
+    if ($username !== null && trim($username) !== '') {
+        $u = trim($username);
+        if ($u !== $existing['username']) {
+            if (strlen($u) > 60 || !preg_match('/^[a-zA-Z0-9_.-]+$/', $u)) {
+                throw new DomainException('ชื่อผู้ใช้ต้องเป็นตัวอักษรภาษาอังกฤษ ตัวเลข หรือขีด (- _ .) ความยาวไม่เกิน 60 ตัวอักษร');
+            }
+            $checkU = $db->prepare('SELECT COUNT(*) FROM `users` WHERE username = :u AND id != :id');
+            $checkU->execute(['u' => $u, 'id' => $id]);
+            if ((int) $checkU->fetchColumn() > 0) {
+                throw new DomainException('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
+            }
+            $newUsername = $u;
+        }
+    }
+
+    $empVal = null;
+    if ($employeeId !== null && trim($employeeId) !== '') {
+        $emp = trim($employeeId);
+        $checkEmp = $db->prepare('SELECT COUNT(*) FROM `users` WHERE employee_id = :emp AND id != :id');
+        $checkEmp->execute(['emp' => $emp, 'id' => $id]);
+        if ((int) $checkEmp->fetchColumn() > 0) {
+            throw new DomainException('รหัสพนักงานนี้ถูกใช้งานแล้วในระบบ');
+        }
+        $empVal = $emp;
+    }
+
+    $emailVal = null;
+    if ($email !== null && trim($email) !== '') {
+        $em = strtolower(trim($email));
+        if (!filter_var($em, FILTER_VALIDATE_EMAIL)) {
+            throw new DomainException('รูปแบบอีเมลไม่ถูกต้อง');
+        }
+        $checkEm = $db->prepare('SELECT COUNT(*) FROM `users` WHERE email = :email AND id != :id');
+        $checkEm->execute(['email' => $em, 'id' => $id]);
+        if ((int) $checkEm->fetchColumn() > 0) {
+            throw new DomainException('อีเมลนี้ถูกใช้งานแล้วในระบบ');
+        }
+        $emailVal = $em;
+    }
+
     if ($newPassword !== null && trim($newPassword) !== '') {
         if (strlen($newPassword) < 4) {
             throw new DomainException('รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร');
         }
         $stmt = $db->prepare(
             'UPDATE `users`
-             SET `name` = :name, `role` = :role, `department` = :department, `status` = :status, `password_hash` = :hash
+             SET `employee_id` = :employee_id, `username` = :username, `email` = :email, `name` = :name, `role` = :role, `department` = :department, `status` = :status, `password_hash` = :hash
              WHERE id = :id'
         );
         $stmt->execute([
             'id' => $id,
+            'employee_id' => $empVal,
+            'username' => $newUsername,
+            'email' => $emailVal,
             'name' => $name,
             'role' => $role,
             'department' => $department,
             'status' => $status,
             'hash' => password_hash($newPassword, PASSWORD_DEFAULT),
         ]);
-        audit_log('user_update', "user#{$id}", "แก้ไขข้อมูลและเปลี่ยนรหัสผ่านผู้ใช้: {$name} ({$role}) สถานะ: {$status}");
+        audit_log('user_update', "user#{$id}", "แก้ไขข้อมูลและเปลี่ยนรหัสผ่านผู้ใช้: {$name} ({$newUsername}, {$role}) สถานะ: {$status}");
     } else {
         $stmt = $db->prepare(
             'UPDATE `users`
-             SET `name` = :name, `role` = :role, `department` = :department, `status` = :status
+             SET `employee_id` = :employee_id, `username` = :username, `email` = :email, `name` = :name, `role` = :role, `department` = :department, `status` = :status
              WHERE id = :id'
         );
         $stmt->execute([
             'id' => $id,
+            'employee_id' => $empVal,
+            'username' => $newUsername,
+            'email' => $emailVal,
             'name' => $name,
             'role' => $role,
             'department' => $department,
             'status' => $status,
         ]);
-        audit_log('user_update', "user#{$id}", "แก้ไขข้อมูลผู้ใช้: {$name} ({$role}) สถานะ: {$status}");
+        audit_log('user_update', "user#{$id}", "แก้ไขข้อมูลผู้ใช้: {$name} ({$newUsername}, {$role}) สถานะ: {$status}");
     }
 }
 
@@ -324,11 +405,26 @@ function inventory_delete_user(int $id): void
     audit_log('user_delete', $user['username'], "ลบผู้ใช้: {$user['name']} ({$user['username']})");
 }
 
-function auth_update_profile(int $userId, string $name, string $department, ?string $currentPassword = null, ?string $newPassword = null): void
-{
+function auth_update_profile(
+    int $userId,
+    string $username,
+    string $name,
+    ?string $email,
+    string $department,
+    ?string $currentPassword = null,
+    ?string $newPassword = null,
+    ?string $employeeId = null
+): void {
+    $username = trim($username);
     $name = trim($name);
     $department = trim($department);
 
+    if ($username === '' || strlen($username) > 60) {
+        throw new DomainException('ชื่อผู้ใช้ต้องมีความยาว 1-60 ตัวอักษร');
+    }
+    if (!preg_match('/^[a-zA-Z0-9_.-]+$/', $username)) {
+        throw new DomainException('ชื่อผู้ใช้ต้องเป็นตัวอักษรภาษาอังกฤษ ตัวเลข หรือขีด (- _ .)');
+    }
     if ($name === '') {
         throw new DomainException('กรุณาระบุชื่อ-นามสกุล');
     }
@@ -338,11 +434,43 @@ function auth_update_profile(int $userId, string $name, string $department, ?str
         throw new DomainException('ไม่พบข้อมูลผู้ใช้');
     }
 
-    if (!in_array($user['role'], ['admin', 'staff'], true)) {
-        throw new DomainException('สิทธิ์ Viewer ไม่สามารถแก้ไขข้อมูลส่วนตัวได้');
+    $db = inventory_db();
+
+    // ตรวจสอบความซ้ำของ username ถ้าเปลี่ยน
+    if ($username !== $user['username']) {
+        $checkU = $db->prepare('SELECT COUNT(*) FROM `users` WHERE username = :u AND id != :id');
+        $checkU->execute(['u' => $username, 'id' => $userId]);
+        if ((int) $checkU->fetchColumn() > 0) {
+            throw new DomainException('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
+        }
     }
 
-    $db = inventory_db();
+    // ตรวจสอบความถูกต้องและความซ้ำของ employee_id
+    $empVal = null;
+    if ($employeeId !== null && trim($employeeId) !== '') {
+        $emp = trim($employeeId);
+        $checkEmp = $db->prepare('SELECT COUNT(*) FROM `users` WHERE employee_id = :emp AND id != :id');
+        $checkEmp->execute(['emp' => $emp, 'id' => $userId]);
+        if ((int) $checkEmp->fetchColumn() > 0) {
+            throw new DomainException('รหัสพนักงานนี้ถูกใช้งานแล้วในระบบ');
+        }
+        $empVal = $emp;
+    }
+
+    // ตรวจสอบความถูกต้องและความซ้ำของ email
+    $emailVal = null;
+    if ($email !== null && trim($email) !== '') {
+        $em = strtolower(trim($email));
+        if (!filter_var($em, FILTER_VALIDATE_EMAIL)) {
+            throw new DomainException('รูปแบบอีเมลไม่ถูกต้อง');
+        }
+        $checkEm = $db->prepare('SELECT COUNT(*) FROM `users` WHERE email = :email AND id != :id');
+        $checkEm->execute(['email' => $em, 'id' => $userId]);
+        if ((int) $checkEm->fetchColumn() > 0) {
+            throw new DomainException('อีเมลนี้ถูกใช้งานแล้วในระบบ');
+        }
+        $emailVal = $em;
+    }
 
     if ($newPassword !== null && $newPassword !== '') {
         if ($currentPassword === null || $currentPassword === '') {
@@ -362,28 +490,34 @@ function auth_update_profile(int $userId, string $name, string $department, ?str
 
         $stmt = $db->prepare(
             'UPDATE `users`
-             SET `name` = :name, `department` = :department, `password_hash` = :hash
+             SET `employee_id` = :employee_id, `username` = :username, `email` = :email, `name` = :name, `department` = :department, `password_hash` = :hash
              WHERE id = :id'
         );
         $stmt->execute([
             'id' => $userId,
+            'employee_id' => $empVal,
+            'username' => $username,
+            'email' => $emailVal,
             'name' => $name,
             'department' => $department,
             'hash' => password_hash($newPassword, PASSWORD_DEFAULT),
         ]);
-        audit_log('profile_update', $user['username'], "แก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน: {$name}");
+        audit_log('profile_update', $username, "แก้ไขโปรไฟล์และเปลี่ยนรหัสผ่าน: {$name}");
     } else {
         $stmt = $db->prepare(
             'UPDATE `users`
-             SET `name` = :name, `department` = :department
+             SET `employee_id` = :employee_id, `username` = :username, `email` = :email, `name` = :name, `department` = :department
              WHERE id = :id'
         );
         $stmt->execute([
             'id' => $userId,
+            'employee_id' => $empVal,
+            'username' => $username,
+            'email' => $emailVal,
             'name' => $name,
             'department' => $department,
         ]);
-        audit_log('profile_update', $user['username'], "แก้ไขข้อมูลโปรไฟล์: {$name}");
+        audit_log('profile_update', $username, "แก้ไขข้อมูลโปรไฟล์: {$name}");
     }
 }
 

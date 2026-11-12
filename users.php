@@ -16,22 +16,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'create_user') {
             $username = (string) ($_POST['username'] ?? '');
+            $employeeId = trim((string) ($_POST['employee_id'] ?? ''));
+            $email = trim((string) ($_POST['email'] ?? ''));
             $password = (string) ($_POST['password'] ?? '');
             $name = (string) ($_POST['name'] ?? '');
             $role = (string) ($_POST['role'] ?? 'staff');
             $department = (string) ($_POST['department'] ?? '');
 
-            inventory_create_user($username, $password, $name, $role, $department);
+            inventory_create_user(
+                $username,
+                $password,
+                $name,
+                $role,
+                $department,
+                'active',
+                $email !== '' ? $email : null,
+                $employeeId !== '' ? $employeeId : null
+            );
             inventory_flash_redirect('เพิ่มผู้ใช้งานใหม่เรียบร้อยแล้ว', 'users.php');
         } elseif ($action === 'update_user') {
             $id = (int) ($_POST['user_id'] ?? 0);
+            $username = trim((string) ($_POST['username'] ?? ''));
+            $employeeId = trim((string) ($_POST['employee_id'] ?? ''));
+            $email = trim((string) ($_POST['email'] ?? ''));
             $name = (string) ($_POST['name'] ?? '');
             $role = (string) ($_POST['role'] ?? 'staff');
             $department = (string) ($_POST['department'] ?? '');
             $status = (string) ($_POST['status'] ?? 'active');
             $newPassword = isset($_POST['password']) && trim((string) $_POST['password']) !== '' ? (string) $_POST['password'] : null;
 
-            inventory_update_user($id, $name, $role, $department, $newPassword, $status);
+            inventory_update_user(
+                $id,
+                $name,
+                $role,
+                $department,
+                $newPassword,
+                $status,
+                $email !== '' ? $email : null,
+                $username !== '' ? $username : null,
+                $employeeId !== '' ? $employeeId : null
+            );
             inventory_flash_redirect('บันทึกการแก้ไขข้อมูลผู้ใช้แล้ว', 'users.php');
         } elseif ($action === 'toggle_status') {
             $id = (int) ($_POST['user_id'] ?? 0);
@@ -79,8 +103,10 @@ require __DIR__ . '/includes/header.php';
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>รหัสพนักงาน</th>
                         <th>Username</th>
                         <th>ชื่อ-นามสกุล</th>
+                        <th>อีเมล</th>
                         <th>บทบาท (Role)</th>
                         <th>แผนก / สังกัด</th>
                         <th>สถานะ</th>
@@ -93,8 +119,10 @@ require __DIR__ . '/includes/header.php';
                         <?php $isSuspended = ($u['status'] ?? 'active') === 'suspended'; ?>
                         <tr>
                             <td>#<?= (int) $u['id'] ?></td>
+                            <td><?= h(!empty($u['employee_id']) ? $u['employee_id'] : '—') ?></td>
                             <td><strong><?= h($u['username']) ?></strong></td>
                             <td><?= h($u['name']) ?></td>
+                            <td><?= h(!empty($u['email']) ? $u['email'] : '-') ?></td>
                             <td>
                                 <span class="user-chip-role role-<?= h($u['role']) ?>">
                                     <?= h(strtoupper($u['role'])) ?>
@@ -109,7 +137,7 @@ require __DIR__ . '/includes/header.php';
                             <td><?= h(substr((string) $u['created_at'], 0, 10)) ?></td>
                             <td style="text-align:right;">
                                 <button class="secondary-button" type="button" style="padding:4px 10px;font-size:10px;"
-                                    onclick="editUser(<?= (int) $u['id'] ?>, '<?= h(addslashes($u['username'])) ?>', '<?= h(addslashes($u['name'])) ?>', '<?= h(addslashes($u['role'])) ?>', '<?= h(addslashes($u['department'])) ?>', '<?= h(addslashes($u['status'] ?? 'active')) ?>')">
+                                    onclick="editUser(<?= (int) $u['id'] ?>, '<?= h(addslashes($u['username'])) ?>', '<?= h(addslashes($u['employee_id'] ?? '')) ?>', '<?= h(addslashes($u['email'] ?? '')) ?>', '<?= h(addslashes($u['name'])) ?>', '<?= h(addslashes($u['role'])) ?>', '<?= h(addslashes($u['department'])) ?>', '<?= h(addslashes($u['status'] ?? 'active')) ?>')">
                                     แก้ไข
                                 </button>
                                 <?php if ($currentUser && $currentUser['id'] !== (int) $u['id']): ?>
@@ -153,6 +181,17 @@ require __DIR__ . '/includes/header.php';
                 ชื่อผู้ใช้ (Username)
                 <input type="text" name="username" required pattern="[a-zA-Z0-9_.-]+" placeholder="เช่น somchai_k">
                 <small style="color:#888;">ตัวอักษรภาษาอังกฤษ ตัวเลข และขีดเท่านั้น</small>
+            </label>
+
+            <label>
+                รหัสพนักงาน (Employee ID)
+                <input type="text" name="employee_id" placeholder="เช่น EMP-001 หรือ 650123 (ใช้เข้าสู่ระบบได้)">
+                <small style="color:#888;">ไม่บังคับ หรือระบุเพื่อใช้เข้าสู่ระบบแทนชื่อผู้ใช้ได้</small>
+            </label>
+
+            <label>
+                อีเมล (Email)
+                <input type="email" name="email" placeholder="เช่น somchai@example.com (ใช้เข้าสู่ระบบได้)">
             </label>
 
             <label>
@@ -202,7 +241,19 @@ require __DIR__ . '/includes/header.php';
 
             <label>
                 ชื่อผู้ใช้ (Username)
-                <input type="text" id="edit-username" disabled style="background:#f4f4f4;color:#666;">
+                <input type="text" name="username" id="edit-username" required pattern="[a-zA-Z0-9_.-]+">
+                <small style="color:#888;">ตัวอักษรภาษาอังกฤษ ตัวเลข และขีดเท่านั้น</small>
+            </label>
+
+            <label>
+                รหัสพนักงาน (Employee ID)
+                <input type="text" name="employee_id" id="edit-employee-id" placeholder="เช่น EMP-001 หรือ 650123 (ใช้เข้าสู่ระบบได้)">
+                <small style="color:#888;">ไม่บังคับ หรือระบุเพื่อใช้เข้าสู่ระบบแทนชื่อผู้ใช้ได้</small>
+            </label>
+
+            <label>
+                อีเมล (Email)
+                <input type="email" name="email" id="edit-email" placeholder="เช่น name@example.com (ใช้เข้าสู่ระบบได้)">
             </label>
 
             <label>
@@ -246,9 +297,11 @@ require __DIR__ . '/includes/header.php';
 </section>
 
 <script>
-function editUser(id, username, name, role, department, status) {
+function editUser(id, username, employeeId, email, name, role, department, status) {
     document.querySelector('#edit-user-id').value = id;
     document.querySelector('#edit-username').value = username;
+    document.querySelector('#edit-employee-id').value = employeeId || '';
+    document.querySelector('#edit-email').value = email || '';
     document.querySelector('#edit-name').value = name;
     document.querySelector('#edit-role').value = role;
     document.querySelector('#edit-department').value = department;

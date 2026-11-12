@@ -1,9 +1,11 @@
 const searchInput = document.querySelector("#product-search");
 const cards = [...document.querySelectorAll(".product-card")];
-const filters = [...document.querySelectorAll(".filter-chip")];
+const filters = [...document.querySelectorAll(".filter-chip[data-category]")];
+const statusFilters = [...document.querySelectorAll(".status-filter-chip[data-status-filter]")];
 const resultCount = document.querySelector("#result-count");
 const emptySearch = document.querySelector("#empty-search");
 let activeCategory = "all";
+let activeStatus = "all";
 
 const systemDropdown = document.querySelector(".nav-dropdown");
 if (systemDropdown) {
@@ -40,12 +42,25 @@ function filterProducts() {
     cards.forEach((card) => {
         const matchesQuery = card.dataset.search.includes(query);
         const matchesCategory = activeCategory === "all" || card.dataset.category === activeCategory;
-        const visible = matchesQuery && matchesCategory;
+        const matchesStatus = activeStatus === "all" || card.dataset.statusKey === activeStatus;
+        const visible = matchesQuery && matchesCategory && matchesStatus;
         card.hidden = !visible;
         visibleCount += Number(visible);
     });
 
     resultCount.textContent = `แสดง ${visibleCount} รายการ`;
+    if (visibleCount === 0) {
+        const statusLabelMap = { normal: "ปกติ", low: "ควรสั่งซื้อ", negative: "หมด" };
+        if (query !== "") {
+            emptySearch.textContent = "ไม่พบสินค้าที่ตรงกับคำค้นหา ลองค้นหาด้วยคำอื่น";
+        } else if (activeStatus !== "all") {
+            emptySearch.textContent = `ไม่มีสินค้าที่มีสถานะ "${statusLabelMap[activeStatus] || activeStatus}"${activeCategory !== "all" ? ` ในหมวดหมู่ "${activeCategory}"` : ""}`;
+        } else if (activeCategory !== "all") {
+            emptySearch.textContent = `ยังไม่มีสินค้าในหมวดหมู่ "${activeCategory}"`;
+        } else {
+            emptySearch.textContent = "ไม่พบสินค้าในระบบ";
+        }
+    }
     emptySearch.hidden = visibleCount !== 0;
 }
 
@@ -55,7 +70,25 @@ if (searchInput) {
     filters.forEach((filter) => {
         filter.addEventListener("click", () => {
             activeCategory = filter.dataset.category;
+            if (activeCategory === "all") {
+                activeStatus = "all";
+                statusFilters.forEach((s) => s.classList.remove("selected"));
+            }
             filters.forEach((item) => item.classList.toggle("selected", item === filter));
+            filterProducts();
+        });
+    });
+
+    statusFilters.forEach((statusBtn) => {
+        statusBtn.addEventListener("click", () => {
+            const targetStatus = statusBtn.dataset.statusFilter;
+            if (activeStatus === targetStatus) {
+                activeStatus = "all";
+                statusBtn.classList.remove("selected");
+            } else {
+                activeStatus = targetStatus;
+                statusFilters.forEach((item) => item.classList.toggle("selected", item === statusBtn));
+            }
             filterProducts();
         });
     });
@@ -77,46 +110,59 @@ if (productDetailDialog) {
     const editDialog = document.querySelector("#product-edit-dialog");
     const detailImage = document.querySelector("#product-detail-image");
     const detailImageEmpty = document.querySelector("#product-detail-image-empty");
-    const editForm = editDialog.querySelector("form");
-    const editImagePreview = editForm.querySelector(".product-image-preview");
-    const editImage = editImagePreview.querySelector("img");
-    const editImageEmpty = editImagePreview.querySelector("span");
-    const editImageInput = editForm.querySelector(".product-image-upload");
-    const removeImageToggle = editForm.querySelector(".product-image-remove-toggle");
-    const removeImageField = editForm.querySelector('[name="remove_image"]');
+    const editForm = editDialog ? editDialog.querySelector("form") : null;
+    const editImagePreview = editForm ? editForm.querySelector(".product-image-preview") : null;
+    const editImage = editImagePreview ? editImagePreview.querySelector("img") : null;
+    const editImageEmpty = editImagePreview ? editImagePreview.querySelector("span") : null;
+    const editImageInput = editForm ? editForm.querySelector(".product-image-upload") : null;
+    const removeImageToggle = editForm ? editForm.querySelector(".product-image-remove-toggle") : null;
+    const removeImageField = editForm ? editForm.querySelector('[name="remove_image"]') : null;
     const detailFields = [...productDetailDialog.querySelectorAll("[data-detail]")];
     let activeProductCard = null;
     let previewObjectUrl = null;
 
-    detailImage.addEventListener("error", () => {
-        detailImage.hidden = true;
-        detailImageEmpty.hidden = false;
-    });
-    editImage.addEventListener("error", () => {
-        editImage.hidden = true;
-        editImageEmpty.hidden = false;
-    });
+    if (detailImage && detailImageEmpty) {
+        detailImage.addEventListener("error", () => {
+            detailImage.hidden = true;
+            detailImageEmpty.hidden = false;
+        });
+    }
+    if (editImage && editImageEmpty) {
+        editImage.addEventListener("error", () => {
+            editImage.hidden = true;
+            editImageEmpty.hidden = false;
+        });
+    }
 
     const openProductDetails = (card) => {
         activeProductCard = card;
         const trigger = card.dataset;
-        deleteForm.elements.product_code.value = trigger.code;
-        detailTitle.textContent = trigger.name;
-        detailCode.textContent = `รหัสสินค้า ${trigger.code}`;
+        if (deleteForm && deleteForm.elements && deleteForm.elements.product_code) {
+            deleteForm.elements.product_code.value = trigger.code;
+        }
+        if (detailTitle) {
+            detailTitle.textContent = trigger.name;
+        }
+        if (detailCode) {
+            detailCode.textContent = `รหัสสินค้า ${trigger.code}`;
+        }
         detailFields.forEach((field) => {
             field.textContent = trigger[field.dataset.detail] || "-";
         });
-        detailImage.hidden = !trigger.image;
-        detailImageEmpty.hidden = Boolean(trigger.image);
-        if (trigger.image) {
-            detailImage.src = trigger.image;
-        } else {
-            detailImage.removeAttribute("src");
+        if (detailImage && detailImageEmpty) {
+            detailImage.hidden = !trigger.image;
+            detailImageEmpty.hidden = Boolean(trigger.image);
+            if (trigger.image) {
+                detailImage.src = trigger.image;
+            } else {
+                detailImage.removeAttribute("src");
+            }
         }
         productDetailDialog.showModal();
     };
 
     const setEditImagePreview = (imageUrl) => {
+        if (!editImage || !editImageEmpty) return;
         editImage.hidden = !imageUrl;
         editImageEmpty.hidden = Boolean(imageUrl);
         if (imageUrl) {
@@ -127,9 +173,9 @@ if (productDetailDialog) {
     };
 
     const resetEditImage = (imageUrl) => {
-        editImageInput.value = "";
-        removeImageToggle.checked = false;
-        removeImageField.value = "0";
+        if (editImageInput) editImageInput.value = "";
+        if (removeImageToggle) removeImageToggle.checked = false;
+        if (removeImageField) removeImageField.value = "0";
         if (previewObjectUrl) {
             URL.revokeObjectURL(previewObjectUrl);
             previewObjectUrl = null;
@@ -147,104 +193,122 @@ if (productDetailDialog) {
         });
     });
 
-    editButton.addEventListener("click", () => {
-        const values = activeProductCard.dataset;
-        editForm.elements.original_code.value = values.code;
-        editForm.elements.code.value = values.code;
-        editForm.elements.name.value = values.name;
-        editForm.elements.category.value = values.category;
-        editForm.elements.item_type.value = values.type;
-        editForm.elements.unit.value = values.unit;
-        editForm.elements.location.value = values.location;
-        editForm.elements.reorder_point.value = values.minimum;
-        editImagePreview.dataset.currentImage = values.image;
-        resetEditImage(values.image);
+    if (editButton && editDialog && editForm) {
+        editButton.addEventListener("click", () => {
+            const values = activeProductCard.dataset;
+            if (editForm.elements.original_code) editForm.elements.original_code.value = values.code;
+            if (editForm.elements.code) editForm.elements.code.value = values.code;
+            if (editForm.elements.name) editForm.elements.name.value = values.name;
+            if (editForm.elements.category) editForm.elements.category.value = values.category;
+            if (editForm.elements.item_type) editForm.elements.item_type.value = values.type;
+            if (editForm.elements.unit) editForm.elements.unit.value = values.unit;
+            if (editForm.elements.location) editForm.elements.location.value = values.location;
+            if (editForm.elements.reorder_point) editForm.elements.reorder_point.value = values.minimum;
+            if (editImagePreview) editImagePreview.dataset.currentImage = values.image;
+            resetEditImage(values.image);
 
-        const hasCustom = values.hasCustomImage === "1";
-        const removeWrap = removeImageToggle ? removeImageToggle.closest(".product-image-remove") : null;
-        if (removeWrap) {
-            removeWrap.hidden = !hasCustom;
+            const hasCustom = values.hasCustomImage === "1";
+            const removeWrap = removeImageToggle ? removeImageToggle.closest(".product-image-remove") : null;
+            if (removeWrap) {
+                removeWrap.hidden = !hasCustom;
+            }
+
+            const codeEl = editDialog.querySelector("#product-edit-code");
+            if (codeEl) codeEl.textContent = `รหัสสินค้า ${values.code}`;
+            productDetailDialog.close();
+            editDialog.showModal();
+        });
+
+        if (editForm.elements.category) {
+            editForm.elements.category.addEventListener("change", () => {
+                const hasUploadedFile = editImageInput && editImageInput.files && editImageInput.files.length > 0;
+                const hasCustom = activeProductCard && activeProductCard.dataset.hasCustomImage === "1";
+                if (!hasUploadedFile && !hasCustom) {
+                    const cat = editForm.elements.category.value || "สินค้าทั่วไป";
+                    const catUrl = "image.php?cat=" + encodeURIComponent(cat);
+                    if (editImagePreview) editImagePreview.dataset.currentImage = catUrl;
+                    setEditImagePreview(catUrl);
+                }
+            });
         }
 
-        editDialog.querySelector("#product-edit-code").textContent = `รหัสสินค้า ${values.code}`;
-        productDetailDialog.close();
-        editDialog.showModal();
-    });
+        if (editImageInput) {
+            editImageInput.addEventListener("change", () => {
+                const [file] = editImageInput.files;
+                if (removeImageToggle) removeImageToggle.checked = false;
+                if (previewObjectUrl) {
+                    URL.revokeObjectURL(previewObjectUrl);
+                    previewObjectUrl = null;
+                }
+                if (file) {
+                    previewObjectUrl = URL.createObjectURL(file);
+                    setEditImagePreview(previewObjectUrl);
+                } else if (editImagePreview) {
+                    setEditImagePreview(editImagePreview.dataset.currentImage);
+                }
+            });
+        }
 
-    if (editForm.elements.category) {
-        editForm.elements.category.addEventListener("change", () => {
-            const hasUploadedFile = editImageInput && editImageInput.files && editImageInput.files.length > 0;
-            const hasCustom = activeProductCard && activeProductCard.dataset.hasCustomImage === "1";
-            if (!hasUploadedFile && !hasCustom) {
-                const cat = editForm.elements.category.value || "สินค้าทั่วไป";
-                const catUrl = "image.php?cat=" + encodeURIComponent(cat);
-                editImagePreview.dataset.currentImage = catUrl;
-                setEditImagePreview(catUrl);
+        if (removeImageToggle) {
+            removeImageToggle.addEventListener("change", () => {
+                if (removeImageToggle.checked) {
+                    if (editImageInput) editImageInput.value = "";
+                    setEditImagePreview("");
+                } else if (editImagePreview) {
+                    setEditImagePreview(editImagePreview.dataset.currentImage);
+                }
+            });
+        }
+
+        editForm.addEventListener("submit", () => {
+            if (removeImageField && removeImageToggle) {
+                removeImageField.value = removeImageToggle.checked ? "1" : "0";
             }
         });
+
+        const backBtn = editDialog.querySelector("[data-back-to-product-details]");
+        if (backBtn) {
+            backBtn.addEventListener("click", () => {
+                editDialog.close();
+                productDetailDialog.showModal();
+            });
+        }
+
+        const closeEditBtn = editDialog.querySelector("[data-close-edit-dialog]");
+        if (closeEditBtn) {
+            closeEditBtn.addEventListener("click", () => {
+                editDialog.close();
+            });
+        }
+
+        editDialog.addEventListener("click", (event) => {
+            if (event.target === editDialog) {
+                editDialog.close();
+            }
+        });
+
+        if (editDialog.dataset.editCode) {
+            const initialCard = [...document.querySelectorAll(".product-detail-trigger")]
+                .find((card) => card.dataset.code === editDialog.dataset.editCode);
+            if (initialCard) {
+                activeProductCard = initialCard;
+                const codeEl = editDialog.querySelector("#product-edit-code");
+                if (codeEl) codeEl.textContent = `รหัสสินค้า ${initialCard.dataset.code}`;
+                editDialog.showModal();
+            }
+        }
     }
 
-    deleteForm.addEventListener("submit", (event) => {
-        const productName = activeProductCard.dataset.name;
-        const confirmed = window.confirm(
-            `ยืนยันลบสินค้า "${productName}" หรือไม่?\nรายการนี้จะลบประวัติรับ–เบิกที่เกี่ยวข้องทั้งหมดและไม่สามารถกู้คืนได้`
-        );
-        if (!confirmed) {
-            event.preventDefault();
-        }
-    });
-
-    editImageInput.addEventListener("change", () => {
-        const [file] = editImageInput.files;
-        removeImageToggle.checked = false;
-        if (previewObjectUrl) {
-            URL.revokeObjectURL(previewObjectUrl);
-            previewObjectUrl = null;
-        }
-        if (file) {
-            previewObjectUrl = URL.createObjectURL(file);
-            setEditImagePreview(previewObjectUrl);
-        } else {
-            setEditImagePreview(editImagePreview.dataset.currentImage);
-        }
-    });
-
-    removeImageToggle.addEventListener("change", () => {
-        if (removeImageToggle.checked) {
-            editImageInput.value = "";
-            setEditImagePreview("");
-        } else {
-            setEditImagePreview(editImagePreview.dataset.currentImage);
-        }
-    });
-
-    editForm.addEventListener("submit", () => {
-        removeImageField.value = removeImageToggle.checked ? "1" : "0";
-    });
-
-    editDialog.querySelector("[data-back-to-product-details]").addEventListener("click", () => {
-        editDialog.close();
-        productDetailDialog.showModal();
-    });
-
-    editDialog.querySelector("[data-close-edit-dialog]").addEventListener("click", () => {
-        editDialog.close();
-    });
-
-    editDialog.addEventListener("click", (event) => {
-        if (event.target === editDialog) {
-            editDialog.close();
-        }
-    });
-
-    if (editDialog.dataset.editCode) {
-        const initialCard = [...document.querySelectorAll(".product-detail-trigger")]
-            .find((card) => card.dataset.code === editDialog.dataset.editCode);
-        if (initialCard) {
-            activeProductCard = initialCard;
-            editDialog.querySelector("#product-edit-code").textContent = `รหัสสินค้า ${initialCard.dataset.code}`;
-            editDialog.showModal();
-        }
+    if (deleteForm) {
+        deleteForm.addEventListener("submit", (event) => {
+            const productName = activeProductCard ? activeProductCard.dataset.name : "สินค้านี้";
+            const confirmed = window.confirm(
+                `ยืนยันลบสินค้า "${productName}" หรือไม่?\nรายการนี้จะลบประวัติรับ–เบิกที่เกี่ยวข้องทั้งหมดและไม่สามารถกู้คืนได้`
+            );
+            if (!confirmed) {
+                event.preventDefault();
+            }
+        });
     }
 
     productDetailDialog.querySelectorAll("[data-close-product-dialog]").forEach((button) => {
@@ -282,18 +346,152 @@ document.querySelectorAll("#new-product .product-image-upload").forEach((input) 
     });
 });
 
-const movementProduct = document.querySelector("#movement-product");
-if (movementProduct) {
-    const nameField = document.querySelector("#movement-product-name");
-    const unitField = document.querySelector("#movement-product-unit");
-    const updateMovementProduct = () => {
-        const option = movementProduct.selectedOptions[0];
-        nameField.value = option?.dataset.name ?? "";
-        unitField.value = option?.dataset.unit ?? "";
+const initProductCombobox = (combobox) => {
+    const searchField = combobox.querySelector("[data-combobox-search]");
+    const codeHidden = combobox.querySelector("[data-combobox-code]");
+    const toggleButton = combobox.querySelector("[data-combobox-toggle]");
+    const listBox = combobox.querySelector("[data-combobox-list]");
+    const emptyNote = combobox.querySelector("[data-combobox-empty]");
+    const options = [...combobox.querySelectorAll(".product-combobox-option")];
+    const form = combobox.closest("form");
+    const codeDisplay = form?.querySelector("[data-combobox-code-display]");
+    const unitField = form?.querySelector("[data-combobox-unit-display]");
+    if (!searchField || !codeHidden || !listBox) return;
+
+    let highlightedIndex = -1;
+    const getVisibleOptions = () => options.filter((opt) => !opt.hidden);
+
+    const openList = () => {
+        listBox.hidden = false;
+        searchField.setAttribute("aria-expanded", "true");
     };
-    movementProduct.addEventListener("change", updateMovementProduct);
-    updateMovementProduct();
-}
+
+    const closeList = () => {
+        listBox.hidden = true;
+        searchField.setAttribute("aria-expanded", "false");
+        highlightedIndex = -1;
+        options.forEach((opt) => opt.classList.remove("highlighted"));
+    };
+
+    const selectOption = (option) => {
+        codeHidden.value = option.dataset.code || "";
+        searchField.value = option.dataset.name || "";
+        searchField.setCustomValidity("");
+        if (codeDisplay) codeDisplay.value = option.dataset.code || "";
+        if (unitField) unitField.value = option.dataset.unit || "";
+        options.forEach((opt) => opt.classList.toggle("selected", opt === option));
+        closeList();
+    };
+
+    const filterOptions = (queryText) => {
+        const query = queryText.trim().toLocaleLowerCase("th");
+        let visibleCount = 0;
+        options.forEach((opt) => {
+            const matches = query === "" || (opt.dataset.search || "").includes(query);
+            opt.hidden = !matches;
+            opt.classList.remove("highlighted");
+            if (matches) visibleCount++;
+        });
+        if (emptyNote) emptyNote.hidden = visibleCount > 0;
+        highlightedIndex = -1;
+    };
+
+    searchField.addEventListener("focus", () => {
+        filterOptions("");
+        openList();
+    });
+
+    searchField.addEventListener("input", () => {
+        searchField.setCustomValidity("");
+        const typed = searchField.value.trim();
+        const exactMatch = options.find(
+            (opt) => opt.dataset.name === typed || opt.dataset.code === typed
+        );
+        if (!exactMatch) {
+            codeHidden.value = "";
+            if (codeDisplay) codeDisplay.value = "";
+            if (unitField) unitField.value = "";
+            options.forEach((opt) => opt.classList.remove("selected"));
+        }
+        filterOptions(typed);
+        openList();
+    });
+
+    searchField.addEventListener("keydown", (event) => {
+        const visible = getVisibleOptions();
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            if (listBox.hidden) openList();
+            if (visible.length === 0) return;
+            highlightedIndex = (highlightedIndex + 1) % visible.length;
+            visible.forEach((opt, i) => opt.classList.toggle("highlighted", i === highlightedIndex));
+            visible[highlightedIndex].scrollIntoView({ block: "nearest" });
+        } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            if (listBox.hidden) openList();
+            if (visible.length === 0) return;
+            highlightedIndex = highlightedIndex <= 0 ? visible.length - 1 : highlightedIndex - 1;
+            visible.forEach((opt, i) => opt.classList.toggle("highlighted", i === highlightedIndex));
+            visible[highlightedIndex].scrollIntoView({ block: "nearest" });
+        } else if (event.key === "Enter" && !listBox.hidden) {
+            if (highlightedIndex >= 0 && visible[highlightedIndex]) {
+                event.preventDefault();
+                selectOption(visible[highlightedIndex]);
+            } else if (visible.length === 1) {
+                event.preventDefault();
+                selectOption(visible[0]);
+            }
+        } else if (event.key === "Escape") {
+            closeList();
+        }
+    });
+
+    if (toggleButton) {
+        toggleButton.addEventListener("click", () => {
+            if (listBox.hidden) {
+                filterOptions("");
+                openList();
+                searchField.focus();
+            } else {
+                closeList();
+            }
+        });
+    }
+
+    options.forEach((option) => {
+        option.addEventListener("click", () => selectOption(option));
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!combobox.contains(event.target)) {
+            closeList();
+        }
+    });
+
+    if (form) {
+        form.addEventListener("submit", (event) => {
+            if (codeHidden.value === "") {
+                const typed = searchField.value.trim().toLocaleLowerCase("th");
+                const match = options.find(
+                    (opt) =>
+                        opt.dataset.name.toLocaleLowerCase("th") === typed ||
+                        opt.dataset.code.toLocaleLowerCase("th") === typed
+                );
+                if (match) {
+                    selectOption(match);
+                } else {
+                    event.preventDefault();
+                    searchField.setCustomValidity("กรุณาเลือกชื่อสินค้าจากรายการ");
+                    searchField.reportValidity();
+                    filterOptions(searchField.value);
+                    openList();
+                }
+            }
+        });
+    }
+};
+
+document.querySelectorAll("[data-product-combobox]").forEach(initProductCombobox);
 
 const historySearch = document.querySelector("#history-search");
 const historyTabs = document.querySelectorAll("[data-history-tab]");

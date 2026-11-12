@@ -1,6 +1,6 @@
 <?php
-$stockStatus = $product['stock'] < 0 ? 'negative' : ($product['stock'] <= $product['minimum'] ? 'low' : 'normal');
-$stockLabel = $stockStatus === 'negative' ? 'สต๊อกติดลบ' : ($stockStatus === 'low' ? 'ควรสั่งซื้อ' : 'ปกติ');
+$stockStatus = $product['stock'] <= 0 ? 'negative' : ($product['stock'] <= $product['minimum'] ? 'low' : 'normal');
+$stockLabel = $stockStatus === 'negative' ? 'หมด' : ($stockStatus === 'low' ? 'ควรสั่งซื้อ' : 'ปกติ');
 $productImageUrl = inventory_product_image_url($product['image_filename'] ?? null, $product['category'] ?? null);
 $hasCustomImage = inventory_has_custom_image($product['image_filename'] ?? null);
 ?>
@@ -22,6 +22,7 @@ $hasCustomImage = inventory_has_custom_image($product['image_filename'] ?? null)
     data-issued="<?= h(inventory_quantity($product['issued'])) ?>"
     data-stock="<?= h(inventory_quantity($product['stock'])) ?>"
     data-status="<?= h($stockLabel) ?>"
+    data-status-key="<?= h($stockStatus) ?>"
     data-image="<?= h($productImageUrl) ?>"
     data-has-custom-image="<?= $hasCustomImage ? '1' : '0' ?>"
     style="--card-index: <?= (int) $index ?>"

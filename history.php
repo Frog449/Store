@@ -39,6 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_movements') {
     try {
         inventory_require_csrf();
+        if (!auth_is_admin()) {
+            throw new DomainException('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถลบประวัติรับ-เบิกสินค้าได้');
+        }
         $kind = (string) ($_POST['movement_kind'] ?? '');
         $ids = $_POST['delete_ids'] ?? [];
         if (!is_array($ids) || $ids === []) {
@@ -162,17 +165,17 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <?php if (!auth_is_viewer()): ?>
+        <?php if (auth_is_admin()): ?>
             <form method="post" id="receipt-bulk-form" style="margin:0 0 10px;">
                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                 <input type="hidden" name="action" value="delete_movements">
                 <input type="hidden" name="movement_kind" value="receipt">
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;"
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f0f5fc;border:1px solid #d0e1f7;border-radius:8px;"
                     id="receipt-bulk-toolbar" hidden>
-                    <span id="receipt-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0
+                    <span id="receipt-selected-count" style="font-size:12px;color:#074080;font-weight:600;">0
                         รายการที่เลือก</span>
                     <button class="primary-button" type="submit"
-                        style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:30px;padding:0 12px;font-size:11px;"
+                        style="background:linear-gradient(105deg,#0758b4,#05448c);min-height:30px;padding:0 12px;font-size:11px;"
                         onclick="return confirm('ยืนยันการลบประวัติรับสินค้าที่เลือก?\nยอดสต๊อกจะถูกอัปเดตโดยอัตโนมัติ')">ลบรายการที่เลือก</button>
                     <button class="secondary-button" type="button" style="min-height:30px;padding:0 12px;font-size:11px;"
                         onclick="clearSelection('receipt')">ยกเลิก</button>
@@ -184,10 +187,10 @@ require __DIR__ . '/includes/header.php';
             <table class="inventory-table movement-table">
                 <thead>
                     <tr>
-                        <?php if (!auth_is_viewer()): ?>
+                        <?php if (auth_is_admin()): ?>
                             <th style="width:36px;text-align:center;">
                                 <input type="checkbox" id="receipt-select-all" title="เลือกทั้งหมด"
-                                    style="accent-color:#ef233c;cursor:pointer;"
+                                    style="accent-color:#0758b4;cursor:pointer;"
                                     onchange="toggleAll('receipt', this.checked)">
                             </th>
                         <?php endif; ?>
@@ -215,11 +218,11 @@ require __DIR__ . '/includes/header.php';
                         ]));
                         ?>
                         <tr class="history-row" data-type="receipt" data-search="<?= h($searchText) ?>">
-                            <?php if (!auth_is_viewer()): ?>
+                            <?php if (auth_is_admin()): ?>
                                 <td style="text-align:center;">
                                     <input type="checkbox" name="delete_ids[]" value="<?= (int) ($row['id'] ?? 0) ?>"
                                         form="receipt-bulk-form" class="receipt-row-check"
-                                        style="accent-color:#ef233c;cursor:pointer;" onchange="updateBulkToolbar('receipt')">
+                                        style="accent-color:#0758b4;cursor:pointer;" onchange="updateBulkToolbar('receipt')">
                                 </td>
                             <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>
@@ -277,17 +280,17 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <?php if (!auth_is_viewer()): ?>
+        <?php if (auth_is_admin()): ?>
             <form method="post" id="issue-bulk-form" style="margin:0 0 10px;">
                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                 <input type="hidden" name="action" value="delete_movements">
                 <input type="hidden" name="movement_kind" value="issue">
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff9f9;border:1px solid #ffd6d6;border-radius:8px;"
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f0f5fc;border:1px solid #d0e1f7;border-radius:8px;"
                     id="issue-bulk-toolbar" hidden>
-                    <span id="issue-selected-count" style="font-size:12px;color:#8b1a28;font-weight:600;">0
+                    <span id="issue-selected-count" style="font-size:12px;color:#074080;font-weight:600;">0
                         รายการที่เลือก</span>
                     <button class="primary-button" type="submit"
-                        style="background:linear-gradient(105deg,#ef233c,#b5172b);min-height:30px;padding:0 12px;font-size:11px;"
+                        style="background:linear-gradient(105deg,#0758b4,#05448c);min-height:30px;padding:0 12px;font-size:11px;"
                         onclick="return confirm('ยืนยันการลบประวัติเบิกสินค้าที่เลือก?\nยอดสต๊อกจะถูกอัปเดตโดยอัตโนมัติ')">ลบรายการที่เลือก</button>
                     <button class="secondary-button" type="button" style="min-height:30px;padding:0 12px;font-size:11px;"
                         onclick="clearSelection('issue')">ยกเลิก</button>
@@ -299,10 +302,10 @@ require __DIR__ . '/includes/header.php';
             <table class="inventory-table movement-table">
                 <thead>
                     <tr>
-                        <?php if (!auth_is_viewer()): ?>
+                        <?php if (auth_is_admin()): ?>
                             <th style="width:36px;text-align:center;">
                                 <input type="checkbox" id="issue-select-all" title="เลือกทั้งหมด"
-                                    style="accent-color:#ef233c;cursor:pointer;"
+                                    style="accent-color:#0758b4;cursor:pointer;"
                                     onchange="toggleAll('issue', this.checked)">
                             </th>
                         <?php endif; ?>
@@ -330,11 +333,11 @@ require __DIR__ . '/includes/header.php';
                         ]));
                         ?>
                         <tr class="history-row" data-type="issue" data-search="<?= h($searchText) ?>">
-                            <?php if (!auth_is_viewer()): ?>
+                            <?php if (auth_is_admin()): ?>
                                 <td style="text-align:center;">
                                     <input type="checkbox" name="delete_ids[]" value="<?= (int) ($row['id'] ?? 0) ?>"
                                         form="issue-bulk-form" class="issue-row-check"
-                                        style="accent-color:#ef233c;cursor:pointer;" onchange="updateBulkToolbar('issue')">
+                                        style="accent-color:#0758b4;cursor:pointer;" onchange="updateBulkToolbar('issue')">
                                 </td>
                             <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>

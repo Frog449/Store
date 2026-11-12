@@ -82,9 +82,20 @@ $typeOptions = inventory_type_options();
 $unitOptions = inventory_unit_options();
 $editProductImageUrl = inventory_product_image_url($editProduct['image_filename'] ?? null, $editProduct['category'] ?? null);
 $categoryCounts = [];
+foreach ($categoryOptions as $cat) {
+    $categoryCounts[$cat] = 0;
+}
+$statusCounts = ['normal' => 0, 'low' => 0, 'negative' => 0];
 foreach ($products as $product) {
     $category = trim($product['category']) !== '' ? $product['category'] : 'ไม่ระบุหมวดหมู่';
     $categoryCounts[$category] = ($categoryCounts[$category] ?? 0) + 1;
+    if ($product['stock'] <= 0) {
+        $statusCounts['negative']++;
+    } elseif ($product['stock'] <= $product['minimum']) {
+        $statusCounts['low']++;
+    } else {
+        $statusCounts['normal']++;
+    }
 }
 require __DIR__ . '/includes/header.php';
 ?>
@@ -93,7 +104,7 @@ require __DIR__ . '/includes/header.php';
         <div>
             <div class="eyebrow section-eyebrow">PRODUCT REGISTER</div>
             <h1>ทะเบียนสินค้า<span class="heading-period">.</span></h1>
-            <p>คลิกการ์ดสินค้าเพื่อดูรายละเอียด รูปสินค้าเพิ่มหรือเปลี่ยนได้ในหน้าต่างแก้ไข</p>
+            <p>คลิกการ์ดสินค้าเพื่อดูรายละเอียด<?= auth_is_admin() ? ' รูปสินค้าเพิ่มหรือเปลี่ยนได้ในหน้าต่างแก้ไข' : '' ?></p>
         </div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
             <a class="secondary-button" href="export.php?type=products" style="font-size:11px;">📊 Export ทะเบียนสินค้า (.csv)</a>
@@ -104,14 +115,33 @@ require __DIR__ . '/includes/header.php';
             </label>
         </div>
     </div>
-    <div class="catalog-toolbar">
+    <div class="catalog-toolbar" style="flex-wrap:wrap;gap:10px 14px;">
         <div class="category-filters" role="group" aria-label="กรองตามหมวดหมู่">
             <button class="filter-chip selected" type="button" data-category="all">สินค้าทั้งหมด <span><?= count($products) ?></span></button>
             <?php foreach ($categoryCounts as $category => $count): ?>
                 <button class="filter-chip" type="button" data-category="<?= h($category) ?>"><?= h($category) ?> <span><?= $count ?></span></button>
             <?php endforeach; ?>
         </div>
-        <span class="result-count" id="result-count">แสดง <?= count($products) ?> รายการ</span>
+        <div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;">
+            <div class="status-filters" role="group" aria-label="กรองตามสถานะสต๊อก" style="display:flex;align-items:center;gap:6px;">
+                <button class="status-filter-chip" type="button" data-status-filter="normal" title="กรองเฉพาะสินค้าสถานะปกติ">
+                    <span class="status-dot dot-normal"></span>ปกติ <span><?= $statusCounts['normal'] ?></span>
+                </button>
+                <button class="status-filter-chip" type="button" data-status-filter="low" title="กรองเฉพาะสินค้าที่ควรสั่งซื้อ">
+                    <span class="status-dot dot-low"></span>ควรสั่งซื้อ <span><?= $statusCounts['low'] ?></span>
+                </button>
+                <button class="status-filter-chip" type="button" data-status-filter="negative" title="กรองเฉพาะสินค้าที่หมดสต๊อก">
+                    <span class="status-dot dot-negative"></span>หมด <span><?= $statusCounts['negative'] ?></span>
+                </button>
+            </div>
+            <?php if (auth_is_admin()): ?>
+                <a class="primary-button" href="receive.php?new=1#new-product" style="min-height:32px;padding:0 14px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                    <span>เพิ่มสินค้าใหม่</span>
+                </a>
+            <?php endif; ?>
+            <span class="result-count" id="result-count">แสดง <?= count($products) ?> รายการ</span>
+        </div>
     </div>
     <div class="product-grid" id="product-grid">
         <?php foreach ($products as $index => $product): ?>
@@ -154,6 +184,7 @@ require __DIR__ . '/includes/header.php';
             <?php endif; ?>
         </div>
     </dialog>
+    <?php if (auth_is_admin()): ?>
     <dialog class="product-detail-dialog product-edit-dialog" id="product-edit-dialog" aria-labelledby="product-edit-title" data-edit-code="<?= h($editProduct['code'] ?? '') ?>">
         <div class="product-detail-heading">
             <div><div class="eyebrow section-eyebrow">EDIT PRODUCT</div><h2 id="product-edit-title">แก้ไขข้อมูลสินค้า</h2><p id="product-edit-code"></p></div>
@@ -196,5 +227,6 @@ require __DIR__ . '/includes/header.php';
             </div>
         </form>
     </dialog>
+    <?php endif; ?>
 </section>
 <?php require __DIR__ . '/includes/footer.php'; ?>

@@ -67,11 +67,11 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
             border: 1px solid #ccc;
         }
         .btn-primary {
-            background: #ef233c;
+            background: #0758b4;
             color: #fff;
-            border-color: #ef233c;
+            border-color: #0758b4;
         }
-        .btn-primary:hover { background: #d90429; }
+        .btn-primary:hover { background: #05448c; }
         .btn-secondary {
             background: #fff;
             color: #444;
@@ -92,19 +92,29 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
             justify-content: space-between;
             align-items: flex-start;
             padding-bottom: 20px;
-            border-bottom: 2px solid #ef233c;
+            border-bottom: 2px solid #0758b4;
             margin-bottom: 24px;
+        }
+        .slip-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .slip-brand img {
+            height: 44px;
+            width: auto;
+            object-fit: contain;
         }
         .slip-brand h2 {
             margin: 0 0 4px;
             font-size: 20px;
             font-weight: 700;
-            color: #222;
+            color: #1e293b;
         }
-        .slip-brand span { color: #ef233c; }
+        .slip-brand span { color: #0758b4; }
         .slip-brand small {
             display: block;
-            color: #666;
+            color: #64748b;
             font-size: 11px;
             letter-spacing: 1px;
         }
@@ -114,7 +124,7 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
         .slip-doc-info h1 {
             margin: 0 0 6px;
             font-size: 18px;
-            color: #ef233c;
+            color: #0758b4;
             font-weight: 700;
         }
         .slip-meta-grid {
@@ -139,7 +149,7 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
             margin-bottom: 30px;
         }
         .slip-table th {
-            background: #2b2b2b;
+            background: #0a1b33;
             color: #fff;
             padding: 10px 12px;
             text-align: left;
@@ -228,9 +238,12 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
 <div class="slip-container">
     <div class="slip-header">
         <div class="slip-brand">
-            <h2>Store <span>Automeation</span></h2>
-            <small>INDUSTRIAL SUPPLY · INVENTORY VOUCHER</small>
-            <div style="margin-top:6px;font-size:11px;color:#777;">ฝ่ายจัดเก็บและควบคุมพัสดุอุตสาหกรรม</div>
+            <img src="assets/logo.png" alt="AUT Automation">
+            <div>
+                <h2>Store <span>Automeation</span></h2>
+                <small>INDUSTRIAL SUPPLY · INVENTORY VOUCHER</small>
+                <div style="margin-top:4px;font-size:11px;color:#64748b;">ฝ่ายจัดเก็บและควบคุมพัสดุอุตสาหกรรม</div>
+            </div>
         </div>
         <div class="slip-doc-info">
             <h1><?= h($slipTitle) ?></h1>
