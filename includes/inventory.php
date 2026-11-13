@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+date_default_timezone_set('Asia/Bangkok');
+
 function inventory_db(): PDO
 {
     static $db;
@@ -36,6 +38,7 @@ function inventory_db(): PDO
             throw $e;
         }
     }
+    $db->exec("SET time_zone = '+07:00'");
     inventory_ensure_schema($db);
 
     $count = (int) $db->query('SELECT COUNT(*) FROM `product`')->fetchColumn();
@@ -260,6 +263,48 @@ function inventory_ensure_schema(PDO $db): void
             KEY `idx_audit_created` (`created_at`),
             KEY `idx_audit_user` (`user_id`),
             KEY `idx_audit_action` (`action`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    }
+
+    if (!inventory_table_exists($db, 'system_settings')) {
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS `system_settings` (
+            `setting_key` VARCHAR(60) NOT NULL,
+            `setting_value` TEXT NULL,
+            `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`setting_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
+        );
+    }
+
+    if (!inventory_table_exists($db, 'borrow_records')) {
+        $db->exec(
+            'CREATE TABLE IF NOT EXISTS `borrow_records` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `borrower_name` VARCHAR(150) NOT NULL,
+            `product_code` VARCHAR(80) NOT NULL DEFAULT \'\',
+            `product_name` VARCHAR(250) NOT NULL DEFAULT \'\',
+            `borrow_date` DATE NOT NULL,
+            `borrow_time` TIME NOT NULL,
+            `location` VARCHAR(255) NOT NULL,
+            `borrow_photo` VARCHAR(80) NULL DEFAULT NULL,
+            `quantity` DECIMAL(14,3) NOT NULL DEFAULT 1.000,
+            `unit` VARCHAR(30) NOT NULL DEFAULT \'\',
+            `notes` VARCHAR(500) NOT NULL DEFAULT \'\',
+            `status` VARCHAR(20) NOT NULL DEFAULT \'borrowed\',
+            `return_date` DATE NULL DEFAULT NULL,
+            `return_time` TIME NULL DEFAULT NULL,
+            `return_received_by` VARCHAR(150) NULL DEFAULT NULL,
+            `return_photo` VARCHAR(80) NULL DEFAULT NULL,
+            `return_notes` VARCHAR(500) NULL DEFAULT NULL,
+            `created_by_user_id` BIGINT UNSIGNED NULL,
+            `created_by_name` VARCHAR(150) NOT NULL DEFAULT \'\',
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_borrow_status` (`status`),
+            KEY `idx_borrow_date` (`borrow_date`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'
         );
     }
@@ -1106,6 +1151,12 @@ function inventory_save_product(array $values, ?string $originalCode = null): vo
         } else {
             audit_log('product_update', $values['code'], "แก้ไขข้อมูลสินค้า: {$values['name']} (จุดสั่งซื้อ: {$values['reorder_point']} {$values['unit']})");
         }
+
+        $savedCode = $originalCode ?? $values['code'];
+        $updatedProduct = inventory_product($savedCode);
+        if ($updatedProduct !== null) {
+            inventory_sync_google_sheet_product($updatedProduct);
+        }
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
             $db->rollBack();
@@ -1188,9 +1239,17 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
              VALUES (:movement_date, :document_no, :product_code, :quantity, :supplier, :received_by, :department, :notes, :created_by_user_id, :created_by_name)'
         );
         $insertReceipt->execute($receipt);
+        $receiptId = (int) $db->lastInsertId();
         inventory_sync_product_summary($db, $product['code']);
         $db->commit();
         audit_log('product_create', $product['code'], "เพิ่มสินค้าพร้อมรับเข้าครั้งแรก: {$product['name']} จำนวน {$receipt['quantity']} {$product['unit']} (เอกสาร: {$receipt['document_no']})");
+
+        $receipt['id'] = $receiptId;
+        $updatedProduct = inventory_product($product['code']);
+        if ($updatedProduct !== null) {
+            inventory_notify_telegram_movement($receipt, 'receipt', $updatedProduct);
+            inventory_sync_google_sheet_movement($receipt, 'receipt', $updatedProduct);
+        }
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
             $db->rollBack();
@@ -1224,11 +1283,18 @@ function inventory_record_movement(string $kind, array $values): void
         );
     }
     $statement->execute($values);
+    $values['id'] = (int) inventory_db()->lastInsertId();
     inventory_sync_product_summary(inventory_db(), $values['product_code']);
     if ($kind === 'receipt') {
         audit_log('receipt_create', $values['product_code'], "รับสินค้าเข้า: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ") ผู้ส่งมอบ: " . ($values['supplier'] ?: '-') . " ผู้รับ: " . ($values['received_by'] ?: '-'));
     } else {
         audit_log('issue_create', $values['product_code'], "เบิกสินค้าออก: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ") ผู้ขอเบิก: " . ($values['requested_by'] ?: '-') . " แผนก: " . ($values['department'] ?: '-'));
+    }
+
+    $updatedProduct = inventory_product($values['product_code']);
+    if ($updatedProduct !== null) {
+        inventory_notify_telegram_movement($values, $kind, $updatedProduct);
+        inventory_sync_google_sheet_movement($values, $kind, $updatedProduct);
     }
 }
 
@@ -1310,6 +1376,11 @@ function inventory_update_movement(string $kind, int $id, array $values): void
         ]);
         inventory_sync_product_summary($db, $existing['product_code']);
         audit_log('issue_update', $existing['product_code'], "แก้ไขรายการเบิกออก #{$id}: จำนวน {$values['quantity']} (เอกสาร: " . ($values['document_no'] ?: '-') . ")");
+    }
+
+    $updatedProduct = inventory_product($existing['product_code']);
+    if ($updatedProduct !== null) {
+        inventory_sync_google_sheet_product($updatedProduct);
     }
 }
 
@@ -1468,6 +1539,10 @@ function inventory_delete_movements(string $kind, array $ids): void
 
     foreach ($affectedCodes as $code) {
         inventory_sync_product_summary($db, (string) $code);
+        $updatedProduct = inventory_product((string) $code);
+        if ($updatedProduct !== null) {
+            inventory_sync_google_sheet_product($updatedProduct);
+        }
     }
 
     $kindLabel = $kind === 'receipt' ? 'รับเข้าคลัง' : 'เบิกออก';
@@ -1496,13 +1571,703 @@ function inventory_delete_audit_logs(array $ids): void
     $stmt->execute(array_values($intIds));
     $deletedCount = $stmt->rowCount();
     // บันทึก audit ว่าลบ log (ใช้ SQL direct เพื่อไม่เกิด loop)
+    $curU = function_exists('auth_user') ? auth_user() : null;
     $db->prepare("INSERT INTO `audit_logs` (user_id, username, user_name, action, target, details, ip_address)
                   VALUES (:uid, :uname, :unamefull, 'audit_log_delete', '', :details, :ip)")
         ->execute([
-            'uid' => auth_user()['id'] ?? 0,
-            'uname' => auth_user()['username'] ?? '',
-            'unamefull' => auth_user()['name'] ?? '',
+            'uid' => $curU['id'] ?? 0,
+            'uname' => $curU['username'] ?? '',
+            'unamefull' => $curU['name'] ?? '',
             'details' => "ลบ Audit Log {$deletedCount} รายการ (ID: " . implode(', ', $intIds) . ")",
             'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
         ]);
+}
+
+/**
+ * ดึงค่าการตั้งค่าระบบ (System Settings)
+ */
+function inventory_get_setting(string $key, string $default = ''): string
+{
+    try {
+        $stmt = inventory_db()->prepare('SELECT `setting_value` FROM `system_settings` WHERE `setting_key` = :key');
+        $stmt->execute(['key' => $key]);
+        $val = $stmt->fetchColumn();
+        return $val !== false && $val !== null ? (string) $val : $default;
+    } catch (Throwable $e) {
+        return $default;
+    }
+}
+
+/**
+ * บันทึกค่าการตั้งค่าระบบ
+ */
+function inventory_set_setting(string $key, ?string $value): void
+{
+    $stmt = inventory_db()->prepare(
+        'INSERT INTO `system_settings` (`setting_key`, `setting_value`)
+         VALUES (:key, :value)
+         ON DUPLICATE KEY UPDATE `setting_value` = :value_update'
+    );
+    $stmt->execute([
+        'key' => $key,
+        'value' => $value,
+        'value_update' => $value,
+    ]);
+}
+
+/**
+ * ดึงการตั้งค่าทั้งหมด
+ */
+function inventory_get_settings(): array
+{
+    $defaults = [
+        'telegram_bot_token' => '',
+        'telegram_chat_id' => '',
+        'telegram_notify_enabled' => '0',
+        'google_sheet_webhook_url' => '',
+        'google_sheet_sync_enabled' => '0',
+    ];
+    try {
+        $rows = inventory_db()->query('SELECT `setting_key`, `setting_value` FROM `system_settings`')->fetchAll();
+        foreach ($rows as $row) {
+            $defaults[$row['setting_key']] = (string) ($row['setting_value'] ?? '');
+        }
+    } catch (Throwable $e) {
+        // Fallback to defaults
+    }
+    return $defaults;
+}
+
+/**
+ * สรุปจำนวนการยืมพัสดุ
+ */
+function inventory_borrow_counts(): array
+{
+    try {
+        $row = inventory_db()->query(
+            'SELECT 
+                COUNT(*) AS total,
+                SUM(CASE WHEN `status` = "borrowed" THEN 1 ELSE 0 END) AS borrowed,
+                SUM(CASE WHEN `status` = "returned" THEN 1 ELSE 0 END) AS returned
+             FROM `borrow_records`'
+        )->fetch();
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'borrowed' => (int) ($row['borrowed'] ?? 0),
+            'returned' => (int) ($row['returned'] ?? 0),
+        ];
+    } catch (Throwable $e) {
+        return ['total' => 0, 'borrowed' => 0, 'returned' => 0];
+    }
+}
+
+/**
+ * ดึงรายการยืม-คืนพัสดุ
+ */
+function inventory_borrow_records(string $statusFilter = 'all', string $search = '', int $limit = 500): array
+{
+    $sql = 'SELECT * FROM `borrow_records` WHERE 1=1';
+    $params = [];
+
+    if ($statusFilter === 'borrowed') {
+        $sql .= ' AND `status` = "borrowed"';
+    } elseif ($statusFilter === 'returned') {
+        $sql .= ' AND `status` = "returned"';
+    }
+
+    if ($search !== '') {
+        $sql .= ' AND (`borrower_name` LIKE :q OR `product_name` LIKE :q OR `product_code` LIKE :q OR `location` LIKE :q OR `notes` LIKE :q)';
+        $params['q'] = '%' . $search . '%';
+    }
+
+    $sql .= ' ORDER BY (`status` = "borrowed") DESC, `borrow_date` DESC, `borrow_time` DESC, `id` DESC LIMIT ' . (int) $limit;
+
+    $stmt = inventory_db()->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
+ * ดึงข้อมูลการยืมรายการเดียวตาม ID
+ */
+function inventory_borrow_record_by_id(int $id): ?array
+{
+    $stmt = inventory_db()->prepare('SELECT * FROM `borrow_records` WHERE `id` = :id');
+    $stmt->execute(['id' => $id]);
+    $row = $stmt->fetch();
+    return $row === false ? null : $row;
+}
+
+/**
+ * บันทึกการยืมพัสดุใหม่
+ */
+function inventory_create_borrow_record(array $data, ?array $photoUpload = null): int
+{
+    $borrowerName = trim((string) ($data['borrower_name'] ?? ''));
+    if ($borrowerName === '') {
+        throw new DomainException('กรุณาระบุชื่อผู้ยืม');
+    }
+
+    $productCode = trim((string) ($data['product_code'] ?? ''));
+    $productName = trim((string) ($data['product_name'] ?? ''));
+    if ($productName === '' && $productCode !== '') {
+        $prod = inventory_product($productCode);
+        if ($prod) {
+            $productName = (string) $prod['name'];
+        }
+    }
+    if ($productName === '') {
+        throw new DomainException('กรุณาระบุหรือเลือกพัสดุ/อุปกรณ์ที่ต้องการยืม');
+    }
+
+    $borrowDate = trim((string) ($data['borrow_date'] ?? ''));
+    if ($borrowDate === '') {
+        $borrowDate = date('Y-m-d');
+    }
+    $borrowTime = trim((string) ($data['borrow_time'] ?? ''));
+    if ($borrowTime === '') {
+        $borrowTime = date('H:i:s');
+    } elseif (strlen($borrowTime) === 5) {
+        $borrowTime .= ':' . date('s');
+    }
+
+    $location = trim((string) ($data['location'] ?? ''));
+    if ($location === '') {
+        throw new DomainException('กรุณาระบุสถานที่นำไปใช้งาน (ใช้ที่ไหน)');
+    }
+
+    $quantity = (float) ($data['quantity'] ?? 1);
+    if ($quantity <= 0) {
+        $quantity = 1.0;
+    }
+    $unit = trim((string) ($data['unit'] ?? 'pcs (ชิ้น)'));
+    $notes = trim((string) ($data['notes'] ?? ''));
+
+    $photoFilename = null;
+    if ($photoUpload !== null) {
+        $photoFilename = inventory_store_product_image($photoUpload);
+    }
+
+    $u = function_exists('auth_user') ? auth_user() : null;
+    $createdById = $u ? (int) $u['id'] : null;
+    $createdByName = $u ? (string) $u['name'] : $borrowerName;
+
+    $db = inventory_db();
+    $stmt = $db->prepare(
+        'INSERT INTO `borrow_records`
+         (`borrower_name`, `product_code`, `product_name`, `borrow_date`, `borrow_time`, `location`, `borrow_photo`, `quantity`, `unit`, `notes`, `status`, `created_by_user_id`, `created_by_name`)
+         VALUES
+         (:borrower_name, :product_code, :product_name, :borrow_date, :borrow_time, :location, :borrow_photo, :quantity, :unit, :notes, "borrowed", :created_by_user_id, :created_by_name)'
+    );
+    $stmt->execute([
+        'borrower_name' => $borrowerName,
+        'product_code' => $productCode,
+        'product_name' => $productName,
+        'borrow_date' => $borrowDate,
+        'borrow_time' => $borrowTime,
+        'location' => $location,
+        'borrow_photo' => $photoFilename,
+        'quantity' => $quantity,
+        'unit' => $unit,
+        'notes' => $notes,
+        'created_by_user_id' => $createdById,
+        'created_by_name' => $createdByName,
+    ]);
+
+    $newId = (int) $db->lastInsertId();
+    audit_log('borrow_create', "borrow#{$newId}", "บันทึกการยืม: {$productName} โดย {$borrowerName} (สถานที่: {$location})");
+
+    $record = inventory_borrow_record_by_id($newId);
+    if ($record) {
+        inventory_notify_telegram($record, 'borrow');
+        inventory_sync_google_sheet($record, 'borrow');
+    }
+
+    return $newId;
+}
+
+/**
+ * บันทึกการคืนพัสดุ
+ */
+function inventory_return_borrow_record(int $id, array $data, ?array $photoUpload = null): void
+{
+    $record = inventory_borrow_record_by_id($id);
+    if ($record === null) {
+        throw new DomainException('ไม่พบรายการยืมที่ต้องการบันทึกคืน');
+    }
+    if ($record['status'] === 'returned') {
+        throw new DomainException('รายการนี้ได้รับการบันทึกคืนแล้ว');
+    }
+
+    $returnDate = trim((string) ($data['return_date'] ?? ''));
+    if ($returnDate === '') {
+        $returnDate = date('Y-m-d');
+    }
+    $returnTime = trim((string) ($data['return_time'] ?? ''));
+    if ($returnTime === '') {
+        $returnTime = date('H:i:s');
+    } elseif (strlen($returnTime) === 5) {
+        $returnTime .= ':' . date('s');
+    }
+
+    $returnReceivedBy = trim((string) ($data['return_received_by'] ?? ''));
+    if ($returnReceivedBy === '') {
+        $u = function_exists('auth_user') ? auth_user() : null;
+        $returnReceivedBy = $u ? (string) $u['name'] : 'เจ้าหน้าที่คลัง';
+    }
+
+    $returnNotes = trim((string) ($data['return_notes'] ?? ''));
+
+    $returnPhoto = null;
+    if ($photoUpload !== null) {
+        $returnPhoto = inventory_store_product_image($photoUpload);
+    }
+
+    $db = inventory_db();
+    $stmt = $db->prepare(
+        'UPDATE `borrow_records`
+         SET `status` = "returned",
+             `return_date` = :return_date,
+             `return_time` = :return_time,
+             `return_received_by` = :return_received_by,
+             `return_photo` = :return_photo,
+             `return_notes` = :return_notes
+         WHERE `id` = :id'
+    );
+    $stmt->execute([
+        'id' => $id,
+        'return_date' => $returnDate,
+        'return_time' => $returnTime,
+        'return_received_by' => $returnReceivedBy,
+        'return_photo' => $returnPhoto,
+        'return_notes' => $returnNotes,
+    ]);
+
+    audit_log('borrow_return', "borrow#{$id}", "บันทึกคืนพัสดุ: {$record['product_name']} จาก {$record['borrower_name']} (ผู้รับคืน: {$returnReceivedBy})");
+
+    $updatedRecord = inventory_borrow_record_by_id($id);
+    if ($updatedRecord) {
+        inventory_notify_telegram($updatedRecord, 'return');
+        inventory_sync_google_sheet($updatedRecord, 'return');
+    }
+}
+
+/**
+ * ลบรายการยืม-คืน (Admin เท่านั้น)
+ */
+function inventory_delete_borrow_record(int $id): void
+{
+    if (function_exists('auth_is_admin') && !auth_is_admin()) {
+        throw new DomainException('เฉพาะ Admin เท่านั้นที่สามารถลบรายการประวัติการยืม-คืนได้');
+    }
+    $record = inventory_borrow_record_by_id($id);
+    if ($record === null) {
+        throw new DomainException('ไม่พบรายการที่ต้องการลบ');
+    }
+
+    $stmt = inventory_db()->prepare('DELETE FROM `borrow_records` WHERE `id` = :id');
+    $stmt->execute(['id' => $id]);
+
+    if (!empty($record['borrow_photo'])) {
+        inventory_delete_product_image($record['borrow_photo']);
+    }
+    if (!empty($record['return_photo'])) {
+        inventory_delete_product_image($record['return_photo']);
+    }
+
+    audit_log('borrow_delete', "borrow#{$id}", "ลบรายการยืม-คืน #{$id} ({$record['product_name']} โดย {$record['borrower_name']})");
+}
+
+/**
+ * ฟังก์ชันกลางสำหรับส่งข้อความ/รูปภาพเข้า Telegram Bot
+ */
+function inventory_telegram_send(string $htmlCaption, ?string $photoFilename = null): array
+{
+    $settings = inventory_get_settings();
+    $enabled = ($settings['telegram_notify_enabled'] ?? '0') === '1';
+    $botToken = trim($settings['telegram_bot_token'] ?? '');
+    $chatId = trim($settings['telegram_chat_id'] ?? '');
+
+    if (!$enabled || $botToken === '' || $chatId === '') {
+        return ['success' => false, 'message' => 'Telegram Notification is disabled or not configured.'];
+    }
+
+    $sentPhoto = false;
+    if ($photoFilename && preg_match('/\A[a-f0-9]{32}\.(?:jpg|png|webp)\z/', $photoFilename)) {
+        $photoPath = __DIR__ . '/../storage/product-images/' . $photoFilename;
+        if (!is_file($photoPath)) {
+            try {
+                $db = inventory_db();
+                $s = $db->prepare('SELECT `data` FROM `product_images` WHERE `filename` = :f');
+                $s->execute(['f' => $photoFilename]);
+                $blob = $s->fetchColumn();
+                if ($blob) {
+                    $dir = __DIR__ . '/../storage/product-images';
+                    if (is_dir($dir) || @mkdir($dir, 0755, true)) {
+                        @file_put_contents($photoPath, $blob);
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
+        if (is_file($photoPath)) {
+            try {
+                $ch = curl_init();
+                $curlFile = new CURLFile($photoPath, mime_content_type($photoPath), $photoFilename);
+                curl_setopt_array($ch, [
+                    CURLOPT_URL => "https://api.telegram.org/bot{$botToken}/sendPhoto",
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => [
+                        'chat_id' => $chatId,
+                        'photo' => $curlFile,
+                        'caption' => $htmlCaption,
+                        'parse_mode' => 'HTML',
+                    ],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 6,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                ]);
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($httpCode === 200) {
+                    $sentPhoto = true;
+                }
+            } catch (Throwable $e) {
+                error_log('Telegram sendPhoto error: ' . $e->getMessage());
+            }
+        }
+    }
+
+    if (!$sentPhoto) {
+        try {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => "https://api.telegram.org/bot{$botToken}/sendMessage",
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => http_build_query([
+                    'chat_id' => $chatId,
+                    'text' => $htmlCaption,
+                    'parse_mode' => 'HTML',
+                ]),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_SSL_VERIFYPEER => false,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            return [
+                'success' => $httpCode === 200,
+                'message' => $httpCode === 200 ? 'OK' : 'Telegram returned HTTP ' . $httpCode . ': ' . $response,
+            ];
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    return ['success' => true, 'message' => 'OK'];
+}
+
+/**
+ * ส่งการแจ้งเตือน ยืม-คืน พัสดุ ไปยัง Telegram Bot
+ */
+function inventory_notify_telegram(array $record, string $actionType = 'borrow'): array
+{
+    $isBorrow = $actionType === 'borrow';
+    $title = $isBorrow ? '<b>[แจ้งเตือนการยืมพัสดุ]</b>' : '<b>[แจ้งเตือนการคืนพัสดุ]</b>';
+    $statusText = $isBorrow ? 'กำลังยืม' : 'คืนแล้ว';
+
+    $lines = [
+        $title,
+        '<b>Store Automeation · ระบบยืม-คืน</b>',
+        '━━━━━━━━━━━━━━━━━━',
+        '<b>ผู้ยืม:</b> ' . htmlspecialchars($record['borrower_name'], ENT_QUOTES, 'UTF-8'),
+        '<b>พัสดุ:</b> ' . htmlspecialchars($record['product_name'], ENT_QUOTES, 'UTF-8') . (!empty($record['product_code']) ? ' (รหัส: ' . htmlspecialchars($record['product_code'], ENT_QUOTES, 'UTF-8') . ')' : ''),
+        '<b>จำนวน:</b> ' . inventory_quantity($record['quantity']) . ' ' . htmlspecialchars($record['unit'], ENT_QUOTES, 'UTF-8'),
+        '<b>สถานที่นำไปใช้:</b> ' . htmlspecialchars($record['location'], ENT_QUOTES, 'UTF-8'),
+        '<b>วันที่ยืม:</b> ' . htmlspecialchars($record['borrow_date'], ENT_QUOTES, 'UTF-8') . ' เวลา ' . substr((string) $record['borrow_time'], 0, 5) . ' น.',
+    ];
+
+    if (!$isBorrow) {
+        $lines[] = '<b>วันที่คืน:</b> ' . htmlspecialchars((string) ($record['return_date'] ?? '-'), ENT_QUOTES, 'UTF-8') . ' เวลา ' . substr((string) ($record['return_time'] ?? '-'), 0, 5) . ' น.';
+        if (!empty($record['return_received_by'])) {
+            $lines[] = '<b>ผู้รับคืน:</b> ' . htmlspecialchars($record['return_received_by'], ENT_QUOTES, 'UTF-8');
+        }
+        if (!empty($record['return_notes'])) {
+            $lines[] = '<b>หมายเหตุคืน:</b> ' . htmlspecialchars($record['return_notes'], ENT_QUOTES, 'UTF-8');
+        }
+    } else {
+        if (!empty($record['notes'])) {
+            $lines[] = '<b>หมายเหตุ:</b> ' . htmlspecialchars($record['notes'], ENT_QUOTES, 'UTF-8');
+        }
+    }
+
+    $lines[] = '<b>สถานะ:</b> ' . $statusText;
+    if (!empty($record['created_by_name'])) {
+        $lines[] = '<i>บันทึกโดย: ' . htmlspecialchars($record['created_by_name'], ENT_QUOTES, 'UTF-8') . '</i>';
+    }
+
+    $caption = implode("\n", $lines);
+    $photoFilename = $isBorrow ? ($record['borrow_photo'] ?? null) : ($record['return_photo'] ?? $record['borrow_photo'] ?? null);
+
+    return inventory_telegram_send($caption, $photoFilename);
+}
+
+/**
+ * ส่งการแจ้งเตือน รับ-เบิก สินค้า ไปยัง Telegram Bot
+ */
+function inventory_notify_telegram_movement(array $movement, string $kind, ?array $product = null): array
+{
+    if ($product === null) {
+        $product = inventory_product((string) $movement['product_code']);
+    }
+
+    $isReceipt = ($kind === 'receipt');
+    $title = $isReceipt ? '<b>[แจ้งเตือนรับสินค้าเข้าคลัง]</b>' : '<b>[แจ้งเตือนเบิกสินค้าออกจากคลัง]</b>';
+    $productName = $product['name'] ?? (string) $movement['product_code'];
+    $category = $product['category'] ?? '-';
+    $unit = $product['unit'] ?? '';
+    $quantity = (float) ($movement['quantity'] ?? 0);
+    $currentStock = (float) ($product['stock'] ?? 0);
+    $createdByName = (string) ($movement['created_by_name'] ?? '');
+    if ($createdByName === '' && function_exists('auth_user')) {
+        $u = auth_user();
+        if ($u) {
+            $createdByName = (string) $u['name'];
+        }
+    }
+
+    $lines = [
+        $title,
+        '<b>Store Automeation · ระบบคลังสินค้า</b>',
+        '━━━━━━━━━━━━━━━━━━',
+        '<b>รหัสสินค้า:</b> ' . htmlspecialchars((string) $movement['product_code'], ENT_QUOTES, 'UTF-8'),
+        '<b>ชื่อสินค้า:</b> ' . htmlspecialchars($productName, ENT_QUOTES, 'UTF-8'),
+        '<b>หมวดหมู่:</b> ' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8'),
+    ];
+
+    if ($isReceipt) {
+        $lines[] = '<b>จำนวนรับเข้า:</b> +' . inventory_quantity($quantity) . ' ' . htmlspecialchars($unit, ENT_QUOTES, 'UTF-8');
+        $lines[] = '<b>ยอดคงเหลือล่าสุด:</b> ' . inventory_quantity($currentStock) . ' ' . htmlspecialchars($unit, ENT_QUOTES, 'UTF-8');
+        if (!empty($movement['document_no'])) {
+            $lines[] = '<b>เลขที่เอกสาร:</b> ' . htmlspecialchars((string) $movement['document_no'], ENT_QUOTES, 'UTF-8');
+        }
+        if (!empty($movement['received_by'])) {
+            $lines[] = '<b>ผู้รับสินค้า:</b> ' . htmlspecialchars((string) $movement['received_by'], ENT_QUOTES, 'UTF-8');
+        }
+    } else {
+        $lines[] = '<b>จำนวนที่เบิก:</b> -' . inventory_quantity($quantity) . ' ' . htmlspecialchars($unit, ENT_QUOTES, 'UTF-8');
+        $lines[] = '<b>ยอดคงเหลือล่าสุด:</b> ' . inventory_quantity($currentStock) . ' ' . htmlspecialchars($unit, ENT_QUOTES, 'UTF-8');
+        if (!empty($movement['requested_by'])) {
+            $lines[] = '<b>ผู้ขอเบิก:</b> ' . htmlspecialchars((string) $movement['requested_by'], ENT_QUOTES, 'UTF-8');
+        }
+        if (!empty($movement['approved_by'])) {
+            $lines[] = '<b>ผู้อนุมัติ:</b> ' . htmlspecialchars((string) $movement['approved_by'], ENT_QUOTES, 'UTF-8');
+        }
+        if (!empty($movement['document_no'])) {
+            $lines[] = '<b>เลขที่เอกสาร:</b> ' . htmlspecialchars((string) $movement['document_no'], ENT_QUOTES, 'UTF-8');
+        }
+    }
+
+    if (!empty($movement['notes'])) {
+        $lines[] = '<b>หมายเหตุ:</b> ' . htmlspecialchars((string) $movement['notes'], ENT_QUOTES, 'UTF-8');
+    }
+    if ($createdByName !== '') {
+        $lines[] = '<i>บันทึกโดย: ' . htmlspecialchars($createdByName, ENT_QUOTES, 'UTF-8') . '</i>';
+    }
+    $date = !empty($movement['movement_date']) ? (string) $movement['movement_date'] : date('Y-m-d');
+    $time = date('H:i');
+    $lines[] = '<i>วัน-เวลา: ' . $date . ' ' . $time . ' น.</i>';
+
+    $caption = implode("\n", $lines);
+    $photoFilename = $product['image_filename'] ?? null;
+
+    return inventory_telegram_send($caption, $photoFilename);
+}
+
+/**
+ * ฟังก์ชันกลางสำหรับยิงข้อมูล JSON ไปยัง Google Apps Script Webhook
+ */
+function inventory_post_google_sheet(array $payload): array
+{
+    $settings = inventory_get_settings();
+    $enabled = ($settings['google_sheet_sync_enabled'] ?? '0') === '1';
+    $webhookUrl = trim($settings['google_sheet_webhook_url'] ?? '');
+
+    if (!$enabled || $webhookUrl === '' || !filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
+        return ['success' => false, 'message' => 'Google Sheets Sync is disabled or invalid URL.'];
+    }
+
+    try {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $webhookUrl,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true, // Essential for Google Apps Script 302 redirects
+            CURLOPT_TIMEOUT => 6,
+            CURLOPT_SSL_VERIFYPEER => false,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return [
+            'success' => $httpCode >= 200 && $httpCode < 400,
+            'message' => 'HTTP ' . $httpCode . ': ' . substr((string) $response, 0, 200),
+        ];
+    } catch (Throwable $e) {
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * ส่งข้อมูลการยืม-คืนไปยัง Google Sheet Webhook (Google Apps Script)
+ */
+function inventory_sync_google_sheet(array $record, string $actionType = 'borrow'): array
+{
+    $isBorrow = ($actionType === 'borrow');
+    $statusThai = $isBorrow ? 'กำลังยืม' : 'คืนแล้ว';
+    $actionThai = $isBorrow ? 'ยืมพัสดุ' : 'คืนพัสดุ';
+    $statusCode = $isBorrow ? 'borrowed' : 'returned';
+
+    $payload = [
+        'event' => 'borrow_sync',
+        'action' => $actionType,                     // 'borrow' หรือ 'return'
+        'action_name' => $actionThai,                // 'ยืมพัสดุ' หรือ 'คืนพัสดุ'
+        'action_th' => $actionThai,
+        'id' => (int) $record['id'],
+        'borrower_name' => (string) $record['borrower_name'],
+        'name' => (string) $record['borrower_name'],
+        'product_name' => (string) $record['product_name'],
+        'item' => (string) $record['product_name'],
+        'product' => (string) $record['product_name'],
+        'product_code' => (string) ($record['product_code'] ?? ''),
+        'quantity' => (float) ($record['quantity'] ?? 1),
+        'unit' => (string) ($record['unit'] ?? ''),
+        'borrow_date' => (string) $record['borrow_date'],
+        'borrow_time' => substr((string) $record['borrow_time'], 0, 5),
+        'location' => (string) $record['location'],
+        'status' => $statusThai,                     // 'กำลังยืม' หรือ 'คืนแล้ว'
+        'status_th' => $statusThai,
+        'status_code' => $statusCode,                // 'borrowed' หรือ 'returned'
+        'is_borrow' => $isBorrow,
+        'is_return' => !$isBorrow,
+        'return_date' => (string) ($record['return_date'] ?? ''),
+        'return_time' => !empty($record['return_time']) ? substr((string) $record['return_time'], 0, 5) : '',
+        'return_received_by' => (string) ($record['return_received_by'] ?? ''),
+        'notes' => (string) ($record['notes'] ?? ''),
+        'return_notes' => (string) ($record['return_notes'] ?? ''),
+        'created_by' => (string) ($record['created_by_name'] ?? ''),
+        'has_borrow_photo' => !empty($record['borrow_photo']) ? '1' : '0',
+        'has_return_photo' => !empty($record['return_photo']) ? '1' : '0',
+        'timestamp' => date('Y-m-d H:i:s'),
+    ];
+
+    return inventory_post_google_sheet($payload);
+}
+
+/**
+ * ส่งข้อมูลการ รับ-เบิก สินค้า ไปยัง Google Sheet
+ * และอัปเดตยอดคงเหลือในแท็บ "ทะเบียนสินค้า" บน Sheet
+ */
+function inventory_sync_google_sheet_movement(array $movement, string $kind, ?array $product = null): array
+{
+    if ($product === null) {
+        $product = inventory_product((string) $movement['product_code']);
+    }
+
+    $isReceipt = ($kind === 'receipt');
+    $productName = $product['name'] ?? (string) $movement['product_code'];
+    $category = $product['category'] ?? '';
+    $unit = $product['unit'] ?? '';
+    $quantity = (float) ($movement['quantity'] ?? 0);
+    $currentStock = (float) ($product['stock'] ?? 0);
+    $createdByName = (string) ($movement['created_by_name'] ?? '');
+    if ($createdByName === '' && function_exists('auth_user')) {
+        $u = auth_user();
+        if ($u) {
+            $createdByName = (string) $u['name'];
+        }
+    }
+
+    $payload = [
+        'event' => 'movement_sync',
+        'action' => $kind,                         // 'receipt' หรือ 'issue'
+        'action_name' => $isReceipt ? 'รับสินค้า' : 'เบิกสินค้า',
+        'id' => (int) ($movement['id'] ?? 0),
+        'movement_date' => (string) ($movement['movement_date'] ?? date('Y-m-d')),
+        'movement_time' => date('H:i:s'),
+        'product_code' => (string) $movement['product_code'],
+        'product_name' => $productName,
+        'category' => $category,
+        'quantity' => $quantity,
+        'unit' => $unit,
+        'current_stock' => $currentStock,
+        'reorder_point' => (float) ($product['reorder_point'] ?? 0),
+        'location' => (string) ($product['location'] ?? ''),
+        'document_no' => (string) ($movement['document_no'] ?? ''),
+        'received_by' => (string) ($movement['received_by'] ?? ''),
+        'requested_by' => (string) ($movement['requested_by'] ?? ''),
+        'approved_by' => (string) ($movement['approved_by'] ?? ''),
+        'notes' => (string) ($movement['notes'] ?? ''),
+        'created_by' => $createdByName,
+        'timestamp' => date('Y-m-d H:i:s'),
+    ];
+
+    return inventory_post_google_sheet($payload);
+}
+
+/**
+ * อัปเดตข้อมูลสินค้าเดี่ยวไปยังแท็บ "ทะเบียนสินค้า" บน Google Sheet (ไม่ส่งแจ้งเตือน Telegram)
+ */
+function inventory_sync_google_sheet_product(array $product): array
+{
+    $payload = [
+        'event' => 'catalog_sync',
+        'action' => 'catalog_update',
+        'product_code' => (string) ($product['code'] ?? $product['id'] ?? ''),
+        'product_name' => (string) ($product['name'] ?? ''),
+        'category' => (string) ($product['category'] ?? ''),
+        'item_type' => (string) ($product['item_type'] ?? ''),
+        'unit' => (string) ($product['unit'] ?? ''),
+        'current_stock' => (float) ($product['stock'] ?? 0),
+        'reorder_point' => (float) ($product['reorder_point'] ?? $product['minimum'] ?? 0),
+        'location' => (string) ($product['location'] ?? ''),
+        'timestamp' => date('Y-m-d H:i:s'),
+    ];
+
+    return inventory_post_google_sheet($payload);
+}
+
+/**
+ * ซิงค์รายการสินค้าทั้งหมดไปยังแท็บ "ทะเบียนสินค้า" บน Google Sheet (ไม่ส่งแจ้งเตือน Telegram)
+ */
+function inventory_sync_all_catalog_to_google_sheet(): array
+{
+    $all = inventory_products();
+    $list = [];
+    foreach ($all as $p) {
+        $list[] = [
+            'product_code' => (string) $p['id'],
+            'product_name' => (string) $p['name'],
+            'category' => (string) ($p['category'] ?? ''),
+            'current_stock' => (float) ($p['stock'] ?? 0),
+            'unit' => (string) ($p['unit'] ?? ''),
+            'reorder_point' => (float) ($p['minimum'] ?? 0),
+            'location' => (string) ($p['location'] ?? ''),
+        ];
+    }
+
+    $payload = [
+        'event' => 'catalog_batch_sync',
+        'action' => 'catalog_batch_sync',
+        'count' => count($list),
+        'products' => $list,
+        'timestamp' => date('Y-m-d H:i:s'),
+    ];
+
+    return inventory_post_google_sheet($payload);
 }

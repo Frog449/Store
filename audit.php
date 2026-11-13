@@ -76,6 +76,7 @@ require __DIR__ . '/includes/header.php';
             <a class="filter-chip <?= $actionFilter === 'product_delete' ? 'selected' : '' ?>" href="audit.php?action=product_delete">ลบสินค้า</a>
             <a class="filter-chip <?= $actionFilter === 'receipt_create' ? 'selected' : '' ?>" href="audit.php?action=receipt_create">รับเข้า</a>
             <a class="filter-chip <?= $actionFilter === 'issue_create' ? 'selected' : '' ?>" href="audit.php?action=issue_create">เบิกออก</a>
+            <a class="filter-chip <?= in_array($actionFilter, ['borrow_create', 'borrow_return', 'borrow_delete'], true) ? 'selected' : '' ?>" href="audit.php?action=borrow_create">ยืม-คืน</a>
             <a class="filter-chip <?= in_array($actionFilter, ['user_create', 'user_update', 'user_delete'], true) ? 'selected' : '' ?>" href="audit.php?action=user_update">จัดการผู้ใช้</a>
         </div>
         <form method="get" class="search-box" style="min-width:280px;">
@@ -115,23 +116,27 @@ require __DIR__ . '/includes/header.php';
                     <?php foreach ($logs as $log): ?>
                         <?php
                             $actionLabel = match ($log['action']) {
-                                'product_create' => '📦 เพิ่มสินค้า',
-                                'product_update' => '✏️ แก้ไขสินค้า',
-                                'product_delete' => '🗑️ ลบสินค้า',
-                                'receipt_create' => '📥 รับเข้าคลัง',
-                                'issue_create' => '📤 เบิกจ่าย',
-                                'user_create' => '👤 สร้างผู้ใช้',
-                                'user_update' => '🔧 แก้ไขผู้ใช้',
-                                'user_delete' => '❌ ลบผู้ใช้',
-                                'profile_update' => '👤 แก้ไขโปรไฟล์',
-                                'user_status_change' => '🔒 เปลี่ยนสถานะผู้ใช้',
-                                'export' => '📊 ส่งออก CSV',
-                                'backup' => '💾 สำรองข้อมูล',
-                                'audit_log_delete' => '🗑️ ลบ Audit Log',
-                                'movement_delete_receipt' => '📥 ลบประวัติรับ',
-                                'movement_delete_issue' => '📤 ลบประวัติเบิก',
-                                'print_receipt' => '🖨️ พิมพ์ใบรับสินค้า',
-                                'print_issue' => '🖨️ พิมพ์ใบเบิกสินค้า',
+                                'product_create' => 'เพิ่มสินค้า',
+                                'product_update' => 'แก้ไขสินค้า',
+                                'product_delete' => 'ลบสินค้า',
+                                'receipt_create' => 'รับเข้าคลัง',
+                                'issue_create' => 'เบิกจ่าย',
+                                'user_create' => 'สร้างผู้ใช้',
+                                'user_update' => 'แก้ไขผู้ใช้',
+                                'user_delete' => 'ลบผู้ใช้',
+                                'profile_update' => 'แก้ไขโปรไฟล์',
+                                'user_status_change' => 'เปลี่ยนสถานะผู้ใช้',
+                                'export' => 'ส่งออก CSV',
+                                'backup' => 'สำรองข้อมูล',
+                                'audit_log_delete' => 'ลบ Audit Log',
+                                'movement_delete_receipt' => 'ลบประวัติรับ',
+                                'movement_delete_issue' => 'ลบประวัติเบิก',
+                                'borrow_create' => 'ยืมพัสดุ',
+                                'borrow_return' => 'คืนพัสดุ',
+                                'borrow_delete' => 'ลบประวัติยืม',
+                                'settings_update' => 'ตั้งค่าระบบ',
+                                'print_receipt' => 'พิมพ์ใบรับสินค้า',
+                                'print_issue' => 'พิมพ์ใบเบิกสินค้า',
                                 default => $log['action'],
                             };
                         ?>

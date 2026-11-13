@@ -130,28 +130,28 @@ require __DIR__ . '/includes/header.php';
 
     <div class="stats-strip" style="margin-bottom:24px;">
         <div class="stat-item">
-            <span class="stat-icon icon-box">📦</span>
+            <span class="stat-icon icon-box">PRD</span>
             <div>
                 <strong><?= number_format($tableCounts['product']) ?></strong>
                 <span>รายการสินค้าในระบบ</span>
             </div>
         </div>
         <div class="stat-item">
-            <span class="stat-icon icon-check">📥</span>
+            <span class="stat-icon icon-check">IN</span>
             <div>
                 <strong><?= number_format($tableCounts['receipts']) ?></strong>
                 <span>ประวัติการรับสินค้า</span>
             </div>
         </div>
         <div class="stat-item">
-            <span class="stat-icon icon-alert" style="color:#ef233c;background:#ffebee;">📤</span>
+            <span class="stat-icon icon-alert" style="color:#ef233c;background:#ffebee;">OUT</span>
             <div>
                 <strong><?= number_format($tableCounts['issues']) ?></strong>
                 <span>ประวัติการเบิกสินค้า</span>
             </div>
         </div>
         <div class="stat-item">
-            <span class="stat-icon" style="background:#e3f2fd;color:#1976d2;">🖼️</span>
+            <span class="stat-icon" style="background:#e3f2fd;color:#1976d2;font-weight:700;font-size:11px;">IMG</span>
             <div>
                 <strong><?= number_format($tableCounts['product_images']) ?></strong>
                 <span>รูปสินค้าในฐานข้อมูล</span>
@@ -163,7 +163,7 @@ require __DIR__ . '/includes/header.php';
         <div class="inventory-panel" style="padding:24px;">
             <div class="panel-heading">
                 <div>
-                    <h2>💾 ดาวน์โหลดไฟล์ SQL Backup (.sql)</h2>
+                    <h2>ดาวน์โหลดไฟล์ SQL Backup (.sql)</h2>
                     <p>ไฟล์สำรองฐานข้อมูลฉบับเต็ม รวมโครงสร้างตาราง ข้อมูลสินค้า รูปภาพ และประวัติรับ-เบิกทั้งหมด</p>
                 </div>
             </div>
@@ -172,7 +172,7 @@ require __DIR__ . '/includes/header.php';
             </p>
             <div style="margin-top:20px;">
                 <a class="primary-button" href="backup.php?download=sql" style="padding:10px 20px;font-size:12px;">
-                    📥 ดาวน์โหลด Full SQL Backup (.sql)
+                    ดาวน์โหลด Full SQL Backup (.sql)
                 </a>
             </div>
         </div>
@@ -180,7 +180,7 @@ require __DIR__ . '/includes/header.php';
         <div class="inventory-panel" style="padding:24px;">
             <div class="panel-heading">
                 <div>
-                    <h2>📄 ดาวน์โหลดข้อมูล JSON (.json)</h2>
+                    <h2>ดาวน์โหลดข้อมูล JSON (.json)</h2>
                     <p>ไฟล์ข้อมูลดิบรูปแบบ JSON สำหรับนำไปประมวลผลต่อ หรือเชื่อมโยงกับระบบภายนอก</p>
                 </div>
             </div>
@@ -189,7 +189,7 @@ require __DIR__ . '/includes/header.php';
             </p>
             <div style="margin-top:20px;">
                 <a class="secondary-button" href="backup.php?download=json" style="padding:10px 20px;font-size:12px;">
-                    📥 ดาวน์โหลด JSON Data (.json)
+                    ดาวน์โหลด JSON Data (.json)
                 </a>
             </div>
         </div>

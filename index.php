@@ -95,7 +95,7 @@ require __DIR__ . '/includes/header.php';
                             style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>ควรสั่งซื้อ
                     </span>
                     <strong
-                        style="color:<?= $statusCounts['reorder'] > 0 ? '#d97706' : '#292326' ?>;"><?= $statusCounts['reorder'] ?></strong>
+                        style="color:<?= $statusCounts['reorder'] >=0 ? '#d97706' : '#292326' ?>;"><?= $statusCounts['reorder'] ?></strong>
                 </div>
                 <div class="dashboard-row" style="<?= $statusCounts['negative'] > 0 ? 'background:#fff1f2;' : '' ?>">
                     <span style="display:flex;align-items:center;gap:7px;">

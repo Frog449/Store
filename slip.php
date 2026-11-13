@@ -231,8 +231,8 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
 <body>
 
 <div class="slip-actions">
-    <a class="btn btn-secondary" href="history.php">⬅️ กลับหน้ารวมประวัติ</a>
-    <button class="btn btn-primary" type="button" onclick="window.print()">🖨️ พิมพ์เอกสารนี้ (Print Slip)</button>
+    <a class="btn btn-secondary" href="history.php">กลับหน้ารวมประวัติ</a>
+    <button class="btn btn-primary" type="button" onclick="window.print()">พิมพ์เอกสารนี้ (Print Slip)</button>
 </div>
 
 <div class="slip-container">

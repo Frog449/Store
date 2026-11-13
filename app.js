@@ -7,33 +7,47 @@ const emptySearch = document.querySelector("#empty-search");
 let activeCategory = "all";
 let activeStatus = "all";
 
-const systemDropdown = document.querySelector(".nav-dropdown");
-if (systemDropdown) {
-    const systemToggle = systemDropdown.querySelector(".nav-dropdown-btn");
-    const mainNav = systemDropdown.closest(".main-nav");
-    const setSystemDropdownOpen = (open) => {
-        systemDropdown.classList.toggle("open", open);
-        mainNav.classList.toggle("dropdown-open", open);
-        systemToggle.setAttribute("aria-expanded", String(open));
-    };
+// Sidebar Drawer (Mobile) & Admin Accordion Handlers
+(function() {
+    const sidebar = document.querySelector("#site-sidebar");
+    const backdrop = document.querySelector("#sidebar-backdrop");
+    const mobileToggle = document.querySelector("#mobile-menu-toggle");
+    const closeBtn = document.querySelector("#sidebar-close-btn");
 
-    systemToggle.addEventListener("click", () => {
-        setSystemDropdownOpen(systemToggle.getAttribute("aria-expanded") !== "true");
-    });
+    function openSidebar() {
+        if (sidebar) sidebar.classList.add("open");
+        if (backdrop) backdrop.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
 
-    document.addEventListener("click", (event) => {
-        if (!systemDropdown.contains(event.target)) {
-            setSystemDropdownOpen(false);
+    function closeSidebar() {
+        if (sidebar) sidebar.classList.remove("open");
+        if (backdrop) backdrop.classList.remove("active");
+        document.body.style.overflow = "";
+    }
+
+    if (mobileToggle) mobileToggle.addEventListener("click", openSidebar);
+    if (closeBtn) closeBtn.addEventListener("click", closeSidebar);
+    if (backdrop) backdrop.addEventListener("click", closeSidebar);
+
+    // Sidebar Admin Accordion
+    const adminAccordion = document.querySelector("#sidebar-admin-accordion");
+    const adminToggle = document.querySelector("#sidebar-admin-toggle");
+    if (adminAccordion && adminToggle) {
+        adminToggle.addEventListener("click", (e) => {
+            e.preventDefault();
+            const isOpen = adminAccordion.classList.toggle("open");
+            adminToggle.setAttribute("aria-expanded", String(isOpen));
+        });
+    }
+
+    // Close mobile sidebar on Escape key
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && sidebar && sidebar.classList.contains("open")) {
+            closeSidebar();
         }
     });
-
-    document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && systemToggle.getAttribute("aria-expanded") === "true") {
-            setSystemDropdownOpen(false);
-            systemToggle.focus();
-        }
-    });
-}
+})();
 
 function filterProducts() {
     const query = searchInput.value.trim().toLocaleLowerCase("th");
@@ -470,6 +484,7 @@ const initProductCombobox = (combobox) => {
 
     if (form) {
         form.addEventListener("submit", (event) => {
+            const allowCustom = combobox.hasAttribute("data-allow-custom") || combobox.dataset.allowCustom === "true";
             if (codeHidden.value === "") {
                 const typed = searchField.value.trim().toLocaleLowerCase("th");
                 const match = options.find(
@@ -479,7 +494,7 @@ const initProductCombobox = (combobox) => {
                 );
                 if (match) {
                     selectOption(match);
-                } else {
+                } else if (!allowCustom) {
                     event.preventDefault();
                     searchField.setCustomValidity("กรุณาเลือกชื่อสินค้าจากรายการ");
                     searchField.reportValidity();

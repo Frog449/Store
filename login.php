@@ -199,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </a>
 
         <div class="login-header">
-            <span class="login-security-tag">🔒 INTERNAL ACCESS ONLY</span>
+            <span class="login-security-tag">INTERNAL ACCESS ONLY</span>
             <h1>เข้าสู่ระบบคลังสินค้า</h1>
             <p>กรุณากรอกชื่อผู้ใช้ รหัสพนักงาน หรืออีเมล และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
         </div>

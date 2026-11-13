@@ -52,6 +52,7 @@ foreach ($pageProducts as $p) {
         break;
     }
 }
+$settings = inventory_get_settings();
 require __DIR__ . '/includes/header.php';
 ?>
 <section class="inventory-page">
@@ -62,8 +63,15 @@ require __DIR__ . '/includes/header.php';
             <p>บันทึกการเบิกหรือจ่ายสินค้าออก พร้อมระบุผู้เบิกและผู้อนุมัติ</p>
         </div>
         <div class="page-kpis">
+            <span style="font-size:12px;color:#475569;display:inline-flex;align-items:center;gap:6px;">
+                Telegram: <strong><?= ($settings['telegram_notify_enabled'] ?? '0') === '1' ? 'เปิด' : 'ปิด' ?></strong> |
+                Sheets: <strong><?= ($settings['google_sheet_sync_enabled'] ?? '0') === '1' ? 'เปิด' : 'ปิด' ?></strong>
+                <?php if (auth_is_admin()): ?>
+                    <a href="settings.php" class="secondary-button" style="padding:2px 8px;font-size:11px;">ตั้งค่า</a>
+                <?php endif; ?>
+            </span>
             <span><strong><?= count($history) ?></strong> รายการเบิก</span>
-            <a class="secondary-button" href="export.php?type=issues" style="font-size:11px;">📊 Export
+            <a class="secondary-button" href="export.php?type=issues" style="font-size:11px;">Export
                 ประวัติเบิกสินค้า</a>
             <a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a>
         </div>

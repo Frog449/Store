@@ -8,12 +8,34 @@ $pageDescription = 'ค้นหาและจัดการทะเบีย
 $activePage = 'products';
 $uploadedProductImage = null;
 $editCode = isset($_GET['edit']) && is_string($_GET['edit']) ? $_GET['edit'] : null;
+
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_product') {
     $editCode = isset($_POST['original_code']) && is_string($_POST['original_code'])
         ? trim($_POST['original_code'])
         : null;
 }
 $editProduct = $editCode === null ? null : inventory_product($editCode);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sync_catalog_to_sheet') {
+    try {
+        inventory_require_csrf();
+        if (!auth_can_manage_stock()) {
+            throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถซิงค์ข้อมูลกับ Google Sheet ได้');
+        }
+        $res = inventory_sync_all_catalog_to_google_sheet();
+        if ($res['success']) {
+            inventory_flash_redirect('ซิงค์ทะเบียนสินค้าทั้งหมดไปยัง Google Sheet สำเร็จแล้ว', 'catalog.php');
+        } else {
+            throw new DomainException('ซิงค์กับ Google Sheet ไม่สำเร็จ: ' . $res['message']);
+        }
+    } catch (DomainException $exception) {
+        $notice = inventory_handle_error($exception);
+        $noticeType = 'error';
+    }
+}
+
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_product') {
     try {
@@ -107,7 +129,16 @@ require __DIR__ . '/includes/header.php';
             <p>คลิกการ์ดสินค้าเพื่อดูรายละเอียด<?= auth_is_admin() ? ' รูปสินค้าเพิ่มหรือเปลี่ยนได้ในหน้าต่างแก้ไข' : '' ?></p>
         </div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <a class="secondary-button" href="export.php?type=products" style="font-size:11px;">📊 Export ทะเบียนสินค้า (.csv)</a>
+            <a class="secondary-button" href="export.php?type=products" style="font-size:11px;">Export ทะเบียนสินค้า (.csv)</a>
+            <?php if (auth_can_manage_stock()): ?>
+                <form method="post" style="display:inline;margin:0;">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="sync_catalog_to_sheet">
+                    <button type="submit" class="secondary-button" style="font-size:11px;" title="ซิงค์ข้อมูลสินค้าและยอดคงเหลือทั้งหมดไปยัง Google Sheet (แท็บ ทะเบียนสินค้า)">
+                        ซิงค์กับ Google Sheet
+                    </button>
+                </form>
+            <?php endif; ?>
             <label class="search-box">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                 <input id="product-search" type="search" placeholder="ค้นหาชื่อหรือรหัสสินค้า..." autocomplete="off">
