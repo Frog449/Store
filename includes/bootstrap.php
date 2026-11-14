@@ -58,3 +58,12 @@ function is_running_in_app(): bool
     }
     return false;
 }
+
+function is_mobile_client(): bool
+{
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    if (str_contains($ua, 'StoreAutomeationApp')) {
+        return true;
+    }
+    return (bool) preg_match('/(android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini)/i', $ua);
+}

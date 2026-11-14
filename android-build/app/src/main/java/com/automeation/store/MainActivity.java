@@ -29,7 +29,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String DEFAULT_URL = "http://172.29.109.35/Store/";
+    private static final String DEFAULT_URL = "http://172.29.109.35/Store/mobile/";
     private static final String PREFS_NAME = "store_prefs";
     private static final String KEY_SERVER_URL = "server_url";
     private static final int FILE_CHOOSER_REQUEST_CODE = 1001;
