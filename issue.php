@@ -63,16 +63,17 @@ require __DIR__ . '/includes/header.php';
             <p>บันทึกการเบิกหรือจ่ายสินค้าออก พร้อมระบุผู้เบิกและผู้อนุมัติ</p>
         </div>
         <div class="page-kpis">
-            <span style="font-size:12px;color:#475569;display:inline-flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;padding:5px 10px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;">
                 Telegram: <strong><?= ($settings['telegram_notify_enabled'] ?? '0') === '1' ? 'เปิด' : 'ปิด' ?></strong> |
                 Sheets: <strong><?= ($settings['google_sheet_sync_enabled'] ?? '0') === '1' ? 'เปิด' : 'ปิด' ?></strong>
                 <?php if (auth_is_admin()): ?>
-                    <a href="settings.php" class="secondary-button" style="padding:2px 8px;font-size:11px;">ตั้งค่า</a>
+                    <a href="settings.php" class="secondary-button" style="padding:2px 8px;font-size:11px;min-height:24px;">ตั้งค่า</a>
                 <?php endif; ?>
             </span>
-            <span><strong><?= count($history) ?></strong> รายการเบิก</span>
-            <a class="secondary-button" href="export.php?type=issues" style="font-size:11px;">Export
-                ประวัติเบิกสินค้า</a>
+            <span style="font-size:12px;color:#074080;background:#f0f5fc;border:1px solid #d0e1f7;padding:5px 10px;border-radius:8px;display:inline-flex;align-items:center;gap:4px;">
+                <strong><?= count($history) ?></strong> รายการเบิก
+            </span>
+            <a class="secondary-button" href="export.php?type=issues" style="font-size:11px;">Export ประวัติเบิกสินค้า</a>
             <a class="secondary-button" href="catalog.php">ดูรายการสินค้า ↗</a>
         </div>
     </div>

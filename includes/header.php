@@ -7,7 +7,7 @@ $activePage = $activePage ?? 'products';
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0758b4">
     <meta name="description" content="<?= h($pageDescription) ?>">
     <title><?= h($pageTitle) ?></title>
@@ -23,7 +23,7 @@ $activePage = $activePage ?? 'products';
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="assets/favicon.png?v=<?= filemtime(__DIR__ . '/../assets/favicon.png') ?>">
     <link rel="shortcut icon" href="favicon.ico?v=<?= filemtime(__DIR__ . '/../favicon.ico') ?>">
-    <link rel="stylesheet" href="style.css?v=3.6">
+    <link rel="stylesheet" href="style.css?v=3.7">
     <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

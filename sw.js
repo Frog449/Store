@@ -1,5 +1,5 @@
 // Store Automeation Service Worker (PWA for iOS & Android)
-const CACHE_NAME = 'store-automeation-v1.3';
+const CACHE_NAME = 'store-automeation-v1.4';
 const STATIC_ASSETS = [
   './',
   'index.php',
