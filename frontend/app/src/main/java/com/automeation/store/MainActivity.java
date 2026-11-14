@@ -29,7 +29,9 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String DEFAULT_URL = "http://172.29.109.35/Store/backend/mobile/";
+    private static final String DEFAULT_URL = "https://store-1m4n.onrender.com/mobile/";
+    private static final String LEGACY_LOCAL_URL = "http://172.29.109.35/Store/mobile/";
+    private static final String PREVIOUS_LOCAL_URL = "http://172.29.109.35/Store/backend/mobile/";
     private static final String PREFS_NAME = "store_prefs";
     private static final String KEY_SERVER_URL = "server_url";
     private static final int FILE_CHOOSER_REQUEST_CODE = 1001;
@@ -142,11 +144,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadCurrentServerUrl() {
-        String url = prefs.getString(KEY_SERVER_URL, DEFAULT_URL);
-        if (url == null || url.trim().isEmpty()) {
+        String url = prefs.getString(KEY_SERVER_URL, null);
+        if (url == null || url.trim().isEmpty() || isLegacyLocalUrl(url)) {
             url = DEFAULT_URL;
+            prefs.edit().putString(KEY_SERVER_URL, url).apply();
         }
         webView.loadUrl(url);
+    }
+
+    private boolean isLegacyLocalUrl(String url) {
+        String normalizedUrl = url.endsWith("/") ? url : url + "/";
+        return LEGACY_LOCAL_URL.equalsIgnoreCase(normalizedUrl)
+                || PREVIOUS_LOCAL_URL.equalsIgnoreCase(normalizedUrl);
     }
 
     private void showServerConfigDialog() {
