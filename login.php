@@ -245,7 +245,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </label>
         </form>
 
-
+        <div style="margin-top:20px;text-align:center;border-top:1px solid #f1f5f9;padding-top:16px;">
+            <a href="app.php" style="color:#0284c7;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                ดาวน์โหลดแอปมือถือ (Android APK / iOS PWA)
+            </a>
+        </div>
     </div>
 </div>
 </body>

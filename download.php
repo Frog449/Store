@@ -48,3 +48,4 @@ if ($handle !== false) {
     readfile($filePath);
 }
 exit;
+
