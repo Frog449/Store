@@ -48,10 +48,13 @@ require __DIR__ . '/includes/header.php';
                 </div>
 
                 <div class="app-card-actions">
-                    <a href="downloads/store-automeation.apk" class="primary-button app-download-btn" download="store-automeation.apk">
+                    <a href="download.php?file=apk" class="primary-button app-download-btn" download="store-automeation.apk">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         ดาวน์โหลดไฟล์ APK สำหรับ Android
                     </a>
+                    <div style="margin-top:8px;font-size:12px;color:#64748b;">
+                        หากดาวน์โหลดไม่เริ่มอัตโนมัติ: <a href="downloads/store-automeation.apk" download="store-automeation.apk" style="color:#0284c7;text-decoration:underline;">คลิกที่นี่เพื่อโหลดลิงก์สำรองโดยตรง</a>
+                    </div>
                 </div>
 
                 <div class="app-card-steps">

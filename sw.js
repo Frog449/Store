@@ -1,5 +1,5 @@
 // Store Automeation Service Worker (PWA for iOS & Android)
-const CACHE_NAME = 'store-automeation-v1.0';
+const CACHE_NAME = 'store-automeation-v1.2';
 const STATIC_ASSETS = [
   './',
   'index.php',
@@ -52,6 +52,19 @@ self.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(event.request.url);
+
+  // CRITICAL: Do NOT intercept downloads, APK files, or export scripts
+  // Let browser download manager handle them natively
+  if (
+    url.pathname.includes('/downloads/') ||
+    url.pathname.endsWith('.apk') ||
+    url.pathname.endsWith('.zip') ||
+    url.pathname.includes('download.php') ||
+    url.pathname.includes('export.php') ||
+    url.pathname.includes('backup.php')
+  ) {
+    return;
+  }
 
   // For static assets (css, images, fonts, manifest)
   if (url.pathname.endsWith('.css') || url.pathname.endsWith('.png') || url.pathname.endsWith('.ico') || url.pathname.endsWith('.json')) {

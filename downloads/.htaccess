@@ -1,5 +1,12 @@
-AddType application/vnd.android.package-archive .apk
-<FilesMatch "\.apk$">
-    Header set Content-Disposition "attachment"
-</FilesMatch>
+<IfModule mod_mime.c>
+    AddType application/vnd.android.package-archive .apk
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.apk$">
+        Header set Content-Disposition "attachment; filename=\"store-automeation.apk\""
+        Header set X-Content-Type-Options "nosniff"
+        Header set Cache-Control "public, must-revalidate, max-age=0"
+    </FilesMatch>
+</IfModule>
 
