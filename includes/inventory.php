@@ -999,7 +999,7 @@ function inventory_product(string $code): ?array
 
 function inventory_movements(string $kind, int $limit = 250): array
 {
-    $limit = min(300, max(1, $limit));
+    $limit = min(250, max(1, $limit));
     if ($kind === 'receipt') {
         $table = 'receipts';
         $extraColumns = 'm.supplier, m.received_by, m.department';
@@ -1097,7 +1097,7 @@ function inventory_movement_by_id(string $kind, int $id): ?array
     return $row === false ? null : $row;
 }
 
-function inventory_prune_audit_logs(int $maxRecords = 300): void
+function inventory_prune_audit_logs(int $maxRecords = 250): void
 {
     try {
         $db = inventory_db();
@@ -1141,8 +1141,8 @@ function audit_log(string $action, string $target = '', string $details = ''): v
             'ip' => $ip,
         ]);
 
-        // Auto-prune audit logs to max 300 records to prevent slowing down the system
-        inventory_prune_audit_logs(300);
+        // Auto-prune audit logs to max 250 records to prevent slowing down the system
+        inventory_prune_audit_logs(250);
     } catch (Throwable $e) {
         error_log('Audit log error: ' . $e->getMessage());
     }
@@ -1705,7 +1705,7 @@ function inventory_borrow_counts(): array
  */
 function inventory_borrow_records(string $statusFilter = 'all', string $search = '', int $limit = 250): array
 {
-    $limit = min(300, max(1, $limit));
+    $limit = min(250, max(1, $limit));
     $sql = 'SELECT * FROM `borrow_records` WHERE 1=1';
     $params = [];
 
@@ -1895,8 +1895,8 @@ function inventory_return_borrow_record(int $id, array $data, ?array $photoUploa
 
     audit_log('borrow_return', "borrow#{$id}", "บันทึกคืนพัสดุ: {$record['product_name']} จาก {$record['borrower_name']} (ผู้รับคืน: {$returnReceivedBy})");
 
-    // Auto-prune old returned borrow records beyond 300 to keep database light and fast
-    inventory_prune_borrow_records(300);
+    // Auto-prune old returned borrow records beyond 250 to keep database light and fast
+    inventory_prune_borrow_records(250);
 
     $updatedRecord = inventory_borrow_record_by_id($id);
     if ($updatedRecord) {
@@ -1906,9 +1906,9 @@ function inventory_return_borrow_record(int $id, array $data, ?array $photoUploa
 }
 
 /**
- * ตัดรอบประวัติการยืม-คืนพัสดุที่คืนแล้ว ให้เก็บไม่เกิน 300 รายการล่าสุด
+ * ตัดรอบประวัติการยืม-คืนพัสดุที่คืนแล้ว ให้เก็บไม่เกิน 250 รายการล่าสุด
  */
-function inventory_prune_borrow_records(int $maxReturned = 300): void
+function inventory_prune_borrow_records(int $maxReturned = 250): void
 {
     try {
         $db = inventory_db();
