@@ -10,7 +10,7 @@ RUN a2enmod rewrite
 WORKDIR /var/www/html
 
 # Copy application files
-COPY . .
+COPY backend/ .
 
 # Create storage directory and set permissions
 RUN mkdir -p storage/product-images \

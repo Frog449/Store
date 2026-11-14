@@ -13,7 +13,7 @@ if not exist "%PHP_EXE%" (
 )
 
 echo Starting the store at http://127.0.0.1:8000
-"%PHP_EXE%" -S 127.0.0.1:8000 -t "%~dp0"
+"%PHP_EXE%" -S 127.0.0.1:8000 -t "%~dp0backend"
 if errorlevel 1 (
     echo.
     echo The PHP server stopped. Check whether port 8000 is already in use.

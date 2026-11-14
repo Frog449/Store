@@ -12,10 +12,14 @@ services:
       - key: STORE_DB_HOST
         sync: false
       - key: STORE_DB_PORT
-        value: "3306"
+        value: "4000"
       - key: STORE_DB_NAME
         sync: false
       - key: STORE_DB_USER
         sync: false
       - key: STORE_DB_PASSWORD
+        sync: false
+      - key: STORE_DB_SSL
+        value: "true"
+      - key: STORE_DB_SSL_CA
         sync: false

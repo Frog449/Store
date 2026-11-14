@@ -1,12 +1,12 @@
 .env
 .env.*
 !.env.example
-/storage/inventory.sqlite
-/storage/product-images/*
-!/storage/product-images/.htaccess
-/docs/*.csv
-android-build/.gradle/
-android-build/build/
-android-build/app/build/
-android-build/local.properties
+/backend/storage/inventory.sqlite
+/backend/storage/product-images/*
+!/backend/storage/product-images/.htaccess
+/backend/docs/*.csv
+frontend/.gradle/
+frontend/build/
+frontend/app/build/
+frontend/local.properties
 

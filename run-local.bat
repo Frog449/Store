@@ -14,17 +14,17 @@ echo ========================================================
 echo   Store Automeation - Local Development Server
 echo ========================================================
 echo [1/3] Ensuring Database and Default Accounts...
-"%PHP_BIN%" setup-local-db.php
+"%PHP_BIN%" "%~dp0backend\setup-local-db.php"
 
 echo.
 echo [2/3] Checking PHP syntax across files...
-"%PHP_BIN%" -l index.php
-"%PHP_BIN%" -l profile.php
-"%PHP_BIN%" -l history.php
-"%PHP_BIN%" -l catalog.php
-"%PHP_BIN%" -l receive.php
-"%PHP_BIN%" -l issue.php
-"%PHP_BIN%" -l users.php
+"%PHP_BIN%" -l "%~dp0backend\index.php"
+"%PHP_BIN%" -l "%~dp0backend\profile.php"
+"%PHP_BIN%" -l "%~dp0backend\history.php"
+"%PHP_BIN%" -l "%~dp0backend\catalog.php"
+"%PHP_BIN%" -l "%~dp0backend\receive.php"
+"%PHP_BIN%" -l "%~dp0backend\issue.php"
+"%PHP_BIN%" -l "%~dp0backend\users.php"
 
 echo.
 echo [3/3] Starting Local Server at http://localhost:8000
@@ -38,5 +38,5 @@ echo ========================================================
 echo.
 
 start "" "http://localhost:8000"
-"%PHP_BIN%" -S localhost:8000
+"%PHP_BIN%" -S localhost:8000 -t "%~dp0backend"
 pause
