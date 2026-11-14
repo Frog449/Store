@@ -1,5 +1,5 @@
 // Store Automeation Service Worker (PWA for iOS & Android)
-const CACHE_NAME = 'store-automeation-v1.5';
+const CACHE_NAME = 'store-automeation-v1.6';
 const STATIC_ASSETS = [
   'style.css',
   'assets/logo.png',

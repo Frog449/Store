@@ -3,6 +3,12 @@ declare(strict_types=1);
 
 define('PUBLIC_PAGE', true);
 require __DIR__ . '/includes/bootstrap.php';
+
+// If already inside the mobile application, redirect to dashboard
+if (is_running_in_app()) {
+    header('Location: index.php');
+    exit;
+}
 $pageTitle = 'ดาวน์โหลดแอปพลิเคชันมือถือ | Store Automeation';
 $pageDescription = 'ดาวน์โหลดแอปพลิเคชันระบบจัดการคลังสินค้าสำหรับ Android (.APK) และคู่มือติดตั้งบน iOS (Safari PWA)';
 $activePage = 'app';

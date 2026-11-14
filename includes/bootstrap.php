@@ -46,3 +46,15 @@ if (isset($_SESSION['flash_notice'])) {
         $noticeType = $flashNotice['type'] === 'error' ? 'error' : 'success';
     }
 }
+
+function is_running_in_app(): bool
+{
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    if (str_contains($ua, 'StoreAutomeationApp')) {
+        return true;
+    }
+    if (isset($_COOKIE['is_standalone']) && $_COOKIE['is_standalone'] === '1') {
+        return true;
+    }
+    return false;
+}

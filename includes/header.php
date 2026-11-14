@@ -23,11 +23,11 @@ $activePage = $activePage ?? 'products';
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="assets/favicon.png?v=<?= filemtime(__DIR__ . '/../assets/favicon.png') ?>">
     <link rel="shortcut icon" href="favicon.ico?v=<?= filemtime(__DIR__ . '/../favicon.ico') ?>">
-    <link rel="stylesheet" href="style.css?v=3.7">
+    <link rel="stylesheet" href="style.css?v=3.8">
     <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js?v=1.5').catch(() => {});
+            navigator.serviceWorker.register('sw.js?v=1.6').catch(() => {});
         });
     }
     </script>
@@ -103,10 +103,12 @@ $activePage = $activePage ?? 'products';
             <?php endif; ?>
 
             <div class="nav-section-title">อื่นๆ</div>
-            <a class="sidebar-link <?= $activePage === 'app' ? 'active' : '' ?>" href="app.php">
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                <span>ดาวน์โหลดแอป</span>
-            </a>
+            <?php if (!is_running_in_app()): ?>
+                <a class="sidebar-link sidebar-link-app <?= $activePage === 'app' ? 'active' : '' ?>" href="app.php">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    <span>ดาวน์โหลดแอป</span>
+                </a>
+            <?php endif; ?>
             <?php if (!function_exists('auth_is_viewer') || !auth_is_viewer()): ?>
                 <a class="sidebar-link <?= $activePage === 'guide' ? 'active' : '' ?>" href="guide.php">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>

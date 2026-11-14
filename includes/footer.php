@@ -6,6 +6,6 @@
 </footer>
 </div><!-- /.app-content-wrapper -->
 </div><!-- /.app-layout -->
-<script src="app.js?v=3.5" defer></script>
+<script src="app.js?v=3.6" defer></script>
 </body>
 </html>

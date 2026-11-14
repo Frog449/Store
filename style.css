@@ -1840,6 +1840,10 @@ body {
         min-height: 42px;
         gap: 12px;
     }
+    .sidebar-link-app,
+    .about-app-banner {
+        display: none !important;
+    }
     .sidebar-footer {
         position: sticky;
         bottom: 0;
@@ -2146,5 +2150,18 @@ body {
         grid-template-columns: 1fr !important;
         gap: 8px !important;
     }
+}
+
+/* Standalone PWA / Mobile App mode */
+@media (display-mode: standalone) {
+    .sidebar-link-app,
+    .about-app-banner {
+        display: none !important;
+    }
+}
+
+.is-mobile-app .sidebar-link-app,
+.is-mobile-app .about-app-banner {
+    display: none !important;
 }
 

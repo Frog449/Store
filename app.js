@@ -47,6 +47,15 @@ let activeStatus = "all";
             closeSidebar();
         }
     });
+
+    // Standalone PWA / Mobile App detection: hide app download links
+    const isApp = window.matchMedia('(display-mode: standalone)').matches ||
+                  window.navigator.standalone === true ||
+                  navigator.userAgent.includes('StoreAutomeationApp');
+    if (isApp) {
+        document.documentElement.classList.add('is-mobile-app');
+        document.cookie = 'is_standalone=1; path=/; max-age=31536000; SameSite=Lax';
+    }
 })();
 
 function filterProducts() {
