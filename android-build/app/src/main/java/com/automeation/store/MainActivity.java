@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
         ws.setLoadWithOverviewMode(true);
         ws.setBuiltInZoomControls(true);
         ws.setDisplayZoomControls(false);
-        ws.setCacheMode(WebSettings.LOAD_DEFAULT);
+        ws.setCacheMode(WebSettings.LOAD_NO_CACHE);
         ws.setUserAgentString(ws.getUserAgentString() + " StoreAutomeationApp/1.0");
 
         webView.setWebViewClient(new WebViewClient() {

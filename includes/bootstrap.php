@@ -3,6 +3,13 @@ declare(strict_types=1);
 
 date_default_timezone_set('Asia/Bangkok');
 
+// Disable HTTP caching for all dynamic pages so stock & history updates are always live
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

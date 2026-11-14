@@ -1,15 +1,6 @@
 // Store Automeation Service Worker (PWA for iOS & Android)
-const CACHE_NAME = 'store-automeation-v1.4';
+const CACHE_NAME = 'store-automeation-v1.5';
 const STATIC_ASSETS = [
-  './',
-  'index.php',
-  'catalog.php',
-  'receive.php',
-  'issue.php',
-  'borrow.php',
-  'history.php',
-  'about.php',
-  'app.php',
   'style.css',
   'assets/logo.png',
   'assets/favicon.png',
@@ -46,7 +37,6 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first strategy for dynamic inventory data
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') {
     return;
@@ -54,8 +44,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // CRITICAL: Do NOT intercept downloads, APK files, or export scripts
-  // Let browser download manager handle them natively
+  // 1. NEVER intercept downloads, APK files, or export scripts
   if (
     url.pathname.includes('/downloads/') ||
     url.pathname.endsWith('.apk') ||
@@ -67,8 +56,37 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For static assets (css, images, fonts, manifest)
-  if (url.pathname.endsWith('.css') || url.pathname.endsWith('.png') || url.pathname.endsWith('.ico') || url.pathname.endsWith('.json')) {
+  // 2. Dynamic PHP pages & navigations: NEVER cache, ALWAYS fetch direct live data from server
+  if (
+    event.request.mode === 'navigate' ||
+    url.pathname.endsWith('.php') ||
+    url.pathname === '/' ||
+    url.pathname.endsWith('/Store/') ||
+    url.search !== ''
+  ) {
+    // Pass directly to network with no-store cache directive
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).catch(() => {
+        return caches.match('index.php').then((res) => {
+          return res || new Response('ออฟไลน์: ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ในขณะนี้', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+          });
+        });
+      })
+    );
+    return;
+  }
+
+  // 3. Static assets only (css, images, fonts, manifest)
+  if (
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.jpg') ||
+    url.pathname.endsWith('.jpeg') ||
+    url.pathname.endsWith('.ico') ||
+    url.pathname.endsWith('.json')
+  ) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         return cached || fetch(event.request).then((response) => {
@@ -82,24 +100,4 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-
-  // Network first for PHP pages to ensure latest stock & movement updates
-  event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      })
-      .catch(() => {
-        return caches.match(event.request).then((cached) => {
-          return cached || caches.match('index.php');
-        });
-      })
-  );
 });
-
