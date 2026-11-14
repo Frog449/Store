@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 define('PUBLIC_PAGE', true);
 require __DIR__ . '/includes/bootstrap.php';
+$resourcePrefix = app_resource_prefix();
 
 if (auth_user() !== null) {
     header('Location: index.php');
@@ -53,11 +54,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0758b4">
     <title><?= h($pageTitle) ?></title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="<?= $resourcePrefix ?>manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <link rel="icon" type="image/png" href="<?= $resourcePrefix ?>assets/favicon.png">
     <style>
         * { box-sizing: border-box; }
         body {
@@ -227,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-wrap">
         <div class="login-card">
             <a class="login-brand" href="login.php">
-                <img src="assets/logo.png" alt="AUT Automation">
+                <img src="<?= $resourcePrefix ?>assets/logo.png" alt="AUT Automation">
                 <div class="brand-text">
                     <span class="brand-name">Store Automeation</span>
                     <span class="brand-sub">INDUSTRIAL SUPPLY</span>

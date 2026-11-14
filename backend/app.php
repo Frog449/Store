@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 define('PUBLIC_PAGE', true);
 require __DIR__ . '/includes/bootstrap.php';
+$resourcePrefix = app_resource_prefix();
 
 // If already inside the mobile application, redirect to dashboard
 if (is_running_in_app()) {
@@ -52,7 +53,7 @@ require __DIR__ . '/includes/header.php';
                         ดาวน์โหลดไฟล์ APK สำหรับ Android
                     </a>
                     <div style="margin-top:8px;font-size:12px;color:#64748b;text-align:center;">
-                        หากดาวน์โหลดไม่เริ่มอัตโนมัติ: <a href="downloads/store-automeation.apk" download="store-automeation.apk" style="color:#0284c7;text-decoration:underline;">คลิกที่นี่เพื่อโหลดลิงก์สำรองโดยตรง</a>
+                        หากดาวน์โหลดไม่เริ่มอัตโนมัติ: <a href="<?= $resourcePrefix ?>downloads/store-automeation.apk" download="store-automeation.apk" style="color:#0284c7;text-decoration:underline;">คลิกที่นี่เพื่อโหลดลิงก์สำรองโดยตรง</a>
                     </div>
                 </div>
 

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/includes/bootstrap.php';
+$resourcePrefix = app_resource_prefix();
 
 auth_require_login();
 
@@ -38,8 +39,8 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
     <link
         href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="icon" type="image/png" href="assets/favicon.png?v=<?= filemtime(__DIR__ . '/assets/favicon.png') ?>">
-    <link rel="shortcut icon" href="favicon.ico?v=<?= filemtime(__DIR__ . '/favicon.ico') ?>">
+    <link rel="icon" type="image/png" href="<?= $resourcePrefix ?>assets/favicon.png?v=<?= filemtime(__DIR__ . '/assets/favicon.png') ?>">
+    <link rel="shortcut icon" href="<?= $resourcePrefix ?>favicon.ico?v=<?= filemtime(__DIR__ . '/favicon.ico') ?>">
     <style>
         * {
             box-sizing: border-box;
@@ -286,7 +287,7 @@ audit_log($printAction, $movement['product_code'] ?? '', "{$printLabel} #{$refNo
     <div class="slip-container">
         <div class="slip-header">
             <div class="slip-brand">
-                <img src="assets/logo.png?v=<?= filemtime(__DIR__ . '/assets/logo.png') ?>" alt="Store Automeation">
+                <img src="<?= $resourcePrefix ?>assets/logo.png?v=<?= filemtime(__DIR__ . '/assets/logo.png') ?>" alt="Store Automeation">
                 <div>
                     <h2>Store <span>Automeation</span></h2>
                     <small>INDUSTRIAL SUPPLY · INVENTORY VOUCHER</small>

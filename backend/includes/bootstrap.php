@@ -38,6 +38,14 @@ function h(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function app_resource_prefix(): string
+{
+    $scriptName = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
+    $routeFolder = basename(dirname($scriptName));
+
+    return in_array($routeFolder, ['web', 'mobile'], true) ? '../' : '';
+}
+
 $csrfToken = h($_SESSION['csrf_token']);
 $notice = '';
 $noticeType = 'success';

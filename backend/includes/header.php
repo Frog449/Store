@@ -2,6 +2,7 @@
 $pageTitle = $pageTitle ?? 'Store Automeation | อะไหล่อุตสาหกรรม';
 $pageDescription = $pageDescription ?? 'รายการสินค้าและระบบจัดการสต๊อก';
 $activePage = $activePage ?? 'products';
+$resourcePrefix = app_resource_prefix();
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -12,8 +13,8 @@ $activePage = $activePage ?? 'products';
     <meta name="description" content="<?= h($pageDescription) ?>">
     <title><?= h($pageTitle) ?></title>
     <!-- PWA & Mobile Web App Meta -->
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+    <link rel="manifest" href="<?= $resourcePrefix ?>manifest.json">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= $resourcePrefix ?>assets/icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Store AUT">
@@ -21,13 +22,13 @@ $activePage = $activePage ?? 'products';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="assets/favicon.png?v=<?= filemtime(__DIR__ . '/../assets/favicon.png') ?>">
-    <link rel="shortcut icon" href="favicon.ico?v=<?= filemtime(__DIR__ . '/../favicon.ico') ?>">
+    <link rel="icon" type="image/png" href="<?= $resourcePrefix ?>assets/favicon.png?v=<?= filemtime(__DIR__ . '/../assets/favicon.png') ?>">
+    <link rel="shortcut icon" href="<?= $resourcePrefix ?>favicon.ico?v=<?= filemtime(__DIR__ . '/../favicon.ico') ?>">
     <link rel="stylesheet" href="style.css?v=3.8">
     <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js?v=1.6').catch(() => {});
+            navigator.serviceWorker.register('<?= $resourcePrefix ?>sw.js?v=1.6').catch(() => {});
         });
     }
     </script>
@@ -39,7 +40,7 @@ $activePage = $activePage ?? 'products';
         <!-- Sidebar Brand Header -->
         <div class="sidebar-header">
             <a class="sidebar-brand" href="index.php" aria-label="Store Automeation หน้าแรก">
-                <img src="assets/logo.png" alt="AUT Automation" class="sidebar-brand-img">
+                <img src="<?= $resourcePrefix ?>assets/logo.png" alt="AUT Automation" class="sidebar-brand-img">
                 <div class="sidebar-brand-text">
                     <span class="brand-name">Store <span>Automeation</span></span>
                     <small>INDUSTRIAL SUPPLY</small>
@@ -157,7 +158,7 @@ $activePage = $activePage ?? 'products';
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <a class="mobile-brand" href="index.php">
-                <img src="assets/logo.png" alt="AUT Automation" style="height:26px;width:auto;object-fit:contain;">
+                <img src="<?= $resourcePrefix ?>assets/logo.png" alt="AUT Automation" style="height:26px;width:auto;object-fit:contain;">
                 <span>Store <b>Automeation</b></span>
             </a>
             <?php if (!empty($currentUser)): ?>

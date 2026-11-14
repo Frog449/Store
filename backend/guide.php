@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/includes/bootstrap.php';
+$resourcePrefix = app_resource_prefix();
 
 $pageTitle = 'คู่มือใช้งาน | Store Automeation';
 $pageDescription = 'คู่มือบันทึกสินค้า รับเข้า เบิกออก และตรวจสอบยอดสต๊อก';
@@ -47,7 +48,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
             </div>
             <div class="guide-pdf-actions">
-                <a href="docs/store-automation-guide.pdf" target="_blank" rel="noopener" class="guide-pdf-btn guide-pdf-btn-outline">
+                <a href="<?= $resourcePrefix ?>docs/store-automation-guide.pdf" target="_blank" rel="noopener" class="guide-pdf-btn guide-pdf-btn-outline">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                         <polyline points="15 3 21 3 21 9"></polyline>
@@ -55,7 +56,7 @@ require __DIR__ . '/includes/header.php';
                     </svg>
                     <span>เปิดดูเต็มหน้า</span>
                 </a>
-                <a href="docs/store-automation-guide.pdf" download="Store-Automation-Manual.pdf" class="guide-pdf-btn guide-pdf-btn-primary">
+                <a href="<?= $resourcePrefix ?>docs/store-automation-guide.pdf" download="Store-Automation-Manual.pdf" class="guide-pdf-btn guide-pdf-btn-primary">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="7 10 12 15 17 10"></polyline>
@@ -66,11 +67,11 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
         <div class="guide-pdf-viewer">
-            <object data="docs/store-automation-guide.pdf#toolbar=1" type="application/pdf" width="100%" height="100%">
-                <iframe src="docs/store-automation-guide.pdf#toolbar=1" title="คู่มือการใช้งาน Store Automeation สำหรับ Admin &amp; Staff" width="100%" height="100%">
+            <object data="<?= $resourcePrefix ?>docs/store-automation-guide.pdf#toolbar=1" type="application/pdf" width="100%" height="100%">
+                <iframe src="<?= $resourcePrefix ?>docs/store-automation-guide.pdf#toolbar=1" title="คู่มือการใช้งาน Store Automeation สำหรับ Admin &amp; Staff" width="100%" height="100%">
                     <div class="guide-pdf-fallback">
                         <p>บราวเซอร์ของคุณไม่รองรับการแสดงตัวอย่างไฟล์ PDF โดยตรงในหน้านี้</p>
-                        <a href="docs/store-automation-guide.pdf" target="_blank" rel="noopener" class="guide-pdf-btn guide-pdf-btn-primary">คลิกที่นี่เพื่อเปิดหรือดาวน์โหลดคู่มือ</a>
+                        <a href="<?= $resourcePrefix ?>docs/store-automation-guide.pdf" target="_blank" rel="noopener" class="guide-pdf-btn guide-pdf-btn-primary">คลิกที่นี่เพื่อเปิดหรือดาวน์โหลดคู่มือ</a>
                     </div>
                 </iframe>
             </object>
