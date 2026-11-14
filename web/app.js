@@ -673,7 +673,7 @@ if (historySearch || historyTabs.length > 0) {
         document.body.appendChild(pill);
     }
 
-    setInterval(checkSync, 6000);
+    setInterval(checkSync, 3500);
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {

@@ -76,7 +76,7 @@ require __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start;">
+    <div class="profile-layout-grid">
         <!-- Card 1: สรุปข้อมูลบัญชี -->
         <div class="inventory-panel" style="text-align:center;padding:28px 20px;">
             <div
@@ -128,7 +128,7 @@ require __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <form class="inventory-form" method="post" style="grid-template-columns:1fr 1fr;gap:16px;">
+            <form class="inventory-form profile-form" method="post">
                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                 <input type="hidden" name="action" value="update_profile">
 

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/includes/inventory.php';
+require_once __DIR__ . '/../includes/inventory.php';
 
 // 1. Handle Category Placeholder Image (?cat=... or ?category=...)
 $categoryParam = $_GET['cat'] ?? $_GET['category'] ?? null;
@@ -35,7 +35,7 @@ if (!preg_match('/\A[a-f0-9]{32}\.(?:jpg|png|webp)\z/', $filename)) {
 }
 
 // 1. Check local cache on disk first
-$cachedPath = __DIR__ . '/storage/product-images/' . $filename;
+$cachedPath = __DIR__ . '/../storage/product-images/' . $filename;
 if (is_file($cachedPath) && is_readable($cachedPath)) {
     $etag = '"' . md5_file($cachedPath) . '"';
     if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim($_SERVER['HTTP_IF_NONE_MATCH']) === $etag) {

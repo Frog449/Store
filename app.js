@@ -628,3 +628,57 @@ if (historySearch || historyTabs.length > 0) {
 
     filterHistory();
 }
+
+// --- Real-time Cross-Device Sync Engine ---
+(function initCrossDeviceSync() {
+    let lastVersion = null;
+    const syncUrl = 'api/sync.php';
+
+    async function checkSync() {
+        try {
+            const resp = await fetch(syncUrl + '?_=' + Date.now(), {
+                cache: 'no-store',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data || !data.success || !data.version) return;
+
+            if (lastVersion === null) {
+                lastVersion = data.version;
+                return;
+            }
+
+            if (data.version !== lastVersion) {
+                lastVersion = data.version;
+                const active = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                const isFormInput = (active === 'input' || active === 'textarea' || active === 'select');
+                if (!isFormInput) {
+                    window.location.reload();
+                } else {
+                    showLiveSyncPill();
+                }
+            }
+        } catch (e) {
+            // Transient network failure ignored
+        }
+    }
+
+    function showLiveSyncPill() {
+        if (document.querySelector('#live-sync-pill')) return;
+        const pill = document.createElement('div');
+        pill.id = 'live-sync-pill';
+        pill.innerHTML = 'มีข้อมูลใหม่จากเครื่องอื่น <button onclick="window.location.reload()" style="margin-left:8px;padding:3px 8px;border-radius:4px;border:none;background:#fff;color:#0758b4;font-weight:600;cursor:pointer;">รีเฟรช</button>';
+        pill.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#0758b4;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:9999;display:flex;align-items:center;';
+        document.body.appendChild(pill);
+    }
+
+    setInterval(checkSync, 3500);
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            checkSync();
+        }
+    });
+})();
+

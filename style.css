@@ -2165,3 +2165,92 @@ body {
     display: none !important;
 }
 
+/* Profile Page Responsive Layout */
+.profile-layout-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+.profile-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 960px) {
+    html, body {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        width: 100% !important;
+    }
+    .app-layout {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        width: 100% !important;
+    }
+    .app-content-wrapper {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    .app-content-wrapper > main {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .inventory-panel {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .profile-layout-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 16px !important;
+    }
+    .profile-layout-grid > .inventory-panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .profile-form {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 14px !important;
+    }
+    .profile-form label,
+    .profile-form .form-span-2 {
+        grid-column: span 1 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .profile-form input,
+    .profile-form button {
+        width: 100% !important;
+        min-height: 44px !important;
+        box-sizing: border-box !important;
+    }
+    .profile-form .form-actions {
+        display: flex !important;
+        flex-direction: column-reverse !important;
+        gap: 10px !important;
+        width: 100% !important;
+        margin-top: 14px !important;
+    }
+    .profile-form .form-actions .primary-button,
+    .profile-form .form-actions .secondary-button {
+        width: 100% !important;
+        min-height: 46px !important;
+        justify-content: center !important;
+        font-size: 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+    }
+}
+
+

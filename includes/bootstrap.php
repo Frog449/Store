@@ -18,6 +18,19 @@ unset($_SESSION['quote']);
 require_once __DIR__ . '/inventory.php';
 require_once __DIR__ . '/auth.php';
 
+// If accessing root directly from browser, forward GET/HEAD requests to dedicated web/ or mobile/
+if (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true) && !defined('NO_ROOT_REDIRECT') && PHP_SAPI !== 'cli') {
+    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    $dir = dirname($script);
+    $base = basename($script);
+    if (!preg_match('#/(?:web|mobile|api)$#i', $dir) && str_ends_with($base, '.php') && !in_array($base, ['index.php', 'image.php', 'setup-local-db.php'], true)) {
+        $folder = (is_running_in_app() || is_mobile_client()) ? 'mobile' : 'web';
+        $query = !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
+        header('Location: ' . $folder . '/' . $base . $query);
+        exit;
+    }
+}
+
 // Enforce authentication on all protected pages unless explicitly marked public
 if (!defined('PUBLIC_PAGE') || PUBLIC_PAGE !== true) {
     auth_require_login();
