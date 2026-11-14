@@ -261,40 +261,78 @@ require __DIR__ . '/includes/header.php';
           </button>
         </div>
         <textarea id="settings-gas-code" readonly
-          style="width:100%;height:320px;font-family:monospace;font-size:11px;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;"><?= h('function doPost(e) {
+          style="width:100%;height:320px;font-family:monospace;font-size:11px;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;"><?= h('/**
+ * =========================================================================
+ * STORE AUTOMEATION - GOOGLE APPS SCRIPT WEBHOOK (V2.1)
+ * ระบบเชื่อมต่อ Google Sheets: รายการสินค้า + รับ-เบิก + ยืม-คืน พัสดุ
+ * =========================================================================
+ */
+
+// 1. ฟังก์ชันตอบสนองเมื่อเปิดผ่าน Browser หรือ Health Check
+function doGet(e) {
+  return jsonResponse({
+    status: "ok",
+    message: "Google Apps Script Web App พร้อมใช้งาน (Store Automeation Ready)",
+    timestamp: Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss")
+  });
+}
+
+// 2. ฟังก์ชันหลักรับข้อมูลแบบ POST จาก Store Automeation
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  var hasLock = lock.tryLock(20000); // รอคิวไม่เกิน 20 วินาทีป้องกันข้อมูลชนกัน
+
   try {
-    var data = JSON.parse(e.postData.contents);
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({
+        status: "error",
+        message: "ไม่พบข้อมูล POST หรือเรียกใช้ฟังก์ชันโดยตรง (หากทดสอบใน Apps Script แนะนำให้รันฟังก์ชัน testWebhook)"
+      });
+    }
+
+    var data;
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch (parseErr) {
+      return jsonResponse({ status: "error", message: "JSON ผิดรูปแบบ: " + parseErr.toString() });
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // 1. บันทึกรับ-เบิกสินค้า (Receipt / Issue) และอัปเดตยอดคงเหลือในรายการสินค้า
+    // 1. รับ-เบิกสินค้า (Receipt / Issue)
     if (data.event === "movement_sync" || data.action === "receipt" || data.action === "issue") {
       updateCatalogStock(ss, data);
       logMovement(ss, data);
-      return jsonResponse({status: "ok", message: "Movement recorded and catalog updated"});
+      return jsonResponse({ status: "ok", message: "บันทึกประวัติรับ-เบิก และอัปเดตยอดคงเหลือในรายการสินค้าเรียบร้อยแล้ว" });
     }
 
     // 2. ซิงค์รายการสินค้าทั้งหมด (Batch Catalog Sync)
     if (data.event === "catalog_batch_sync") {
-      batchSyncCatalog(ss, data.products || [], data.timestamp);
-      return jsonResponse({status: "ok", message: "Catalog batch sync completed"});
+      var count = batchSyncCatalog(ss, data.products || [], data.timestamp);
+      return jsonResponse({ status: "ok", message: "ซิงค์รายการสินค้าทั้งหมดสำเร็จ จำนวน " + count + " รายการ" });
     }
 
     // 3. ซิงค์ข้อมูลสินค้าเดี่ยว (Single Product Catalog Sync)
     if (data.event === "catalog_sync" || data.action === "catalog_update") {
       updateCatalogStock(ss, data);
-      return jsonResponse({status: "ok", message: "Product catalog updated"});
+      return jsonResponse({ status: "ok", message: "อัปเดตข้อมูลสินค้าในรายการสินค้าเรียบร้อยแล้ว" });
     }
 
     // 4. บันทึกระบบ ยืม-คืน พัสดุ (Borrow & Return Sync)
     return handleBorrowSync(ss, data);
 
   } catch (err) {
-    return jsonResponse({status: "error", message: err.toString()});
+    return jsonResponse({ status: "error", message: err.toString() });
+  } finally {
+    if (hasLock) {
+      lock.releaseLock();
+    }
   }
 }
 
 function jsonResponse(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function getOrCreateSheet(ss, name, headers) {
@@ -311,7 +349,8 @@ function getOrCreateSheet(ss, name, headers) {
   if (sheet.getLastRow() === 0 && headers && headers.length > 0) {
     sheet.appendRow(headers);
     sheet.setFrozenRows(1);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#f1f5f9");
+    var hRange = sheet.getRange(1, 1, 1, headers.length);
+    hRange.setFontWeight("bold").setBackground("#f1f5f9").setFontColor("#1e293b").setHorizontalAlignment("center");
   }
   return sheet;
 }
@@ -322,10 +361,12 @@ function getCatalogSheet(ss) {
     var s = ss.getSheetByName(names[i]);
     if (s) return s;
   }
-  return getOrCreateSheet(ss, "รายการสินค้า", [
+  var sNew = getOrCreateSheet(ss, "รายการสินค้า", [
     "รหัสสินค้า", "ชื่อสินค้า", "หมวดหมู่", "คงเหลือ", "หน่วยนับ",
     "จุดสั่งซื้อขั้นต่ำ", "ตำแหน่งจัดเก็บ", "อัปเดตล่าสุด"
   ]);
+  try { sNew.getRange("A:A").setNumberFormat("@"); } catch(e) {}
+  return sNew;
 }
 
 function getMovementSheet(ss) {
@@ -334,10 +375,30 @@ function getMovementSheet(ss) {
     var s = ss.getSheetByName(names[i]);
     if (s) return s;
   }
-  return getOrCreateSheet(ss, "ประวัติรับ-เบิก", [
+  var sNew = getOrCreateSheet(ss, "ประวัติรับ-เบิก", [
     "วัน-เวลา", "ประเภท", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "หน่วยนับ",
     "คงเหลือหลังทำรายการ", "เลขที่เอกสาร", "ผู้รับ/ผู้ขอเบิก", "ผู้อนุมัติ", "หมายเหตุ", "ผู้บันทึก"
   ]);
+  try { sNew.getRange("C:C").setNumberFormat("@"); } catch(e) {}
+  return sNew;
+}
+
+function getBorrowSheet(ss) {
+  var names = ["ยืม-คืน", "ยืมคืน", "Borrow"];
+  for (var i = 0; i < names.length; i++) {
+    var s = ss.getSheetByName(names[i]);
+    if (s) return s;
+  }
+  var sNew = getOrCreateSheet(ss, "ยืม-คืน", [
+    "ID", "กิจกรรม", "ผู้ยืม", "รายการพัสดุ", "รหัสสินค้า",
+    "จำนวน", "หน่วยนับ", "สถานที่ใช้งาน", "วันที่ยืม", "เวลาที่ยืม",
+    "สถานะ", "วันที่คืน", "เวลาที่คืน", "ผู้รับคืน", "หมายเหตุ", "เวลาที่บันทึก"
+  ]);
+  try {
+    sNew.getRange("A:A").setNumberFormat("@");
+    sNew.getRange("E:E").setNumberFormat("@");
+  } catch(e) {}
+  return sNew;
 }
 
 function updateCatalogStock(ss, data) {
@@ -347,8 +408,9 @@ function updateCatalogStock(ss, data) {
 
   var values = catalogSheet.getDataRange().getValues();
   var foundRow = 0;
+  var targetLower = targetCode.toLowerCase();
   for (var i = 1; i < values.length; i++) {
-    if (String(values[i][0]).trim() === targetCode) {
+    if (String(values[i][0]).trim().toLowerCase() === targetLower) {
       foundRow = i + 1;
       break;
     }
@@ -363,11 +425,17 @@ function updateCatalogStock(ss, data) {
     catalogSheet.getRange(foundRow, 4).setValue(newStock);
     catalogSheet.getRange(foundRow, 8).setValue(ts);
     if (data.product_name) catalogSheet.getRange(foundRow, 2).setValue(data.product_name);
-    if (data.category) catalogSheet.getRange(foundRow, 3).setValue(data.category);
+    if (data.category !== undefined && data.category !== null) catalogSheet.getRange(foundRow, 3).setValue(data.category);
     if (data.unit) catalogSheet.getRange(foundRow, 5).setValue(data.unit);
+    if (data.reorder_point !== undefined && data.reorder_point !== null && data.reorder_point !== "") {
+      catalogSheet.getRange(foundRow, 6).setValue(Math.round(Number(data.reorder_point || 0)));
+    }
+    if (data.location !== undefined && data.location !== null) {
+      catalogSheet.getRange(foundRow, 7).setValue(data.location);
+    }
   } else {
     catalogSheet.appendRow([
-      targetCode,
+      "\'" + targetCode,
       data.product_name || "",
       data.category || "",
       newStock,
@@ -390,7 +458,7 @@ function logMovement(ss, data) {
   movSheet.appendRow([
     data.timestamp || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss"),
     data.action_name || (isReceipt ? "รับสินค้า" : "เบิกสินค้า"),
-    data.product_code || "",
+    "\'" + (data.product_code || ""),
     displayName,
     qtyPrefix + Math.round(Number(data.quantity || 0)),
     data.unit || "",
@@ -406,16 +474,18 @@ function logMovement(ss, data) {
 function batchSyncCatalog(ss, products, ts) {
   var catalogSheet = getCatalogSheet(ss);
   var lastRow = catalogSheet.getLastRow();
+  var lastCol = Math.max(8, catalogSheet.getLastColumn());
   if (lastRow > 1) {
-    catalogSheet.getRange(2, 1, lastRow - 1, catalogSheet.getLastColumn()).clearContent();
+    catalogSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
   }
 
   var timeStr = ts || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss");
   var rows = [];
   for (var i = 0; i < products.length; i++) {
     var p = products[i];
+    var code = String(p.product_code || p.code || "").trim();
     rows.push([
-      p.product_code || p.code || "",
+      "\'" + code,
       p.product_name || p.name || "",
       p.category || "",
       Math.round(Number(p.current_stock !== undefined ? p.current_stock : (p.stock || 0))),
@@ -428,28 +498,11 @@ function batchSyncCatalog(ss, products, ts) {
   if (rows.length > 0) {
     catalogSheet.getRange(2, 1, rows.length, 8).setValues(rows);
   }
+  return rows.length;
 }
 
 function handleBorrowSync(ss, data) {
-  var borrowSheet = ss.getSheetByName("ยืม-คืน");
-  if (!borrowSheet) {
-    borrowSheet = ss.getSheetByName("ยืมคืน");
-  }
-  if (!borrowSheet) {
-    var firstSheet = ss.getSheets()[0];
-    var firstRowText = firstSheet.getLastRow() > 0 ? firstSheet.getRange(1, 1, 1, Math.min(firstSheet.getLastColumn(), 16)).getValues()[0].join(" ") : "";
-    if (firstRowText.indexOf("ยืม") !== -1 || firstRowText.indexOf("พัสดุ") !== -1 || firstRowText.indexOf("ID") !== -1) {
-      borrowSheet = firstSheet;
-      try { borrowSheet.setName("ยืม-คืน"); } catch(e) {}
-    } else {
-      borrowSheet = getOrCreateSheet(ss, "ยืม-คืน", [
-        "ID", "กิจกรรม", "ผู้ยืม", "รายการพัสดุ", "รหัสสินค้า",
-        "จำนวน", "หน่วยนับ", "สถานที่ใช้งาน", "วันที่ยืม", "เวลาที่ยืม",
-        "สถานะ", "วันที่คืน", "เวลาที่คืน", "ผู้รับคืน", "หมายเหตุ", "เวลาที่บันทึก"
-      ]);
-    }
-  }
-
+  var borrowSheet = getBorrowSheet(ss);
   var isReturn = (data.action === "return" || data.status === "คืนแล้ว" || data.status_code === "returned");
   var itemName = data.product_name || data.item || data.product || "";
   var targetId = String(data.id || "").trim();
@@ -466,28 +519,40 @@ function handleBorrowSync(ss, data) {
   }
 
   if (foundRow > 0 && isReturn) {
+    borrowSheet.getRange(foundRow, 2).setValue("คืนพัสดุ");
     borrowSheet.getRange(foundRow, 11).setValue("คืนแล้ว");
     borrowSheet.getRange(foundRow, 12).setValue(data.return_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd"));
     borrowSheet.getRange(foundRow, 13).setValue(data.return_time || Utilities.formatDate(new Date(), "Asia/Bangkok", "HH:mm"));
     borrowSheet.getRange(foundRow, 14).setValue(data.return_received_by || "-");
-    if (data.return_notes) {
-      borrowSheet.getRange(foundRow, 15).setValue(data.return_notes);
+    var existingNote = String(borrowSheet.getRange(foundRow, 15).getValue() || "").trim();
+    var returnNote = String(data.return_notes || "").trim();
+    if (returnNote !== "") {
+      var merged = (existingNote !== "" && existingNote !== "-") ? existingNote + " | [คืน: " + returnNote + "]" : returnNote;
+      borrowSheet.getRange(foundRow, 15).setValue(merged);
     }
-    return jsonResponse({status: "ok", message: "Return updated in row " + foundRow});
+    return jsonResponse({status: "ok", message: "อัปเดตรายการคืนพัสดุในแถวที่ " + foundRow + " เรียบร้อย"});
   }
 
   if (foundRow > 0 && !isReturn) {
+    borrowSheet.getRange(foundRow, 2).setValue("ยืมพัสดุ");
+    if (data.borrower_name) borrowSheet.getRange(foundRow, 3).setValue(data.borrower_name);
+    if (itemName) borrowSheet.getRange(foundRow, 4).setValue(itemName);
+    if (data.product_code) borrowSheet.getRange(foundRow, 5).setValue("\'" + data.product_code);
+    if (data.quantity !== undefined) borrowSheet.getRange(foundRow, 6).setValue(Math.round(Number(data.quantity || 1)));
+    if (data.unit) borrowSheet.getRange(foundRow, 7).setValue(data.unit);
+    if (data.location) borrowSheet.getRange(foundRow, 8).setValue(data.location);
     borrowSheet.getRange(foundRow, 11).setValue("กำลังยืม");
-    return jsonResponse({status: "ok", message: "Borrow record exists in row " + foundRow});
+    if (data.notes) borrowSheet.getRange(foundRow, 15).setValue(data.notes);
+    return jsonResponse({status: "ok", message: "อัปเดตข้อมูลการยืมในแถวที่ " + foundRow + " เรียบร้อย"});
   }
 
   // Append new row
   borrowSheet.appendRow([
-    data.id || "",
+    targetId,
     isReturn ? "คืนพัสดุ" : "ยืมพัสดุ",
     data.borrower_name || data.name || "",
     itemName,
-    data.product_code || "",
+    "\'" + (data.product_code || ""),
     Math.round(Number(data.quantity || 1)),
     data.unit || "",
     data.location || "",
@@ -497,11 +562,38 @@ function handleBorrowSync(ss, data) {
     isReturn ? (data.return_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd")) : "",
     isReturn ? (data.return_time || Utilities.formatDate(new Date(), "Asia/Bangkok", "HH:mm")) : "",
     isReturn ? (data.return_received_by || "-") : "",
-    (isReturn ? data.return_notes : data.notes) || "",
+    (isReturn ? data.return_notes : data.notes) || "-",
     data.timestamp || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss")
   ]);
 
-  return jsonResponse({status: "ok", message: isReturn ? "Return appended" : "New borrow recorded"});
+  return jsonResponse({status: "ok", message: isReturn ? "บันทึกรายการคืนพัสดุใหม่เรียบร้อยแล้ว" : "บันทึกการยืมพัสดุใหม่เรียบร้อยแล้ว"});
+}
+
+// ฟังก์ชันสำหรับทดสอบรันใน Google Apps Script Editor โดยตรง
+function testWebhook() {
+  var testPayload = {
+    postData: {
+      contents: JSON.stringify({
+        event: "movement_sync",
+        action: "receipt",
+        action_name: "ทดสอบผ่าน Apps Script",
+        product_code: "TEST-001",
+        product_name: "สินค้าทดสอบระบบ (Test Item)",
+        category: "ทดสอบ",
+        quantity: 5,
+        unit: "PCS",
+        current_stock: 50,
+        reorder_point: 10,
+        location: "Zone-A",
+        document_no: "TEST-GAS",
+        received_by: "Admin Tester",
+        notes: "ทดสอบการทำงานผ่านฟังก์ชัน testWebhook",
+        timestamp: Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss")
+      })
+    }
+  };
+  var result = doPost(testPayload);
+  Logger.log(result.getContent());
 }') ?></textarea>
       </div>
     </div>

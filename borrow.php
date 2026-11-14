@@ -722,17 +722,6 @@ require __DIR__ . '/includes/header.php';
 
         dialog.showModal();
     }
-
-    function copyGasCode() {
-        const ta = document.querySelector('#gas-code-textarea');
-        ta.select();
-        navigator.clipboard.writeText(ta.value).then(() => {
-            alert('คัดลอกโค้ด Google Apps Script เรียบร้อยแล้ว!');
-        }).catch(() => {
-            document.execCommand('copy');
-            alert('คัดลอกโค้ดเรียบร้อยแล้ว!');
-        });
-    }
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>

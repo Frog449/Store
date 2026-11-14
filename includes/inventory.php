@@ -1266,7 +1266,6 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
         if ($updatedProduct !== null) {
             inventory_notify_telegram_movement($receipt, 'receipt', $updatedProduct, true);
             inventory_sync_google_sheet_movement($receipt, 'receipt', $updatedProduct, true);
-            inventory_sync_google_sheet_product($updatedProduct);
         }
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -2129,6 +2128,11 @@ function inventory_post_google_sheet(array $payload): array
     $enabled = ($settings['google_sheet_sync_enabled'] ?? '0') === '1';
     $webhookUrl = trim($settings['google_sheet_webhook_url'] ?? '');
 
+    // แก้ไข URL อัตโนมัติหากผู้ใช้เผลอก๊อปปี้ลิงก์หน้าแก้ไข script (/edit) มาแทน Web App (/exec)
+    if (str_ends_with($webhookUrl, '/edit')) {
+        $webhookUrl = substr($webhookUrl, 0, -5) . '/exec';
+    }
+
     if (!$enabled || $webhookUrl === '' || !filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
         return ['success' => false, 'message' => 'Google Sheets Sync is disabled or invalid URL.'];
     }
@@ -2141,13 +2145,30 @@ function inventory_post_google_sheet(array $payload): array
             CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
             CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8'],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true, // Essential for Google Apps Script 302 redirects
-            CURLOPT_TIMEOUT => 12,
+            CURLOPT_FOLLOWLOCATION => true, // รองรับ 302 redirect ของ Google Apps Script
+            CURLOPT_TIMEOUT => 20,
             CURLOPT_SSL_VERIFYPEER => false,
         ]);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        $responseData = json_decode((string) $response, true);
+        if (is_array($responseData)) {
+            if (isset($responseData['status']) && $responseData['status'] === 'error') {
+                return [
+                    'success' => false,
+                    'message' => 'Apps Script Error: ' . ($responseData['message'] ?? 'ข้อผิดพลาดในสคริปต์ Google Sheets'),
+                ];
+            }
+            if (isset($responseData['status']) && $responseData['status'] === 'ok') {
+                return [
+                    'success' => true,
+                    'message' => (string) ($responseData['message'] ?? 'บันทึกลง Google Sheet สำเร็จ'),
+                ];
+            }
+        }
+
         return [
             'success' => $httpCode >= 200 && $httpCode < 400,
             'message' => 'HTTP ' . $httpCode . ': ' . substr((string) $response, 0, 200),

@@ -5,3 +5,8 @@
 /storage/product-images/*
 !/storage/product-images/.htaccess
 /docs/*.csv
+android-build/.gradle/
+android-build/build/
+android-build/app/build/
+android-build/local.properties
+
