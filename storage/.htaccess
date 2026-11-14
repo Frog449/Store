@@ -1,1 +1,2 @@
 Require all denied
+AddType application/vnd.android.package-archive apk
