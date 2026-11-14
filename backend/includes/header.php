@@ -34,6 +34,7 @@ $resourcePrefix = app_resource_prefix();
     </script>
 </head>
 <body>
+<?php require __DIR__ . '/loading-indicator.php'; ?>
 <div class="app-layout">
     <!-- Left Sidebar Navigation -->
     <aside class="site-sidebar" id="site-sidebar">

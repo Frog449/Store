@@ -225,6 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
+<?php require __DIR__ . '/includes/loading-indicator.php'; ?>
     <div class="login-wrap">
         <div class="login-card">
             <a class="login-brand" href="login.php">

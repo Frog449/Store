@@ -33,7 +33,7 @@ require __DIR__ . '/includes/header.php';
         <article class="about-app-card android-card">
             <div class="app-card-header">
                 <span class="app-card-badge android-badge">Android Application</span>
-                <span class="app-card-ver">v1.2.1</span>
+                <span class="app-card-ver">v1.2.2</span>
             </div>
             <div class="app-card-body">
                 <h3>แอปพลิเคชัน Android (APK)</h3>

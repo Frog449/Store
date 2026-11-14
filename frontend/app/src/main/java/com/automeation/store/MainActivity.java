@@ -38,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
     private SwipeRefreshLayout swipeRefresh;
+    private View loadingOverlay;
     private ValueCallback<Uri[]> fileUploadCallback;
     private SharedPreferences prefs;
 
@@ -50,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         webView = findViewById(R.id.webview);
         swipeRefresh = findViewById(R.id.swipe_refresh);
+        loadingOverlay = findViewById(R.id.loading_overlay);
 
         swipeRefresh.setColorSchemeResources(R.color.primary);
         swipeRefresh.setOnRefreshListener(() -> webView.reload());
@@ -71,19 +73,20 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+                loadingOverlay.setVisibility(View.VISIBLE);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                swipeRefresh.setRefreshing(false);
+                hideLoading();
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
-                swipeRefresh.setRefreshing(false);
                 if (request.isForMainFrame()) {
+                    hideLoading();
                     showErrorDialog(request.getUrl().toString());
                 }
             }
@@ -150,6 +153,11 @@ public class MainActivity extends AppCompatActivity {
             prefs.edit().putString(KEY_SERVER_URL, url).apply();
         }
         webView.loadUrl(url);
+    }
+
+    private void hideLoading() {
+        loadingOverlay.setVisibility(View.GONE);
+        swipeRefresh.setRefreshing(false);
     }
 
     private boolean isLegacyLocalUrl(String url) {
