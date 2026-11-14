@@ -6,7 +6,7 @@ require __DIR__ . '/includes/bootstrap.php';
 auth_require_role('admin');
 
 $pageTitle = 'ประวัติการใช้งานระบบ (Audit Log) | Store Automeation';
-$pageDescription = 'แสดงประวัติกิจกรรมล่าสุดไม่เกิน 500 รายการ และการแก้ไขข้อมูลในระบบคลังสินค้า';
+$pageDescription = 'แสดงประวัติกิจกรรมล่าสุดไม่เกิน 300 รายการ และการแก้ไขข้อมูลในระบบคลังสินค้า';
 $activePage = 'audit';
 
 // --- POST: ลบ Audit Log ที่เลือก ---
@@ -44,7 +44,7 @@ if ($search !== '') {
     $params['q'] = '%' . $search . '%';
 }
 
-$sql .= ' ORDER BY id DESC LIMIT 500';
+$sql .= ' ORDER BY id DESC LIMIT 300';
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $logs = $stmt->fetchAll();
@@ -63,7 +63,7 @@ require __DIR__ . '/includes/header.php';
             <p>บันทึกประวัติกิจกรรม ตรวจสอบความเคลื่อนไหว และการแก้ไขข้อมูลย้อนหลัง</p>
         </div>
         <div class="page-kpis">
-            <span><strong><?= count($logs) ?></strong> รายการล่าสุด (สูงสุด 500)</span>
+            <span><strong><?= count($logs) ?></strong> รายการล่าสุด (จำกัดสูงสุด 300)</span>
             <a class="secondary-button" href="backup.php">สำรองข้อมูลระบบ ↗</a>
         </div>
     </div>

@@ -106,8 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $statusFilter = isset($_GET['status']) && is_string($_GET['status']) ? trim($_GET['status']) : 'all';
 $searchQuery = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']) : '';
 
+$limit = isset($_GET['limit']) ? min(300, max(50, (int) $_GET['limit'])) : 250;
 $counts = inventory_borrow_counts();
-$records = inventory_borrow_records($statusFilter, $searchQuery);
+$records = inventory_borrow_records($statusFilter, $searchQuery, $limit);
 $pageProducts = inventory_products();
 $settings = inventory_get_settings();
 $unitOptions = inventory_unit_options();
@@ -213,7 +214,7 @@ require __DIR__ . '/includes/header.php';
                 <h2>รายการยืม–คืนพัสดุ</h2>
                 <p>แสดงรายการยืมพัสดุและอุปกรณ์ สถานะการคืน วันที่เวลา และสถานที่นำไปใช้งาน</p>
             </div>
-            <span class="result-count">แสดง <?= count($records) ?> รายการ</span>
+            <span class="result-count">แสดง <?= count($records) ?> รายการล่าสุด (จำกัดสูงสุด <?= $limit ?>)</span>
         </div>
 
         <div class="table-scroll">

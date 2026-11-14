@@ -50,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -65,16 +66,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="icon" type="image/png" href="assets/favicon.png?v=<?= filemtime(__DIR__ . '/assets/favicon.png') ?>">
     <link rel="shortcut icon" href="favicon.ico?v=<?= filemtime(__DIR__ . '/favicon.ico') ?>">
     <link rel="stylesheet" href="style.css">
     <script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').catch(() => {});
-        });
-    }
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => { });
+            });
+        }
     </script>
     <style>
         .login-wrap {
@@ -85,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 30px 16px;
             background: linear-gradient(135deg, #f0f5fc 0%, #e6effa 100%);
         }
+
         .login-card {
             width: 100%;
             max-width: 420px;
@@ -95,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 16px 45px rgba(7, 88, 180, 0.08);
             animation: rise-in 0.4s both;
         }
+
         .login-brand {
             display: flex;
             align-items: center;
@@ -103,28 +108,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-decoration: none;
             color: inherit;
         }
+
         .login-brand img {
             height: 42px;
             width: auto;
             object-fit: contain;
         }
+
         .login-header h1 {
             margin: 0 0 6px;
             font-size: 22px;
             font-weight: 700;
             color: #1e293b;
         }
+
         .login-header p {
             margin: 0 0 24px;
             font-size: 12px;
             color: #64748b;
             line-height: 1.6;
         }
+
         .login-form {
             display: flex;
             flex-direction: column;
             gap: 16px;
         }
+
         .login-form label {
             display: flex;
             flex-direction: column;
@@ -133,6 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 600;
             color: #334155;
         }
+
         .login-form input {
             height: 44px;
             padding: 0 14px;
@@ -143,11 +154,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: #1e293b;
             transition: all 0.2s;
         }
+
         .login-form input:focus {
             outline: none;
             border-color: #0758b4;
             box-shadow: 0 0 0 3px rgba(7, 88, 180, 0.15);
         }
+
         .login-submit {
             height: 44px;
             margin-top: 8px;
@@ -161,10 +174,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 6px 18px rgba(7, 88, 180, 0.22);
             transition: all 0.2s;
         }
+
         .login-submit:hover {
             background: linear-gradient(105deg, #05448c, #032d5e);
             transform: translateY(-1px);
         }
+
         .login-error {
             margin-bottom: 18px;
             padding: 10px 14px;
@@ -175,6 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 500;
             border: 1px solid #fecaca;
         }
+
         .login-security-tag {
             display: inline-flex;
             align-items: center;
@@ -187,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 600;
             margin-bottom: 14px;
         }
+
         .login-remember {
             display: flex;
             align-items: center;
@@ -197,6 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             cursor: pointer;
             margin-top: -4px;
         }
+
         .login-remember input[type=checkbox] {
             width: 15px;
             height: 15px;
@@ -206,53 +224,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     </style>
 </head>
+
 <body>
-<div class="login-wrap">
-    <div class="login-card">
-        <a class="login-brand" href="login.php">
-            <img src="assets/logo.png" alt="AUT Automation Logo">
-            <span class="brand-name">Store <span>Automeation</span><small>INDUSTRIAL SUPPLY</small></span>
-        </a>
-
-        <div class="login-header">
-            <span class="login-security-tag">INTERNAL ACCESS ONLY</span>
-            <h1>เข้าสู่ระบบคลังสินค้า</h1>
-            <p>กรุณากรอกชื่อผู้ใช้ รหัสพนักงาน หรืออีเมล และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
-        </div>
-
-        <?php if ($error !== ''): ?>
-            <div class="login-error" role="alert"><?= h($error) ?></div>
-        <?php endif; ?>
-
-        <form class="login-form" method="post" autocomplete="off">
-            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-
-            <label>
-                ชื่อผู้ใช้งาน, รหัสพนักงาน หรือ อีเมล
-                <input type="text" name="username" placeholder="ระบุ username, รหัสพนักงาน หรือ อีเมล..." required autofocus value="<?= h((string) ($_POST['username'] ?? '')) ?>">
-            </label>
-
-            <label>
-                รหัสผ่าน (Password)
-                <input type="password" name="password" placeholder="ระบุรหัสผ่าน..." required>
-            </label>
-
-            <button class="login-submit" type="submit">เข้าสู่ระบบ</button>
-
-            <label class="login-remember">
-                <input type="checkbox" name="remember_me" value="1">
-                จดจำฉัน (30 วัน)
-            </label>
-        </form>
-
-        <div style="margin-top:20px;text-align:center;border-top:1px solid #f1f5f9;padding-top:16px;">
-            <a href="app.php" style="color:#0284c7;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                ดาวน์โหลดแอปมือถือ (Android APK / iOS PWA)
+    <div class="login-wrap">
+        <div class="login-card">
+            <a class="login-brand" href="login.php">
+                <img src="assets/logo.png" alt="AUT Automation Logo">
+                <span class="brand-name">Store <span>Automeation</span><small>INDUSTRIAL SUPPLY</small></span>
             </a>
+
+            <div class="login-header">
+                <span class="login-security-tag">INTERNAL ACCESS ONLY</span>
+                <h1>เข้าสู่ระบบคลังสินค้า</h1>
+                <p>กรุณากรอกชื่อผู้ใช้ รหัสพนักงาน หรืออีเมล และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
+            </div>
+
+            <?php if ($error !== ''): ?>
+                <div class="login-error" role="alert"><?= h($error) ?></div>
+            <?php endif; ?>
+
+            <form class="login-form" method="post" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+
+                <label>
+                    ชื่อผู้ใช้งาน, รหัสพนักงาน หรือ อีเมล
+                    <input type="text" name="username" placeholder="ระบุ username, รหัสพนักงาน หรือ อีเมล..." required
+                        autofocus value="<?= h((string) ($_POST['username'] ?? '')) ?>">
+                </label>
+
+                <label>
+                    รหัสผ่าน (Password)
+                    <input type="password" name="password" placeholder="ระบุรหัสผ่าน..." required>
+                </label>
+
+                <button class="login-submit" type="submit">เข้าสู่ระบบ</button>
+
+                <label class="login-remember">
+                    <input type="checkbox" name="remember_me" value="1">
+                    จดจำฉัน (30 วัน)
+                </label>
+            </form>
+
+            <div style="margin-top:20px;text-align:center;border-top:1px solid #f1f5f9;padding-top:16px;">
+                <a href="app.php" style="color:#0284c7;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    ดาวน์โหลดแอปมือถือ (Android APK / iOS PWA)
+                </a>
+            </div>
         </div>
     </div>
-</div>
 </body>
-</html>
 
+</html>

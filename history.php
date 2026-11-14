@@ -56,8 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
     }
 }
 
-$receipts = inventory_movements('receipt', 500);
-$issues = inventory_movements('issue', 500);
+$limit = isset($_GET['limit']) ? min(300, max(50, (int) $_GET['limit'])) : 250;
+$receipts = inventory_movements('receipt', $limit);
+$issues = inventory_movements('issue', $limit);
 $movementCounts = inventory_movement_counts();
 
 $totalReceiptQty = 0.0;
@@ -80,8 +81,9 @@ require __DIR__ . '/includes/header.php';
             <p>ประวัติความเคลื่อนไหวสินค้าทั้งหมด แยกตามการรับเข้าและเบิกออกอย่างชัดเจน พร้อมระบบค้นหา</p>
         </div>
         <div class="page-kpis">
-            <span><strong><?= count($receipts) ?></strong> รายการรับเข้า</span>
-            <span><strong><?= count($issues) ?></strong> รายการเบิกออก</span>
+            <span><strong><?= count($receipts) ?></strong> รายการรับเข้าล่าสุด</span>
+            <span><strong><?= count($issues) ?></strong> รายการเบิกออกล่าสุด</span>
+            <span style="font-size:11px;color:#475569;background:#f1f5f9;padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;">จำกัดสูงสุด <?= $limit ?> รายการล่าสุด</span>
             <a class="secondary-button" href="export.php?type=history" style="font-size:11px;">Export ประวัติทั้งหมด</a>
             <a class="secondary-button" href="catalog.php">ดูรายการสินค้า ↗</a>
         </div>
@@ -134,7 +136,13 @@ require __DIR__ . '/includes/header.php';
                 ประวัติเบิกสินค้าออก <span><?= count($issues) ?></span>
             </button>
         </div>
-        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#64748b;background:#f8fafc;padding:3px 8px;border-radius:8px;border:1px solid #e2e8f0;">
+                <span>จำกัด:</span>
+                <a href="history.php?limit=100" class="filter-chip <?= $limit === 100 ? 'selected' : '' ?>" style="padding:2px 8px;font-size:11px;text-decoration:none;min-height:auto;height:auto;">100</a>
+                <a href="history.php?limit=250" class="filter-chip <?= $limit === 250 ? 'selected' : '' ?>" style="padding:2px 8px;font-size:11px;text-decoration:none;min-height:auto;height:auto;">250</a>
+                <a href="history.php?limit=300" class="filter-chip <?= $limit === 300 ? 'selected' : '' ?>" style="padding:2px 8px;font-size:11px;text-decoration:none;min-height:auto;height:auto;">300</a>
+            </div>
             <span class="result-count" id="history-result-count">แสดง <?= count($receipts) + count($issues) ?>
                 รายการ</span>
             <label class="search-box" style="min-width:280px;">
