@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'product_name' => 'รายการทดสอบระบบ (Test Item)',
                 'product_code' => 'TEST-001',
                 'quantity' => 1,
-                'unit' => 'pcs (ชิ้น)',
+                'unit' => 'PCS',
                 'location' => 'หน้างานทดสอบ / Test Line',
                 'borrow_date' => date('Y-m-d'),
                 'borrow_time' => date('H:i:s'),
@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'product_name' => 'รายการทดสอบระบบ (Test Item)',
                 'product_code' => 'TEST-001',
                 'quantity' => 1,
-                'unit' => 'pcs (ชิ้น)',
+                'unit' => 'PCS',
                 'location' => 'หน้างานทดสอบ / Test Line',
                 'borrow_date' => date('Y-m-d'),
                 'borrow_time' => date('H:i:s'),
@@ -152,7 +152,7 @@ require __DIR__ . '/includes/header.php';
             <div>
                 <strong style="color:#d97706;"><?= number_format($counts['borrowed']) ?> <small
                         style="font-size:11px;font-weight:normal;">รายการ</small></strong>
-                <span>กำลังยืม (ยังไม่คืน)</span>
+                <span>กำลังยืม</span>
             </div>
         </div>
         <div class="stat-item">
@@ -185,7 +185,7 @@ require __DIR__ . '/includes/header.php';
             </a>
             <a class="filter-chip <?= $statusFilter === 'borrowed' ? 'selected' : '' ?>"
                 href="borrow.php?status=borrowed<?= $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '' ?>">
-                กำลังยืม (ยังไม่คืน) <span><?= $counts['borrowed'] ?></span>
+                กำลังยืม<span><?= $counts['borrowed'] ?></span>
             </a>
             <a class="filter-chip <?= $statusFilter === 'returned' ? 'selected' : '' ?>"
                 href="borrow.php?status=returned<?= $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '' ?>">
@@ -362,7 +362,7 @@ require __DIR__ . '/includes/header.php';
                                     <?= h($product['unit']) ?></small>
                             </button>
                         <?php endforeach; ?>
-                        <div class="product-combobox-empty" data-combobox-empty hidden>ไม่พบสินค้าในทะเบียน
+                        <div class="product-combobox-empty" data-combobox-empty hidden>ไม่พบสินค้าในรายการ
                             (คุณสามารถพิมพ์ชื่อเองได้โดยตรง)</div>
                     </div>
                 </div>
@@ -370,7 +370,7 @@ require __DIR__ . '/includes/header.php';
 
             <label>
                 จำนวน
-                <input type="number" name="quantity" min="1" step="0" required value="1">
+                <input type="number" name="quantity" min="1" step="1" required value="1">
             </label>
 
             <label>
@@ -640,8 +640,9 @@ require __DIR__ . '/includes/header.php';
         if (dateInput) dateInput.value = dateStr;
         if (timeInput) timeInput.value = timeStr;
 
+        const qtyInt = Math.round(parseFloat(record.quantity) || 0).toLocaleString('en-US');
         document.querySelector('#return-borrow-id').value = record.id;
-        document.querySelector('#return-item-title').textContent = record.product_name + (record.product_code ? ' (' + record.product_code + ')' : '') + ' • ' + record.quantity + ' ' + record.unit;
+        document.querySelector('#return-item-title').textContent = record.product_name + (record.product_code ? ' (' + record.product_code + ')' : '') + ' • ' + qtyInt + ' ' + record.unit;
         document.querySelector('#return-borrower-name').textContent = record.borrower_name;
         document.querySelector('#return-location').textContent = record.location;
         dialog.showModal();
@@ -651,6 +652,7 @@ require __DIR__ . '/includes/header.php';
         const dialog = document.querySelector('#borrow-detail-dialog');
         const dl = document.querySelector('#borrow-detail-dl');
         const isBorrowed = record.status === 'borrowed';
+        const qtyInt = Math.round(parseFloat(record.quantity) || 0).toLocaleString('en-US');
 
         const fields = [
             ['รหัสรายการ', '#' + record.id],
@@ -658,7 +660,7 @@ require __DIR__ . '/includes/header.php';
             ['ผู้ยืม', record.borrower_name],
             ['พัสดุ / อุปกรณ์', record.product_name],
             ['รหัสสินค้า', record.product_code || '—'],
-            ['จำนวน', record.quantity + ' ' + record.unit],
+            ['จำนวน', qtyInt + ' ' + record.unit],
             ['สถานที่นำไปใช้', record.location],
             ['วันที่–เวลายืม', record.borrow_date + ' ' + (record.borrow_time ? record.borrow_time.substring(0, 5) : '') + ' น.'],
             ['หมายเหตุยืม', record.notes || '—'],

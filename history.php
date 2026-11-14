@@ -83,7 +83,7 @@ require __DIR__ . '/includes/header.php';
             <span><strong><?= count($receipts) ?></strong> รายการรับเข้า</span>
             <span><strong><?= count($issues) ?></strong> รายการเบิกออก</span>
             <a class="secondary-button" href="export.php?type=history" style="font-size:11px;">Export ประวัติทั้งหมด</a>
-            <a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a>
+            <a class="secondary-button" href="catalog.php">ดูรายการสินค้า ↗</a>
         </div>
     </div>
 
@@ -92,7 +92,7 @@ require __DIR__ . '/includes/header.php';
             <span class="stat-icon icon-box">IN</span>
             <div>
                 <strong><?= number_format(count($receipts)) ?> <small
-                        style="font-size:11px;font-weight:normal;">รายการ</small></strong>
+                        style="font-size:11px;font-weight:normal">รายการ</small></strong>
                 <span>รับเข้ารวม <?= inventory_quantity($totalReceiptQty) ?> หน่วย</span>
             </div>
         </div>
@@ -486,13 +486,14 @@ require __DIR__ . '/includes/header.php';
         const title = document.querySelector('#movement-detail-title');
         const eyebrow = document.querySelector('#movement-detail-eyebrow');
         const list = document.querySelector('#movement-detail-list');
+        const qtyInt = Math.round(parseFloat(data.quantity) || 0).toLocaleString('en-US');
         const details = kind === 'receipt'
             ? [
                 ['วันที่รับ', data.movement_date],
                 ['เลขที่เอกสาร', data.document_no],
                 ['รหัสสินค้า', data.product_code],
                 ['ชื่อสินค้า', data.product_name],
-                ['จำนวนรับ', `+${data.quantity} ${data.unit}`],
+                ['จำนวนรับ', `+${qtyInt} ${data.unit}`],
                 ['ผู้ส่งมอบ', data.supplier],
                 ['ผู้รับสินค้า', data.received_by],
                 ['แผนก/หน่วยงาน', data.department],
@@ -504,7 +505,7 @@ require __DIR__ . '/includes/header.php';
                 ['เลขที่เอกสาร', data.document_no],
                 ['รหัสสินค้า', data.product_code],
                 ['ชื่อสินค้า', data.product_name],
-                ['จำนวนเบิก', `-${data.quantity} ${data.unit}`],
+                ['จำนวนเบิก', `-${qtyInt} ${data.unit}`],
                 ['ผู้เบิก', data.requested_by],
                 ['แผนก/ผู้รับ', data.department],
                 ['ผู้อนุมัติ', data.approved_by],
@@ -568,7 +569,7 @@ require __DIR__ . '/includes/header.php';
         document.querySelector('#edit-movement-unit').textContent = data.unit || 'หน่วย';
         document.querySelector('#edit-movement-date').value = data.movement_date || '';
         document.querySelector('#edit-movement-doc').value = data.document_no || '';
-        document.querySelector('#edit-movement-qty').value = data.quantity || '';
+        document.querySelector('#edit-movement-qty').value = Math.round(parseFloat(data.quantity) || 0) || '';
         document.querySelector('#edit-movement-dept').value = data.department || '';
         document.querySelector('#edit-movement-notes').value = data.notes || '';
 

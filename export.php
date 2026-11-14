@@ -67,7 +67,7 @@ if ($type === 'products') {
         ]);
     }
 
-    audit_log('export', 'products', 'ส่งออกรายงานทะเบียนสินค้าเป็น CSV/Excel');
+    audit_log('export', 'products', 'ส่งออกรายงานรายการสินค้าเป็น CSV/Excel');
 } elseif ($type === 'receipts') {
     $receipts = inventory_movements('receipt', 2000);
     fputcsv($output, [

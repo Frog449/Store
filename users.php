@@ -86,7 +86,8 @@ require __DIR__ . '/includes/header.php';
         </div>
         <div class="page-kpis">
             <span><strong><?= count($userList) ?></strong> บัญชีผู้ใช้</span>
-            <button class="primary-button" type="button" onclick="document.querySelector('#add-user-dialog').showModal()">+ เพิ่มผู้ใช้ใหม่</button>
+            <button class="primary-button" type="button"
+                onclick="document.querySelector('#add-user-dialog').showModal()">+ เพิ่มผู้ใช้ใหม่</button>
         </div>
     </div>
 
@@ -94,7 +95,7 @@ require __DIR__ . '/includes/header.php';
         <div class="panel-heading">
             <div>
                 <h2>รายชื่อผู้ใช้งานทั้งหมด</h2>
-                <p>สิทธิ์การใช้งาน: Admin (จัดการได้ทั้งหมด), Staff (รับ-เบิกได้), Viewer (ดูข้อมูลได้อย่างเดียว)</p>
+                <p>สิทธิ์การใช้งาน: Admin,Staff,Viewer</p>
             </div>
         </div>
 
@@ -131,11 +132,14 @@ require __DIR__ . '/includes/header.php';
                             </td>
                             <td><?= h($u['department'] !== '' ? $u['department'] : '—') ?></td>
                             <td style="white-space:nowrap;">
-                                <span class="user-chip-role" style="background:<?= $isSuspended ? '#fee2e2;color:#b91c1c;' : '#dcfce7;color:#15803d;' ?>">
+                                <span class="user-chip-role"
+                                    style="background:<?= $isSuspended ? '#fee2e2;color:#b91c1c;' : '#dcfce7;color:#15803d;' ?>">
                                     <?= $isSuspended ? 'ระงับการใช้งาน' : 'ใช้งานปกติ' ?>
                                 </span>
                             </td>
-                            <td style="white-space:nowrap;font-size:11px;color:#64748b;"><?= h(substr((string) $u['created_at'], 0, 10)) ?></td>
+                            <td style="white-space:nowrap;font-size:11px;color:#64748b;">
+                                <?= h(substr((string) $u['created_at'], 0, 10)) ?>
+                            </td>
                             <td style="text-align:right;white-space:nowrap;">
                                 <div class="users-action-group">
                                     <button class="secondary-button users-action-btn" type="button"
@@ -143,11 +147,13 @@ require __DIR__ . '/includes/header.php';
                                         แก้ไข
                                     </button>
                                     <?php if ($currentUser && $currentUser['id'] !== (int) $u['id']): ?>
-                                        <form method="post" onsubmit="return confirm('ยืนยันที่จะ<?= $isSuspended ? 'ปลดการระงับ' : 'ระงับการใช้งาน' ?>ผู้ใช้นี้หรือไม่?')">
+                                        <form method="post"
+                                            onsubmit="return confirm('ยืนยันที่จะ<?= $isSuspended ? 'ปลดการระงับ' : 'ระงับการใช้งาน' ?>ผู้ใช้นี้หรือไม่?')">
                                             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                                             <input type="hidden" name="action" value="toggle_status">
                                             <input type="hidden" name="user_id" value="<?= (int) $u['id'] ?>">
-                                            <button class="secondary-button users-action-btn" type="submit" style="color:<?= $isSuspended ? '#15803d' : '#b91c1c' ?>;border-color:<?= $isSuspended ? '#bbf7d0' : '#fecaca' ?>;">
+                                            <button class="secondary-button users-action-btn" type="submit"
+                                                style="color:<?= $isSuspended ? '#15803d' : '#b91c1c' ?>;border-color:<?= $isSuspended ? '#bbf7d0' : '#fecaca' ?>;">
                                                 <?= $isSuspended ? 'ปลดระงับ' : 'ระงับ' ?>
                                             </button>
                                         </form>
@@ -174,7 +180,8 @@ require __DIR__ . '/includes/header.php';
                 <div class="eyebrow section-eyebrow">NEW USER</div>
                 <h2>เพิ่มผู้ใช้งานใหม่</h2>
             </div>
-            <button class="product-detail-close" type="button" onclick="document.querySelector('#add-user-dialog').close()">×</button>
+            <button class="product-detail-close" type="button"
+                onclick="document.querySelector('#add-user-dialog').close()">×</button>
         </div>
         <form class="inventory-form" method="post" style="grid-template-columns:1fr;gap:14px;">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
@@ -188,7 +195,8 @@ require __DIR__ . '/includes/header.php';
 
             <label>
                 รหัสพนักงาน (ID)
-                <input type="text" name="employee_id" inputmode="numeric" pattern="[0-9]+" placeholder="เช่น 623384 (เว้นว่างเพื่อสร้างรหัสอัตโนมัติ)">
+                <input type="text" name="employee_id" inputmode="numeric" pattern="[0-9]+"
+                    placeholder="เช่น 623384 (เว้นว่างเพื่อสร้างรหัสอัตโนมัติ)">
                 <small style="color:#888;">ตัวเลขเท่านั้น ใช้เข้าสู่ระบบแทนชื่อผู้ใช้ได้</small>
             </label>
 
@@ -210,9 +218,9 @@ require __DIR__ . '/includes/header.php';
             <label>
                 บทบาท (Role)
                 <select name="role" required>
-                    <option value="staff" selected>Staff (บันทึกรับ-เบิกสินค้าได้)</option>
-                    <option value="viewer">Viewer (ดูข้อมูลได้อย่างเดียว)</option>
-                    <option value="admin">Admin (ผู้ดูแลระบบ จัดการได้ทั้งหมด)</option>
+                    <option value="viewer">Viewer</option>
+                    <option value="staff" selected>Staff</option>
+                    <option value="admin">Admin</option>
                 </select>
             </label>
 
@@ -222,7 +230,8 @@ require __DIR__ . '/includes/header.php';
             </label>
 
             <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
-                <button class="secondary-button" type="button" onclick="document.querySelector('#add-user-dialog').close()">ยกเลิก</button>
+                <button class="secondary-button" type="button"
+                    onclick="document.querySelector('#add-user-dialog').close()">ยกเลิก</button>
                 <button class="primary-button" type="submit">บันทึกผู้ใช้ใหม่</button>
             </div>
         </form>
@@ -235,7 +244,8 @@ require __DIR__ . '/includes/header.php';
                 <div class="eyebrow section-eyebrow">EDIT USER</div>
                 <h2 id="edit-user-title">แก้ไขข้อมูลผู้ใช้</h2>
             </div>
-            <button class="product-detail-close" type="button" onclick="document.querySelector('#edit-user-dialog').close()">×</button>
+            <button class="product-detail-close" type="button"
+                onclick="document.querySelector('#edit-user-dialog').close()">×</button>
         </div>
         <form class="inventory-form" method="post" id="edit-user-form" style="grid-template-columns:1fr;gap:14px;">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
@@ -250,13 +260,15 @@ require __DIR__ . '/includes/header.php';
 
             <label>
                 รหัสพนักงาน (ID)
-                <input type="text" name="employee_id" id="edit-employee-id" required inputmode="numeric" pattern="[0-9]+" placeholder="เช่น 623382">
+                <input type="text" name="employee_id" id="edit-employee-id" required inputmode="numeric"
+                    pattern="[0-9]+" placeholder="เช่น 623382">
                 <small style="color:#888;">ตัวเลขเท่านั้น ใช้เข้าสู่ระบบแทนชื่อผู้ใช้ได้</small>
             </label>
 
             <label>
                 อีเมล (Email)
-                <input type="email" name="email" id="edit-email" placeholder="เช่น name@example.com (ใช้เข้าสู่ระบบได้)">
+                <input type="email" name="email" id="edit-email"
+                    placeholder="เช่น name@example.com (ใช้เข้าสู่ระบบได้)">
             </label>
 
             <label>
@@ -292,7 +304,8 @@ require __DIR__ . '/includes/header.php';
             </label>
 
             <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
-                <button class="secondary-button" type="button" onclick="document.querySelector('#edit-user-dialog').close()">ยกเลิก</button>
+                <button class="secondary-button" type="button"
+                    onclick="document.querySelector('#edit-user-dialog').close()">ยกเลิก</button>
                 <button class="primary-button" type="submit">บันทึกการแก้ไข</button>
             </div>
         </form>
@@ -300,18 +313,17 @@ require __DIR__ . '/includes/header.php';
 </section>
 
 <script>
-function editUser(id, username, email, name, role, department, status) {
-    document.querySelector('#edit-user-id').value = id;
-    document.querySelector('#edit-username').value = username;
-    document.querySelector('#edit-employee-id').value = id || '';
-    document.querySelector('#edit-email').value = email || '';
-    document.querySelector('#edit-name').value = name;
-    document.querySelector('#edit-role').value = role;
-    document.querySelector('#edit-department').value = department;
-    document.querySelector('#edit-status').value = status || 'active';
-    document.querySelector('#edit-user-title').textContent = 'แก้ไขผู้ใช้: ' + username;
-    document.querySelector('#edit-user-dialog').showModal();
-}
+    function editUser(id, username, email, name, role, department, status) {
+        document.querySelector('#edit-user-id').value = id;
+        document.querySelector('#edit-username').value = username;
+        document.querySelector('#edit-employee-id').value = id || '';
+        document.querySelector('#edit-email').value = email || '';
+        document.querySelector('#edit-name').value = name;
+        document.querySelector('#edit-role').value = role;
+        document.querySelector('#edit-department').value = department;
+        document.querySelector('#edit-status').value = status || 'active';
+        document.querySelector('#edit-user-title').textContent = 'แก้ไขผู้ใช้: ' + username;
+        document.querySelector('#edit-user-dialog').showModal();
+    }
 </script>
 <?php require __DIR__ . '/includes/footer.php'; ?>
-

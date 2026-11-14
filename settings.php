@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'code' => 'TEST-001',
         'name' => 'รายการทดสอบ (Test Product)',
         'category' => 'ทดสอบระบบ',
-        'unit' => 'pcs (ชิ้น)',
+        'unit' => 'PCS',
         'stock' => 10,
         'reorder_point' => 5,
         'location' => 'Zone-Test',
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'code' => 'TEST-001',
         'name' => 'รายการทดสอบ (Test Product)',
         'category' => 'ทดสอบระบบ',
-        'unit' => 'pcs (ชิ้น)',
+        'unit' => 'PCS',
         'stock' => 10,
         'reorder_point' => 5,
         'location' => 'Zone-Test',
@@ -86,9 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'sync_all_catalog') {
       $res = inventory_sync_all_catalog_to_google_sheet();
       if ($res['success']) {
-        inventory_flash_redirect('ซิงค์ทะเบียนสินค้าทั้งหมด (' . $productCount . ' รายการ) ไปยัง Google Sheet สำเร็จแล้ว', 'settings.php');
+        inventory_flash_redirect('ซิงค์รายการสินค้าทั้งหมด (' . $productCount . ' รายการ) ไปยัง Google Sheet สำเร็จแล้ว', 'settings.php');
       } else {
-        throw new DomainException('ซิงค์ทะเบียนสินค้าไม่สำเร็จ: ' . $res['message']);
+        throw new DomainException('ซิงค์รายการสินค้าไม่สำเร็จ: ' . $res['message']);
       }
     }
   } catch (DomainException $e) {
@@ -108,7 +108,7 @@ require __DIR__ . '/includes/header.php';
     </div>
     <div class="page-kpis">
       <a class="secondary-button" href="borrow.php">ระบบยืม-คืนพัสดุ ↗</a>
-      <a class="secondary-button" href="catalog.php">ทะเบียนสินค้า ↗</a>
+      <a class="secondary-button" href="catalog.php">รายการสินค้า ↗</a>
     </div>
   </div>
 
@@ -193,7 +193,7 @@ require __DIR__ . '/includes/header.php';
           <div>
             <h2 style="margin:0;font-size:18px;color:#1e293b;">การเชื่อมต่อ Google Sheets (Real-time Sync)</h2>
             <p style="margin:2px 0 0;font-size:13px;color:#64748b;">
-              ส่งข้อมูลลง Google Sheet อัตโนมัติ: อัปเดตยอดคงเหลือในแท็บ <strong>ทะเบียนสินค้า</strong> (ลดลงเมื่อเบิก
+              ส่งข้อมูลลง Google Sheet อัตโนมัติ: อัปเดตยอดคงเหลือในแท็บ <strong>รายการสินค้า</strong> (ลดลงเมื่อเบิก
               เพิ่มเมื่อรับ), บันทึกประวัติในแท็บ <strong>ประวัติรับ-เบิก</strong>, และบันทึกแท็บ
               <strong>ยืม-คืน</strong>
             </p>
@@ -224,8 +224,8 @@ require __DIR__ . '/includes/header.php';
           <?php if (!empty($settings['google_sheet_webhook_url'])): ?>
             <button type="submit" form="sync-catalog-form" class="secondary-button"
               style="padding:6px 14px;font-size:12px;"
-              title="ส่งรายการสินค้าทั้งหมดในเว็บ พร้อมยอดคงเหลือปัจจุบัน ไปสร้างและอัปเดตในแท็บ ทะเบียนสินค้า บน Google Sheet">
-              ซิงค์ทะเบียนสินค้าทั้งหมดเข้า Sheet (<?= number_format($productCount) ?> รายการ)
+              title="ส่งรายการสินค้าทั้งหมดในเว็บ พร้อมยอดคงเหลือปัจจุบัน ไปสร้างและอัปเดตในแท็บ รายการสินค้า บน Google Sheet">
+              ซิงค์รายการสินค้าทั้งหมดเข้า Sheet (<?= number_format($productCount) ?> รายการ)
             </button>
           <?php endif; ?>
         </div>
@@ -253,7 +253,7 @@ require __DIR__ . '/includes/header.php';
         </ol>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <span style="font-weight:600;color:#475569;">โค้ด Google Apps Script (รองรับ ทะเบียนสินค้า + รับ-เบิก +
+          <span style="font-weight:600;color:#475569;">โค้ด Google Apps Script (รองรับ รายการสินค้า + รับ-เบิก +
             ยืม-คืน ในไฟล์เดียว):</span>
           <button type="button" class="secondary-button" style="padding:3px 10px;font-size:11px;"
             onclick="copySettingsGasCode()">
@@ -266,14 +266,14 @@ require __DIR__ . '/includes/header.php';
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // 1. บันทึกรับ-เบิกสินค้า (Receipt / Issue) และอัปเดตยอดคงเหลือในทะเบียนสินค้า
+    // 1. บันทึกรับ-เบิกสินค้า (Receipt / Issue) และอัปเดตยอดคงเหลือในรายการสินค้า
     if (data.event === "movement_sync" || data.action === "receipt" || data.action === "issue") {
       updateCatalogStock(ss, data);
       logMovement(ss, data);
       return jsonResponse({status: "ok", message: "Movement recorded and catalog updated"});
     }
 
-    // 2. ซิงค์ทะเบียนสินค้าทั้งหมด (Batch Catalog Sync)
+    // 2. ซิงค์รายการสินค้าทั้งหมด (Batch Catalog Sync)
     if (data.event === "catalog_batch_sync") {
       batchSyncCatalog(ss, data.products || [], data.timestamp);
       return jsonResponse({status: "ok", message: "Catalog batch sync completed"});
@@ -316,12 +316,32 @@ function getOrCreateSheet(ss, name, headers) {
   return sheet;
 }
 
-function updateCatalogStock(ss, data) {
-  var catalogSheet = getOrCreateSheet(ss, "ทะเบียนสินค้า", [
+function getCatalogSheet(ss) {
+  var names = ["รายการสินค้า", "ทะเบียนสินค้า", "Catalog", "สินค้า"];
+  for (var i = 0; i < names.length; i++) {
+    var s = ss.getSheetByName(names[i]);
+    if (s) return s;
+  }
+  return getOrCreateSheet(ss, "รายการสินค้า", [
     "รหัสสินค้า", "ชื่อสินค้า", "หมวดหมู่", "คงเหลือ", "หน่วยนับ",
     "จุดสั่งซื้อขั้นต่ำ", "ตำแหน่งจัดเก็บ", "อัปเดตล่าสุด"
   ]);
+}
 
+function getMovementSheet(ss) {
+  var names = ["ประวัติรับ-เบิก", "รับ-เบิก", "ประวัติรับเบิก", "Movements"];
+  for (var i = 0; i < names.length; i++) {
+    var s = ss.getSheetByName(names[i]);
+    if (s) return s;
+  }
+  return getOrCreateSheet(ss, "ประวัติรับ-เบิก", [
+    "วัน-เวลา", "ประเภท", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "หน่วยนับ",
+    "คงเหลือหลังทำรายการ", "เลขที่เอกสาร", "ผู้รับ/ผู้ขอเบิก", "ผู้อนุมัติ", "หมายเหตุ", "ผู้บันทึก"
+  ]);
+}
+
+function updateCatalogStock(ss, data) {
+  var catalogSheet = getCatalogSheet(ss);
   var targetCode = String(data.product_code || "").trim();
   if (!targetCode) return;
 
@@ -334,9 +354,9 @@ function updateCatalogStock(ss, data) {
     }
   }
 
-  var newStock = (data.current_stock !== undefined && data.current_stock !== null)
+  var newStock = Math.round(Number((data.current_stock !== undefined && data.current_stock !== null)
                  ? data.current_stock
-                 : (data.stock !== undefined ? data.stock : 0);
+                 : (data.stock !== undefined ? data.stock : 0)));
   var ts = data.timestamp || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss");
 
   if (foundRow > 0) {
@@ -352,7 +372,7 @@ function updateCatalogStock(ss, data) {
       data.category || "",
       newStock,
       data.unit || "",
-      data.reorder_point || 0,
+      Math.round(Number(data.reorder_point || 0)),
       data.location || "",
       ts
     ]);
@@ -360,24 +380,21 @@ function updateCatalogStock(ss, data) {
 }
 
 function logMovement(ss, data) {
-  var movSheet = getOrCreateSheet(ss, "ประวัติรับ-เบิก", [
-    "วัน-เวลา", "ประเภท", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "หน่วยนับ",
-    "คงเหลือหลังทำรายการ", "เลขที่เอกสาร", "ผู้รับ/ผู้ขอเบิก", "ผู้อนุมัติ", "หมายเหตุ", "ผู้บันทึก"
-  ]);
-
+  var movSheet = getMovementSheet(ss);
   var isReceipt = (data.action === "receipt");
   var qtyPrefix = isReceipt ? "+" : "-";
   var actor = isReceipt ? (data.received_by || "-") : (data.requested_by || "-");
   var approver = isReceipt ? "-" : (data.approved_by || "-");
+  var displayName = data.display_name || data.product_name || "";
 
   movSheet.appendRow([
     data.timestamp || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss"),
     data.action_name || (isReceipt ? "รับสินค้า" : "เบิกสินค้า"),
     data.product_code || "",
-    data.product_name || "",
-    qtyPrefix + (data.quantity || 0),
+    displayName,
+    qtyPrefix + Math.round(Number(data.quantity || 0)),
     data.unit || "",
-    data.current_stock !== undefined ? data.current_stock : 0,
+    data.current_stock !== undefined ? Math.round(Number(data.current_stock)) : 0,
     data.document_no || "-",
     actor,
     approver,
@@ -387,11 +404,7 @@ function logMovement(ss, data) {
 }
 
 function batchSyncCatalog(ss, products, ts) {
-  var catalogSheet = getOrCreateSheet(ss, "ทะเบียนสินค้า", [
-    "รหัสสินค้า", "ชื่อสินค้า", "หมวดหมู่", "คงเหลือ", "หน่วยนับ",
-    "จุดสั่งซื้อขั้นต่ำ", "ตำแหน่งจัดเก็บ", "อัปเดตล่าสุด"
-  ]);
-
+  var catalogSheet = getCatalogSheet(ss);
   var lastRow = catalogSheet.getLastRow();
   if (lastRow > 1) {
     catalogSheet.getRange(2, 1, lastRow - 1, catalogSheet.getLastColumn()).clearContent();
@@ -405,9 +418,9 @@ function batchSyncCatalog(ss, products, ts) {
       p.product_code || p.code || "",
       p.product_name || p.name || "",
       p.category || "",
-      p.current_stock !== undefined ? p.current_stock : (p.stock || 0),
+      Math.round(Number(p.current_stock !== undefined ? p.current_stock : (p.stock || 0))),
       p.unit || "",
-      p.reorder_point || p.minimum || 0,
+      Math.round(Number(p.reorder_point || p.minimum || 0)),
       p.location || "",
       timeStr
     ]);
@@ -419,6 +432,9 @@ function batchSyncCatalog(ss, products, ts) {
 
 function handleBorrowSync(ss, data) {
   var borrowSheet = ss.getSheetByName("ยืม-คืน");
+  if (!borrowSheet) {
+    borrowSheet = ss.getSheetByName("ยืมคืน");
+  }
   if (!borrowSheet) {
     var firstSheet = ss.getSheets()[0];
     var firstRowText = firstSheet.getLastRow() > 0 ? firstSheet.getRange(1, 1, 1, Math.min(firstSheet.getLastColumn(), 16)).getValues()[0].join(" ") : "";
@@ -435,16 +451,14 @@ function handleBorrowSync(ss, data) {
   }
 
   var isReturn = (data.action === "return" || data.status === "คืนแล้ว" || data.status_code === "returned");
-  var statusText = isReturn ? "คืนแล้ว" : "กำลังยืม";
-  var actionText = isReturn ? "คืนพัสดุ" : "ยืมพัสดุ";
   var itemName = data.product_name || data.item || data.product || "";
-
-  var targetId = String(data.id || "");
+  var targetId = String(data.id || "").trim();
   var foundRow = 0;
+
   if (targetId !== "") {
     var allData = borrowSheet.getDataRange().getValues();
     for (var i = 1; i < allData.length; i++) {
-      if (String(allData[i][0]) === targetId) {
+      if (String(allData[i][0]).trim() === targetId) {
         foundRow = i + 1;
         break;
       }
@@ -453,32 +467,41 @@ function handleBorrowSync(ss, data) {
 
   if (foundRow > 0 && isReturn) {
     borrowSheet.getRange(foundRow, 11).setValue("คืนแล้ว");
-    borrowSheet.getRange(foundRow, 12).setValue(data.return_date || "");
-    borrowSheet.getRange(foundRow, 13).setValue(data.return_time || "");
-    borrowSheet.getRange(foundRow, 14).setValue(data.return_received_by || "");
+    borrowSheet.getRange(foundRow, 12).setValue(data.return_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd"));
+    borrowSheet.getRange(foundRow, 13).setValue(data.return_time || Utilities.formatDate(new Date(), "Asia/Bangkok", "HH:mm"));
+    borrowSheet.getRange(foundRow, 14).setValue(data.return_received_by || "-");
     if (data.return_notes) {
       borrowSheet.getRange(foundRow, 15).setValue(data.return_notes);
     }
-  } else {
-    borrowSheet.appendRow([
-      data.id || "",
-      actionText,
-      data.borrower_name || data.name || "",
-      itemName,
-      data.product_code || "",
-      data.quantity || 1,
-      data.unit || "",
-      data.location || "",
-      data.borrow_date || "",
-      data.borrow_time || "",
-      statusText,
-      "", "", "",
-      data.notes || "",
-      data.timestamp || new Date().toLocaleString("th-TH")
-    ]);
+    return jsonResponse({status: "ok", message: "Return updated in row " + foundRow});
   }
 
-  return jsonResponse({status: "ok", message: "Borrow record processed"});
+  if (foundRow > 0 && !isReturn) {
+    borrowSheet.getRange(foundRow, 11).setValue("กำลังยืม");
+    return jsonResponse({status: "ok", message: "Borrow record exists in row " + foundRow});
+  }
+
+  // Append new row
+  borrowSheet.appendRow([
+    data.id || "",
+    isReturn ? "คืนพัสดุ" : "ยืมพัสดุ",
+    data.borrower_name || data.name || "",
+    itemName,
+    data.product_code || "",
+    Math.round(Number(data.quantity || 1)),
+    data.unit || "",
+    data.location || "",
+    data.borrow_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd"),
+    data.borrow_time || Utilities.formatDate(new Date(), "Asia/Bangkok", "HH:mm"),
+    isReturn ? "คืนแล้ว" : "กำลังยืม",
+    isReturn ? (data.return_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd")) : "",
+    isReturn ? (data.return_time || Utilities.formatDate(new Date(), "Asia/Bangkok", "HH:mm")) : "",
+    isReturn ? (data.return_received_by || "-") : "",
+    (isReturn ? data.return_notes : data.notes) || "",
+    data.timestamp || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss")
+  ]);
+
+  return jsonResponse({status: "ok", message: isReturn ? "Return appended" : "New borrow recorded"});
 }') ?></textarea>
       </div>
     </div>

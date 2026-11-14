@@ -61,9 +61,8 @@ require __DIR__ . '/includes/header.php';
     <header class="dashboard-title">
         <div>
             <h1 id="dashboard-title">รายงานภาพรวมคลังสินค้า</h1>
-            <p>สรุปสถานะสต๊อกและรายการเคลื่อนไหวจากข้อมูลในทะเบียน</p>
         </div>
-        <a href="catalog.php">ดูทะเบียนสินค้า <span aria-hidden="true">↗</span></a>
+        <a href="catalog.php">ดูรายการสินค้า <span aria-hidden="true">↗</span></a>
     </header>
     <div class="dashboard-grid">
         <section class="dashboard-panel" aria-labelledby="dashboard-metrics">
@@ -115,10 +114,10 @@ require __DIR__ . '/includes/header.php';
             <div class="dashboard-category-table">
                 <div class="dashboard-category-row dashboard-category-header">
                     <span>หมวดหมู่</span>
+                    <span>รายการสินค้า</span>
                     <span>จำนวนสินค้า</span>
-                    <span>มีของ (ชิ้น)</span>
-                    <span>รับเข้า (รอบ)</span>
-                    <span>เบิกออก (รอบ)</span>
+                    <span>รายการรับเข้า</span>
+                    <span>รายการเบิกออก</span>
                 </div>
                 <?php foreach ($categoryLegend as $category): ?>
                     <div class="dashboard-category-row">

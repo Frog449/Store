@@ -2,7 +2,7 @@
 <footer class="site-footer">
     <a class="footer-brand" href="index.php">Store <span>Automeation</span></a>
     <span>INDUSTRIAL SUPPLY · INVENTORY</span>
-    <span>ข้อมูลสต๊อกอ้างอิงจากทะเบียนสินค้า</span>
+    <span>ข้อมูลสต๊อกอ้างอิงจากรายการสินค้า</span>
 </footer>
 </div><!-- /.app-content-wrapper -->
 </div><!-- /.app-layout -->

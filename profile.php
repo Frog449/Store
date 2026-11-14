@@ -6,7 +6,7 @@ require __DIR__ . '/includes/bootstrap.php';
 auth_require_login();
 
 $pageTitle = 'ข้อมูลส่วนตัว (Profile) | Store Automeation';
-$pageDescription = 'จัดการและแก้ไขข้อมูลโปรไฟล์ ชื่อผู้ใช้ อีเมล ชื่อ-นามสกุล แผนก และรหัสผ่านของคุณ';
+$pageDescription = 'จัดการและแก้ไขข้อมูลโปรไฟล์ ชื่อผู้ใช้ อีเมล ชื่อ-นามสกุล และรหัสผ่านของคุณ';
 $activePage = 'profile';
 
 $currentUser = auth_user();
@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
         $username = trim((string) ($_POST['username'] ?? ''));
         $employeeId = trim((string) ($_POST['employee_id'] ?? ''));
         $email = trim((string) ($_POST['email'] ?? ''));
-        $department = trim((string) ($_POST['department'] ?? ''));
+        $department = (string) ($currentUser['department'] ?? '');
         $currentPassword = (string) ($_POST['current_password'] ?? '');
         $newPassword = (string) ($_POST['new_password'] ?? '');
         $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
@@ -107,11 +107,6 @@ require __DIR__ . '/includes/header.php';
                     <strong style="color:#292326;"><?= h(!empty($currentUser['email']) ? $currentUser['email'] : 'ไม่ระบุ') ?></strong>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;">
-                    <span style="color:#777;">แผนก / สังกัด:</span>
-                    <strong
-                        style="color:#292326;"><?= h($currentUser['department'] !== '' ? $currentUser['department'] : 'ไม่ระบุ') ?></strong>
-                </div>
-                <div style="display:flex;justify-content:space-between;padding:6px 0;">
                     <span style="color:#777;">สถานะบัญชี:</span>
                     <strong
                         style="color:#2e7d32;"><?= ($currentUser['status'] ?? 'active') === 'active' ? 'ใช้งานปกติ' : 'ระงับการใช้งาน' ?></strong>
@@ -129,7 +124,7 @@ require __DIR__ . '/includes/header.php';
             <div class="panel-heading">
                 <div>
                     <h2>แก้ไขข้อมูลส่วนตัว</h2>
-                    <p>สามารถแก้ไขชื่อผู้ใช้ ชื่อ-นามสกุล อีเมล แผนก และเปลี่ยนรหัสผ่านได้ (ยกเว้นบทบาทกำหนดโดยผู้ดูแลระบบ)</p>
+                    <p>สามารถแก้ไขชื่อผู้ใช้ ชื่อ-นามสกุล อีเมล และเปลี่ยนรหัสผ่านได้ (ยกเว้นบทบาทกำหนดโดยผู้ดูแลระบบ)</p>
                 </div>
             </div>
 
@@ -167,19 +162,12 @@ require __DIR__ . '/includes/header.php';
                     <small style="color:#888;font-size:9px;">กำหนดโดยผู้ดูแลระบบ (ไม่สามารถเปลี่ยนแปลงบทบาทในหน้าโปรไฟล์ได้)</small>
                 </label>
 
-                <label>
+                <label class="form-span-2">
                     อีเมล (Email)
                     <input type="email" name="email" maxlength="191"
                         value="<?= h((string) ($_POST['email'] ?? ($currentUser['email'] ?? ''))) ?>"
                         placeholder="เช่น somchai@example.com">
                     <small style="color:#888;font-size:9px;">ใช้สำหรับเข้าสู่ระบบแทน Username ได้</small>
-                </label>
-
-                <label>
-                    แผนก / สังกัด
-                    <input type="text" name="department" maxlength="150"
-                        value="<?= h((string) ($_POST['department'] ?? $currentUser['department'])) ?>"
-                        placeholder="เช่น คลังสินค้าส่วนกลาง, ฝ่ายซ่อมบำรุง">
                 </label>
 
                 <div class="form-span-2" style="border-top:1px solid #edf0eb;margin-top:8px;padding-top:16px;">

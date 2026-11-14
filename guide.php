@@ -12,21 +12,20 @@ require __DIR__ . '/includes/header.php';
     <div class="page-intro guide-intro">
         <div class="eyebrow section-eyebrow">HOW TO USE</div>
         <h1>คู่มือใช้งาน<span class="heading-period">.</span></h1>
-        <p>ขั้นตอนใช้งานระบบทะเบียนสินค้าและบันทึกสต๊อกให้ยอดคงเหลือถูกต้อง</p>
     </div>
 
     <section class="guide-steps" aria-label="ขั้นตอนการใช้งาน">
         <article class="guide-step">
-            <span class="guide-step-number">01</span><div class="guide-step-body"><h2>เพิ่มสินค้าเข้าทะเบียน</h2><p>เปิดหน้า <a href="receive.php?new=1#new-product">รับสินค้า</a> แล้วเลือกเพิ่มสินค้าใหม่ กรอกรหัส ชื่อ หมวดหมู่ ประเภท หน่วยนับ ตำแหน่งจัดเก็บ จุดสั่งซื้อขั้นต่ำ และจำนวนรับครั้งแรก ระบบจะสร้างทะเบียนและบันทึกรับพร้อมกัน หากมีรูปสินค้าให้เลือกไฟล์ JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB</p></div>
+            <span class="guide-step-number">01</span><div class="guide-step-body"><h2>เพิ่มสินค้าเข้ารายการ</h2><p>เปิดหน้า <a href="receive.php?new=1#new-product">รับสินค้า</a> แล้วเลือกเพิ่มสินค้าใหม่ กรอกรหัส ชื่อ หมวดหมู่ ประเภท หน่วยนับ ตำแหน่งจัดเก็บ จุดสั่งซื้อขั้นต่ำ และจำนวนรับครั้งแรก ระบบจะสร้างรายการและบันทึกรับพร้อมกัน หากมีรูปสินค้าให้เลือกไฟล์ JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB</p></div>
         </article>
         <article class="guide-step">
-            <span class="guide-step-number">02</span><div class="guide-step-body"><h2>รับสินค้าเดิมเข้าคลัง</h2><p>เปิดหน้า <a href="receive.php">รับสินค้า</a> เลือกสินค้าที่มีในทะเบียน ระบุวันที่และจำนวนรับ พร้อมกรอกเลขที่เอกสาร ผู้ส่งมอบ ผู้รับ และหน่วยงานตามต้องการ</p></div>
+            <span class="guide-step-number">02</span><div class="guide-step-body"><h2>รับสินค้าเดิมเข้าคลัง</h2><p>เปิดหน้า <a href="receive.php">รับสินค้า</a> เลือกสินค้าที่มีในรายการ ระบุวันที่และจำนวนรับ พร้อมกรอกเลขที่เอกสาร ผู้ส่งมอบ ผู้รับ และหน่วยงานตามต้องการ</p></div>
         </article>
         <article class="guide-step">
             <span class="guide-step-number">03</span><div class="guide-step-body"><h2>บันทึกเบิกสินค้าออกจากคลัง</h2><p>เปิดหน้า <a href="issue.php">เบิกสินค้า</a> เลือกสินค้าและระบุจำนวนเบิก ผู้เบิก แผนก/ผู้รับ และชื่อผู้อนุมัติ (จำเป็น) หากเบิกเกินยอดคงเหลือ ระบบจะบันทึกและแสดงยอดติดลบเพื่อให้ตรวจสอบ</p></div>
         </article>
         <article class="guide-step">
-            <span class="guide-step-number">04</span><div class="guide-step-body"><h2>ตรวจสอบยอดและสถานะ</h2><p>หน้า <a href="index.php">ภาพรวม</a> สรุปจำนวนสินค้า รายการรับ–เบิก สถานะ และจำนวนสินค้าแยกตามหมวดหมู่ ส่วนหน้า <a href="catalog.php">ทะเบียนสินค้า</a> ใช้ค้นหา ดูรายละเอียด และแก้ไขสินค้า หากลบสินค้า ระบบจะลบประวัติรับ–เบิกที่เกี่ยวข้องด้วย และไม่สามารถกู้คืนได้</p></div>
+            <span class="guide-step-number">04</span><div class="guide-step-body"><h2>ตรวจสอบยอดและสถานะ</h2><p>หน้า <a href="index.php">ภาพรวม</a> สรุปจำนวนสินค้า รายการรับ–เบิก สถานะ และจำนวนสินค้าแยกตามหมวดหมู่ ส่วนหน้า <a href="catalog.php">รายการสินค้า</a> ใช้ค้นหา ดูรายละเอียด และแก้ไขสินค้า หากลบสินค้า ระบบจะลบประวัติรับ–เบิกที่เกี่ยวข้องด้วย และไม่สามารถกู้คืนได้</p></div>
         </article>
     </section>
 

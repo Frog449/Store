@@ -332,14 +332,14 @@ function inventory_ensure_schema(PDO $db): void
             $insertLegacyReceipt->execute([
                 'code' => $product['code'],
                 'quantity' => $product['received'],
-                'notes' => 'ย้ายยอดรวมเดิมจากทะเบียนสินค้า',
+                'notes' => 'ย้ายยอดรวมเดิมจากรายการสินค้า',
             ]);
         }
         if ($product['recorded_issues'] === null && (float) $product['issued'] > 0) {
             $insertLegacyIssue->execute([
                 'code' => $product['code'],
                 'quantity' => $product['issued'],
-                'notes' => 'ย้ายยอดรวมเดิมจากทะเบียนสินค้า',
+                'notes' => 'ย้ายยอดรวมเดิมจากรายการสินค้า',
             ]);
         }
     }
@@ -349,8 +349,9 @@ function inventory_ensure_schema(PDO $db): void
         $db->exec('ALTER TABLE `product` DROP COLUMN `opening_stock`');
     }
 
-    // Migrate legacy Thai units ('ชิ้น', 'อัน') to 'pcs (ชิ้น)'
-    $db->exec("UPDATE `product` SET `หน่วยนับ` = 'pcs (ชิ้น)' WHERE `หน่วยนับ` IN ('ชิ้น', 'อัน')");
+    // Migrate legacy units to 'PCS'
+    $db->exec("UPDATE `product` SET `หน่วยนับ` = 'PCS' WHERE `หน่วยนับ` IN ('ชิ้น', 'อัน', 'pcs (ชิ้น)', 'pcs', 'PCS (ชิ้น)', 'Pcs')");
+    $db->exec("UPDATE `borrow_records` SET `unit` = 'PCS' WHERE `unit` IN ('ชิ้น', 'อัน', 'pcs (ชิ้น)', 'pcs', 'PCS (ชิ้น)', 'Pcs')");
 }
 
 function inventory_store_product_image(?array $upload): ?string
@@ -959,10 +960,10 @@ function inventory_products(): array
             'type' => $row['item_type'],
             'unit' => $row['unit'],
             'location' => $row['location'],
-            'minimum' => (float) $row['reorder_point'],
-            'received' => (float) $row['received'],
-            'issued' => (float) $row['issued'],
-            'stock' => (float) $row['stock'],
+            'minimum' => (int) round((float) $row['reorder_point']),
+            'received' => (int) round((float) $row['received']),
+            'issued' => (int) round((float) $row['issued']),
+            'stock' => (int) round((float) $row['stock']),
             'art' => $row['art'],
             'image_filename' => $row['image_filename'],
         ];
@@ -985,7 +986,15 @@ function inventory_product(string $code): ?array
     );
     $statement->execute(['code' => $code]);
     $product = $statement->fetch();
-    return $product === false ? null : $product;
+    if ($product === false) {
+        return null;
+    }
+    $product['reorder_point'] = (int) round((float) ($product['reorder_point'] ?? 0));
+    $product['received'] = (int) round((float) ($product['received'] ?? 0));
+    $product['issued'] = (int) round((float) ($product['issued'] ?? 0));
+    $product['stock'] = (int) round((float) ($product['stock'] ?? 0));
+    $product['minimum'] = $product['reorder_point'];
+    return $product;
 }
 
 function inventory_movements(string $kind, int $limit = 250): array
@@ -1010,7 +1019,14 @@ function inventory_movements(string $kind, int $limit = 250): array
     );
     $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
     $statement->execute();
-    return $statement->fetchAll();
+    $rows = $statement->fetchAll();
+    foreach ($rows as &$row) {
+        if (isset($row['quantity'])) {
+            $row['quantity'] = (int) round((float) $row['quantity']);
+        }
+    }
+    unset($row);
+    return $rows;
 }
 
 function inventory_movement_counts(): array
@@ -1207,7 +1223,7 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
 {
     $db = inventory_db();
     if (inventory_product($product['code']) !== null) {
-        throw new DomainException('รหัสสินค้านี้มีในทะเบียนแล้ว กรุณาเลือกรับสินค้าเดิม');
+        throw new DomainException('รหัสสินค้านี้มีในรายการแล้ว กรุณาเลือกรับสินค้าเดิม');
     }
 
     $db->beginTransaction();
@@ -1245,10 +1261,12 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
         audit_log('product_create', $product['code'], "เพิ่มสินค้าพร้อมรับเข้าครั้งแรก: {$product['name']} จำนวน {$receipt['quantity']} {$product['unit']} (เอกสาร: {$receipt['document_no']})");
 
         $receipt['id'] = $receiptId;
+        $receipt['is_new'] = true;
         $updatedProduct = inventory_product($product['code']);
         if ($updatedProduct !== null) {
-            inventory_notify_telegram_movement($receipt, 'receipt', $updatedProduct);
-            inventory_sync_google_sheet_movement($receipt, 'receipt', $updatedProduct);
+            inventory_notify_telegram_movement($receipt, 'receipt', $updatedProduct, true);
+            inventory_sync_google_sheet_movement($receipt, 'receipt', $updatedProduct, true);
+            inventory_sync_google_sheet_product($updatedProduct);
         }
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -1444,11 +1462,11 @@ function inventory_number(string $key, string $label, bool $allowZero = true): f
     if ($raw === '' || !is_numeric($raw)) {
         throw new DomainException("กรุณากรอก{$label}เป็นตัวเลข");
     }
-    $value = (float) $raw;
+    $value = round((float) $raw);
     if (!is_finite($value) || $value < 0 || (!$allowZero && $value <= 0)) {
         throw new DomainException($allowZero ? "{$label}ต้องไม่ติดลบ" : "{$label}ต้องมากกว่า 0");
     }
-    return $value;
+    return (float) $value;
 }
 
 function inventory_date(string $key = 'movement_date'): string
@@ -1486,11 +1504,8 @@ function inventory_handle_error(DomainException|RuntimeException $exception): st
 
 function inventory_quantity(float|int|string $quantity): string
 {
-    $number = (float) $quantity;
-    if (floor($number) === $number) {
-        return number_format($number, 0);
-    }
-    return rtrim(rtrim(number_format($number, 3, '.', ','), '0'), '.');
+    $number = round((float) $quantity);
+    return number_format($number, 0);
 }
 
 /**
@@ -1684,7 +1699,14 @@ function inventory_borrow_records(string $statusFilter = 'all', string $search =
 
     $stmt = inventory_db()->prepare($sql);
     $stmt->execute($params);
-    return $stmt->fetchAll();
+    $rows = $stmt->fetchAll();
+    foreach ($rows as &$r) {
+        if (isset($r['quantity'])) {
+            $r['quantity'] = (int) round((float) $r['quantity']);
+        }
+    }
+    unset($r);
+    return $rows;
 }
 
 /**
@@ -1695,6 +1717,9 @@ function inventory_borrow_record_by_id(int $id): ?array
     $stmt = inventory_db()->prepare('SELECT * FROM `borrow_records` WHERE `id` = :id');
     $stmt->execute(['id' => $id]);
     $row = $stmt->fetch();
+    if ($row !== false && isset($row['quantity'])) {
+        $row['quantity'] = (int) round((float) $row['quantity']);
+    }
     return $row === false ? null : $row;
 }
 
@@ -1736,11 +1761,11 @@ function inventory_create_borrow_record(array $data, ?array $photoUpload = null)
         throw new DomainException('กรุณาระบุสถานที่นำไปใช้งาน (ใช้ที่ไหน)');
     }
 
-    $quantity = (float) ($data['quantity'] ?? 1);
+    $quantity = (int) round((float) ($data['quantity'] ?? 1));
     if ($quantity <= 0) {
-        $quantity = 1.0;
+        $quantity = 1;
     }
-    $unit = trim((string) ($data['unit'] ?? 'pcs (ชิ้น)'));
+    $unit = trim((string) ($data['unit'] ?? 'PCS'));
     $notes = trim((string) ($data['notes'] ?? ''));
 
     $photoFilename = null;
@@ -2017,14 +2042,19 @@ function inventory_notify_telegram(array $record, string $actionType = 'borrow')
 /**
  * ส่งการแจ้งเตือน รับ-เบิก สินค้า ไปยัง Telegram Bot
  */
-function inventory_notify_telegram_movement(array $movement, string $kind, ?array $product = null): array
+function inventory_notify_telegram_movement(array $movement, string $kind, ?array $product = null, bool $isNewProduct = false): array
 {
     if ($product === null) {
         $product = inventory_product((string) $movement['product_code']);
     }
 
     $isReceipt = ($kind === 'receipt');
-    $title = $isReceipt ? '<b>[แจ้งเตือนรับสินค้าเข้าคลัง]</b>' : '<b>[แจ้งเตือนเบิกสินค้าออกจากคลัง]</b>';
+    $isNew = $isNewProduct || !empty($movement['is_new']);
+    if ($isNew) {
+        $title = '<b>[NEW] [แจ้งเตือนรับสินค้าเข้าคลัง]</b>';
+    } else {
+        $title = $isReceipt ? '<b>[แจ้งเตือนรับสินค้าเข้าคลัง]</b>' : '<b>[แจ้งเตือนเบิกสินค้าออกจากคลัง]</b>';
+    }
     $productName = $product['name'] ?? (string) $movement['product_code'];
     $category = $product['category'] ?? '-';
     $unit = $product['unit'] ?? '';
@@ -2043,9 +2073,13 @@ function inventory_notify_telegram_movement(array $movement, string $kind, ?arra
         '<b>Store Automeation · ระบบคลังสินค้า</b>',
         '━━━━━━━━━━━━━━━━━━',
         '<b>รหัสสินค้า:</b> ' . htmlspecialchars((string) $movement['product_code'], ENT_QUOTES, 'UTF-8'),
-        '<b>ชื่อสินค้า:</b> ' . htmlspecialchars($productName, ENT_QUOTES, 'UTF-8'),
+        '<b>ชื่อสินค้า:</b> ' . htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') . ($isNew ? ' [NEW]' : ''),
         '<b>หมวดหมู่:</b> ' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8'),
     ];
+
+    if ($isNew) {
+        $lines[] = '<b>ประเภทรายการ:</b> สินค้าใหม่ [NEW]';
+    }
 
     if ($isReceipt) {
         $lines[] = '<b>จำนวนรับเข้า:</b> +' . inventory_quantity($quantity) . ' ' . htmlspecialchars($unit, ENT_QUOTES, 'UTF-8');
@@ -2108,7 +2142,7 @@ function inventory_post_google_sheet(array $payload): array
             CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true, // Essential for Google Apps Script 302 redirects
-            CURLOPT_TIMEOUT => 6,
+            CURLOPT_TIMEOUT => 12,
             CURLOPT_SSL_VERIFYPEER => false,
         ]);
         $response = curl_exec($ch);
@@ -2145,7 +2179,7 @@ function inventory_sync_google_sheet(array $record, string $actionType = 'borrow
         'item' => (string) $record['product_name'],
         'product' => (string) $record['product_name'],
         'product_code' => (string) ($record['product_code'] ?? ''),
-        'quantity' => (float) ($record['quantity'] ?? 1),
+        'quantity' => (int) round((float) ($record['quantity'] ?? 1)),
         'unit' => (string) ($record['unit'] ?? ''),
         'borrow_date' => (string) $record['borrow_date'],
         'borrow_time' => substr((string) $record['borrow_time'], 0, 5),
@@ -2171,20 +2205,21 @@ function inventory_sync_google_sheet(array $record, string $actionType = 'borrow
 
 /**
  * ส่งข้อมูลการ รับ-เบิก สินค้า ไปยัง Google Sheet
- * และอัปเดตยอดคงเหลือในแท็บ "ทะเบียนสินค้า" บน Sheet
+ * และอัปเดตยอดคงเหลือในแท็บ "รายการสินค้า" บน Sheet
  */
-function inventory_sync_google_sheet_movement(array $movement, string $kind, ?array $product = null): array
+function inventory_sync_google_sheet_movement(array $movement, string $kind, ?array $product = null, bool $isNewProduct = false): array
 {
     if ($product === null) {
         $product = inventory_product((string) $movement['product_code']);
     }
 
     $isReceipt = ($kind === 'receipt');
+    $isNew = $isNewProduct || !empty($movement['is_new']);
     $productName = $product['name'] ?? (string) $movement['product_code'];
     $category = $product['category'] ?? '';
     $unit = $product['unit'] ?? '';
-    $quantity = (float) ($movement['quantity'] ?? 0);
-    $currentStock = (float) ($product['stock'] ?? 0);
+    $quantity = (int) round((float) ($movement['quantity'] ?? 0));
+    $currentStock = (int) round((float) ($product['stock'] ?? 0));
     $createdByName = (string) ($movement['created_by_name'] ?? '');
     if ($createdByName === '' && function_exists('auth_user')) {
         $u = auth_user();
@@ -2193,20 +2228,24 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
         }
     }
 
+    $actionName = $isNew ? 'รับสินค้าใหม่ [NEW]' : ($isReceipt ? 'รับสินค้า' : 'เบิกสินค้า');
+
     $payload = [
         'event' => 'movement_sync',
         'action' => $kind,                         // 'receipt' หรือ 'issue'
-        'action_name' => $isReceipt ? 'รับสินค้า' : 'เบิกสินค้า',
+        'action_name' => $actionName,
+        'is_new' => $isNew ? '1' : '0',
         'id' => (int) ($movement['id'] ?? 0),
         'movement_date' => (string) ($movement['movement_date'] ?? date('Y-m-d')),
         'movement_time' => date('H:i:s'),
         'product_code' => (string) $movement['product_code'],
         'product_name' => $productName,
+        'display_name' => $isNew ? ($productName . ' [NEW]') : $productName,
         'category' => $category,
         'quantity' => $quantity,
         'unit' => $unit,
         'current_stock' => $currentStock,
-        'reorder_point' => (float) ($product['reorder_point'] ?? 0),
+        'reorder_point' => (int) round((float) ($product['reorder_point'] ?? 0)),
         'location' => (string) ($product['location'] ?? ''),
         'document_no' => (string) ($movement['document_no'] ?? ''),
         'received_by' => (string) ($movement['received_by'] ?? ''),
@@ -2221,7 +2260,7 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
 }
 
 /**
- * อัปเดตข้อมูลสินค้าเดี่ยวไปยังแท็บ "ทะเบียนสินค้า" บน Google Sheet (ไม่ส่งแจ้งเตือน Telegram)
+ * อัปเดตข้อมูลสินค้าเดี่ยวไปยังแท็บ "รายการสินค้า" บน Google Sheet (ไม่ส่งแจ้งเตือน Telegram)
  */
 function inventory_sync_google_sheet_product(array $product): array
 {
@@ -2233,8 +2272,8 @@ function inventory_sync_google_sheet_product(array $product): array
         'category' => (string) ($product['category'] ?? ''),
         'item_type' => (string) ($product['item_type'] ?? ''),
         'unit' => (string) ($product['unit'] ?? ''),
-        'current_stock' => (float) ($product['stock'] ?? 0),
-        'reorder_point' => (float) ($product['reorder_point'] ?? $product['minimum'] ?? 0),
+        'current_stock' => (int) round((float) ($product['stock'] ?? 0)),
+        'reorder_point' => (int) round((float) ($product['reorder_point'] ?? $product['minimum'] ?? 0)),
         'location' => (string) ($product['location'] ?? ''),
         'timestamp' => date('Y-m-d H:i:s'),
     ];
@@ -2243,7 +2282,7 @@ function inventory_sync_google_sheet_product(array $product): array
 }
 
 /**
- * ซิงค์รายการสินค้าทั้งหมดไปยังแท็บ "ทะเบียนสินค้า" บน Google Sheet (ไม่ส่งแจ้งเตือน Telegram)
+ * ซิงค์รายการสินค้าทั้งหมดไปยังแท็บ "รายการสินค้า" บน Google Sheet (ไม่ส่งแจ้งเตือน Telegram)
  */
 function inventory_sync_all_catalog_to_google_sheet(): array
 {
@@ -2254,9 +2293,9 @@ function inventory_sync_all_catalog_to_google_sheet(): array
             'product_code' => (string) $p['id'],
             'product_name' => (string) $p['name'],
             'category' => (string) ($p['category'] ?? ''),
-            'current_stock' => (float) ($p['stock'] ?? 0),
+            'current_stock' => (int) round((float) ($p['stock'] ?? 0)),
             'unit' => (string) ($p['unit'] ?? ''),
-            'reorder_point' => (float) ($p['minimum'] ?? 0),
+            'reorder_point' => (int) round((float) ($p['minimum'] ?? 0)),
             'location' => (string) ($p['location'] ?? ''),
         ];
     }

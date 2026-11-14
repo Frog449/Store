@@ -3,23 +3,23 @@ declare(strict_types=1);
 
 require __DIR__ . '/includes/bootstrap.php';
 $pageTitle = 'เกี่ยวกับเรา | Store Automeation';
-$pageDescription = 'ข้อมูลระบบทะเบียนสินค้าและจัดการคลังสินค้า';
+$pageDescription = 'ข้อมูลระบบรายการสินค้าและจัดการคลังสินค้า';
 $activePage = 'about';
 require __DIR__ . '/includes/header.php';
 ?>
 <section class="page-intro about-intro">
     <div class="eyebrow section-eyebrow">ABOUT STORE AUTOMEATION</div>
     <h1>อะไหล่ที่ใช่<br><span>งานก็ไปต่อได้</span><b>.</b></h1>
-    <p>ระบบจัดการทะเบียนสินค้า รับสินค้าเข้า เบิกสินค้าออก และติดตามจำนวนคงเหลือจากฐานข้อมูลเดียวกัน</p>
+    <p>ระบบจัดการรายการสินค้า รับสินค้าเข้า เบิกสินค้าออก และติดตามจำนวนคงเหลือจากฐานข้อมูลเดียวกัน</p>
 </section>
 
 <section class="about-detail-grid">
     <article class="about-detail-card">
         <span class="about-detail-number">01</span>
         <div class="about-detail-icon">▦</div>
-        <h2>ทะเบียนสินค้า</h2>
+        <h2>รายการสินค้า</h2>
         <p>ค้นหาด้วยชื่อหรือรหัสสินค้า ดูข้อมูลและสถานะคงเหลือ พร้อมแก้ไขรายละเอียดสินค้า</p>
-        <a href="catalog.php">ไปทะเบียนสินค้า <span aria-hidden="true">↗</span></a>
+        <a href="catalog.php">ไปรายการสินค้า <span aria-hidden="true">↗</span></a>
     </article>
     <article class="about-detail-card">
         <span class="about-detail-number">02</span>

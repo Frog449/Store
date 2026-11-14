@@ -73,7 +73,7 @@ require __DIR__ . '/includes/header.php';
             <span><strong><?= count($history) ?></strong> รายการเบิก</span>
             <a class="secondary-button" href="export.php?type=issues" style="font-size:11px;">Export
                 ประวัติเบิกสินค้า</a>
-            <a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a>
+            <a class="secondary-button" href="catalog.php">ดูรายการสินค้า ↗</a>
         </div>
     </div>
     <section class="inventory-panel">

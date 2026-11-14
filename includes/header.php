@@ -1,6 +1,6 @@
 <?php
 $pageTitle = $pageTitle ?? 'Store Automeation | อะไหล่อุตสาหกรรม';
-$pageDescription = $pageDescription ?? 'ทะเบียนสินค้าและระบบจัดการสต๊อก';
+$pageDescription = $pageDescription ?? 'รายการสินค้าและระบบจัดการสต๊อก';
 $activePage = $activePage ?? 'products';
 ?>
 <!DOCTYPE html>
@@ -14,7 +14,9 @@ $activePage = $activePage ?? 'products';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3.5">
+    <link rel="icon" type="image/png" href="assets/favicon.png?v=<?= filemtime(__DIR__ . '/../assets/favicon.png') ?>">
+    <link rel="shortcut icon" href="favicon.ico?v=<?= filemtime(__DIR__ . '/../favicon.ico') ?>">
+    <link rel="stylesheet" href="style.css?v=3.6">
 </head>
 <body>
 <div class="app-layout">
@@ -41,7 +43,7 @@ $activePage = $activePage ?? 'products';
             </a>
             <a class="sidebar-link <?= $activePage === 'products' ? 'active' : '' ?>" href="catalog.php">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                <span>ทะเบียนสินค้า</span>
+                <span>รายการสินค้า</span>
             </a>
 
             <?php if (!function_exists('auth_is_viewer') || !auth_is_viewer()): ?>

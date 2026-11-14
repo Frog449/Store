@@ -97,7 +97,7 @@ require __DIR__ . '/includes/header.php';
         <div>
             <div class="eyebrow section-eyebrow">STOCK IN</div>
             <h1>รับสินค้า<span class="heading-period">.</span></h1>
-            <p>รับสินค้าเดิมเข้าคลัง หรือเพิ่มทะเบียนสินค้าใหม่พร้อมบันทึกรับเข้าครั้งแรก</p>
+            <p>รับสินค้าเดิมเข้าคลัง หรือเพิ่มรายการสินค้าใหม่พร้อมบันทึกรับเข้าครั้งแรก</p>
         </div>
         <div class="page-kpis">
             <span style="font-size:12px;color:#475569;display:inline-flex;align-items:center;gap:6px;">
@@ -110,7 +110,7 @@ require __DIR__ . '/includes/header.php';
             <span><strong><?= count($history) ?></strong> รายการรับ</span>
             <a class="secondary-button" href="export.php?type=receipts" style="font-size:11px;">Export
                 ประวัติรับสินค้า</a>
-            <a class="secondary-button" href="catalog.php">ดูทะเบียนสินค้า ↗</a>
+            <a class="secondary-button" href="catalog.php">ดูรายการสินค้า ↗</a>
         </div>
     </div>
     <section class="inventory-panel">
@@ -179,7 +179,7 @@ require __DIR__ . '/includes/header.php';
         <details class="inventory-panel new-product-details" id="new-product" <?= $openNewProduct ? 'open' : '' ?>>
             <summary>เพิ่มสินค้าใหม่พร้อมรับเข้าครั้งแรก</summary>
             <p class="new-product-description">กรอกรายละเอียดสินค้าและจำนวนที่รับเข้าครั้งแรก
-                ระบบจะสร้างทะเบียนและบันทึกรับสินค้าไว้พร้อมกัน</p>
+                ระบบจะสร้างรายการและบันทึกรับสินค้าไว้พร้อมกัน</p>
             <form class="inventory-form" method="post" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>"><input type="hidden" name="action"
                     value="create_product_receipt">

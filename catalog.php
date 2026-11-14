@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 require __DIR__ . '/includes/bootstrap.php';
 
-$pageTitle = 'ทะเบียนสินค้า | Store Automeation';
-$pageDescription = 'ค้นหาและจัดการทะเบียนสินค้าและจำนวนคงเหลือ';
+$pageTitle = 'รายการสินค้า | Store Automeation';
+$pageDescription = 'ค้นหาและจัดการรายการสินค้าและจำนวนคงเหลือ';
 $activePage = 'products';
 $uploadedProductImage = null;
 $editCode = isset($_GET['edit']) && is_string($_GET['edit']) ? $_GET['edit'] : null;
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sync_
         }
         $res = inventory_sync_all_catalog_to_google_sheet();
         if ($res['success']) {
-            inventory_flash_redirect('ซิงค์ทะเบียนสินค้าทั้งหมดไปยัง Google Sheet สำเร็จแล้ว', 'catalog.php');
+            inventory_flash_redirect('ซิงค์รายการสินค้าทั้งหมดไปยัง Google Sheet สำเร็จแล้ว', 'catalog.php');
         } else {
             throw new DomainException('ซิงค์กับ Google Sheet ไม่สำเร็จ: ' . $res['message']);
         }
@@ -125,16 +125,16 @@ require __DIR__ . '/includes/header.php';
     <div class="section-heading">
         <div>
             <div class="eyebrow section-eyebrow">PRODUCT REGISTER</div>
-            <h1>ทะเบียนสินค้า<span class="heading-period">.</span></h1>
+            <h1>รายการสินค้า<span class="heading-period">.</span></h1>
             <p>คลิกการ์ดสินค้าเพื่อดูรายละเอียด<?= auth_is_admin() ? ' รูปสินค้าเพิ่มหรือเปลี่ยนได้ในหน้าต่างแก้ไข' : '' ?></p>
         </div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <a class="secondary-button" href="export.php?type=products" style="font-size:11px;">Export ทะเบียนสินค้า (.csv)</a>
+            <a class="secondary-button" href="export.php?type=products" style="font-size:11px;">Export รายการสินค้า (.csv)</a>
             <?php if (auth_can_manage_stock()): ?>
                 <form method="post" style="display:inline;margin:0;">
                     <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                     <input type="hidden" name="action" value="sync_catalog_to_sheet">
-                    <button type="submit" class="secondary-button" style="font-size:11px;" title="ซิงค์ข้อมูลสินค้าและยอดคงเหลือทั้งหมดไปยัง Google Sheet (แท็บ ทะเบียนสินค้า)">
+                    <button type="submit" class="secondary-button" style="font-size:11px;" title="ซิงค์ข้อมูลสินค้าและยอดคงเหลือทั้งหมดไปยัง Google Sheet (แท็บ รายการสินค้า)">
                         ซิงค์กับ Google Sheet
                     </button>
                 </form>
@@ -241,7 +241,7 @@ require __DIR__ . '/includes/header.php';
                 <?php foreach ($unitOptions as $option): ?><option value="<?= h($option) ?>" <?= ($_POST['unit'] ?? $editProduct['unit'] ?? '') === $option ? 'selected' : '' ?>><?= h($option) ?></option><?php endforeach; ?>
             </select></label>
             <label>ตำแหน่งจัดเก็บ <input name="location" maxlength="80" value="<?= h((string) ($_POST['location'] ?? $editProduct['location'] ?? '')) ?>"></label>
-            <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="1" min="0" required value="<?= h((string) ($_POST['reorder_point'] ?? $editProduct['reorder_point'] ?? '')) ?>"></label>
+            <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="1" min="0" required value="<?= h((string) ($_POST['reorder_point'] ?? (isset($editProduct['reorder_point']) ? (int) round((float) $editProduct['reorder_point']) : ''))) ?>"></label>
             <label class="product-image-upload-field form-span-2">รูปสินค้า
                 <input class="product-image-upload" type="file" name="product_image" accept="image/jpeg,image/png,image/webp">
                 <small>JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB</small>

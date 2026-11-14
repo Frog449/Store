@@ -215,7 +215,7 @@ require __DIR__ . '/includes/header.php';
                 <tbody>
                     <tr>
                         <td><code>product</code></td>
-                        <td>ทะเบียนสินค้า รายละเอียด จุดสั่งซื้อ และสต๊อกคงเหลือ</td>
+                        <td>รายการสินค้า รายละเอียด จุดสั่งซื้อ และสต๊อกคงเหลือ</td>
                         <td class="numeric"><?= number_format($tableCounts['product']) ?></td>
                         <td><span style="color:#2e7d32;font-weight:600;">พร้อมใช้งาน</span></td>
                     </tr>
