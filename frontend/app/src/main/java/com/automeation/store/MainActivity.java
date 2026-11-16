@@ -53,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
         swipeRefresh = findViewById(R.id.swipe_refresh);
         loadingOverlay = findViewById(R.id.loading_overlay);
 
+        swipeRefresh.setOnChildScrollUpCallback((parent, child) -> webView.canScrollVertically(-1));
         swipeRefresh.setColorSchemeResources(R.color.primary);
         swipeRefresh.setOnRefreshListener(() -> webView.reload());
 

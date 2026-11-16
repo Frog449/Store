@@ -83,7 +83,7 @@ $activePage = $activePage ?? 'products';
             </a>
 
             <?php if (function_exists('auth_is_admin') && auth_is_admin()): ?>
-                <?php $isSysActive = in_array($activePage, ['users', 'settings', 'audit', 'backup'], true); ?>
+                <?php $isSysActive = in_array($activePage, ['server', 'users', 'settings', 'audit', 'backup'], true); ?>
                 <div class="nav-section-title">ผู้ดูแลระบบ</div>
                 <div class="sidebar-accordion <?= $isSysActive ? 'open' : '' ?>" id="sidebar-admin-accordion">
                     <button class="sidebar-link sidebar-accordion-btn <?= $isSysActive ? 'active' : '' ?>" type="button" aria-expanded="<?= $isSysActive ? 'true' : 'false' ?>" id="sidebar-admin-toggle">
@@ -94,6 +94,7 @@ $activePage = $activePage ?? 'products';
                         <span class="accordion-arrow">▾</span>
                     </button>
                     <div class="sidebar-submenu">
+                        <a class="sidebar-sublink <?= $activePage === 'server' ? 'active' : '' ?>" href="server.php">จัดการเซิร์ฟเวอร์</a>
                         <a class="sidebar-sublink <?= $activePage === 'users' ? 'active' : '' ?>" href="users.php">จัดการผู้ใช้</a>
                         <a class="sidebar-sublink <?= $activePage === 'settings' ? 'active' : '' ?>" href="settings.php">ตั้งค่าระบบ (Telegram / Sheets)</a>
                         <a class="sidebar-sublink <?= $activePage === 'audit' ? 'active' : '' ?>" href="audit.php">Audit Log</a>

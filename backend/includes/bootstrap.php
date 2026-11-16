@@ -33,17 +33,21 @@ if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-function h(string $value): string
-{
-    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+if (!function_exists('h')) {
+    function h(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
 }
 
-function app_resource_prefix(): string
-{
-    $scriptName = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
-    $routeFolder = basename(dirname($scriptName));
+if (!function_exists('app_resource_prefix')) {
+    function app_resource_prefix(): string
+    {
+        $scriptName = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
+        $routeFolder = basename(dirname($scriptName));
 
-    return in_array($routeFolder, ['web', 'mobile'], true) ? '../' : '';
+        return in_array($routeFolder, ['web', 'mobile'], true) ? '../' : '';
+    }
 }
 
 $csrfToken = h($_SESSION['csrf_token']);
@@ -59,23 +63,27 @@ if (isset($_SESSION['flash_notice'])) {
     }
 }
 
-function is_running_in_app(): bool
-{
-    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    if (str_contains($ua, 'StoreAutomeationApp')) {
-        return true;
+if (!function_exists('is_running_in_app')) {
+    function is_running_in_app(): bool
+    {
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        if (str_contains($ua, 'StoreAutomeationApp')) {
+            return true;
+        }
+        if (isset($_COOKIE['is_standalone']) && $_COOKIE['is_standalone'] === '1') {
+            return true;
+        }
+        return false;
     }
-    if (isset($_COOKIE['is_standalone']) && $_COOKIE['is_standalone'] === '1') {
-        return true;
-    }
-    return false;
 }
 
-function is_mobile_client(): bool
-{
-    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    if (str_contains($ua, 'StoreAutomeationApp')) {
-        return true;
+if (!function_exists('is_mobile_client')) {
+    function is_mobile_client(): bool
+    {
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        if (str_contains($ua, 'StoreAutomeationApp')) {
+            return true;
+        }
+        return (bool) preg_match('/(android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini)/i', $ua);
     }
-    return (bool) preg_match('/(android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini)/i', $ua);
 }
