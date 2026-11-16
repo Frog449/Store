@@ -24,7 +24,7 @@ $resourcePrefix = app_resource_prefix();
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="<?= $resourcePrefix ?>assets/favicon.png?v=<?= filemtime(__DIR__ . '/../assets/favicon.png') ?>">
     <link rel="shortcut icon" href="<?= $resourcePrefix ?>favicon.ico?v=<?= filemtime(__DIR__ . '/../favicon.ico') ?>">
-    <link rel="stylesheet" href="style.css?v=3.8">
+    <link rel="stylesheet" href="style.css?v=3.9">
     <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -155,13 +155,17 @@ $resourcePrefix = app_resource_prefix();
     <div class="app-content-wrapper">
         <!-- Mobile Header (<= 960px) -->
         <header class="mobile-top-header">
-            <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="เปิดเมนู">
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="เปิดเมนู" aria-controls="site-sidebar" aria-expanded="false">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <a class="mobile-brand" href="index.php">
                 <img src="<?= $resourcePrefix ?>assets/logo.png" alt="AUT Automation" style="height:26px;width:auto;object-fit:contain;">
                 <span>Store <b>Automeation</b></span>
             </a>
+            <div class="mobile-header-actions">
+                <button class="mobile-refresh-button" id="mobile-refresh-button" type="button" aria-label="รีเฟรชหน้า" title="รีเฟรชหน้า">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12"/><path d="M4 12l2.8 5a7 7 0 0 0 11.6-2"/></svg>
+                </button>
             <?php if (!empty($currentUser)): ?>
                 <a href="profile.php" class="mobile-user-avatar" title="<?= h($currentUser['name'] ?? '') ?>">
                     <?= mb_strtoupper(mb_substr($cleanName, 0, 1, 'UTF-8'), 'UTF-8') ?>
@@ -169,6 +173,7 @@ $resourcePrefix = app_resource_prefix();
             <?php else: ?>
                 <div style="width:32px;"></div>
             <?php endif; ?>
+            </div>
         </header>
 
         <main>

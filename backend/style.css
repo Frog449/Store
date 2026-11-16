@@ -1572,7 +1572,6 @@ body {
     text-overflow: ellipsis;
     text-decoration: none;
 }
-
 .sidebar-user-name:hover {
     color: #0758b4;
 }
@@ -1864,6 +1863,7 @@ body {
         align-items: center;
         justify-content: space-between;
         padding: 10px 14px;
+        gap: 4px;
         background: #ffffff;
         border-bottom: 1px solid #e2e8f0;
         position: sticky;
@@ -1888,14 +1888,44 @@ body {
     .mobile-menu-toggle:hover {
         background: #f1f5f9;
     }
-    .mobile-brand {
+    .mobile-refresh-button {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 0;
+        border-radius: 8px;
+        color: #1e293b;
+        background: transparent;
+        cursor: pointer;
+    }
+    .mobile-refresh-button:hover {
+        background: #f1f5f9;
+    }
+    .mobile-header-actions {
         display: flex;
         align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    .mobile-brand {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        align-items: center;
+        justify-content: center;
         gap: 8px;
         font-size: 15px;
         font-weight: 700;
         color: #1e293b;
         text-decoration: none;
+    }
+    .mobile-brand > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     .mobile-brand b {
         color: #0758b4;
@@ -2294,7 +2324,7 @@ button, input, select, textarea {
         display: flex !important;
         align-items: center !important;
         justify-content: space-between !important;
-        padding: 0 16px !important;
+        padding: 0 10px !important;
         box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
     }
     .app-content-wrapper > main {

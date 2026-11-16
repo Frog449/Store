@@ -12,23 +12,67 @@ let activeStatus = "all";
     const sidebar = document.querySelector("#site-sidebar");
     const backdrop = document.querySelector("#sidebar-backdrop");
     const mobileToggle = document.querySelector("#mobile-menu-toggle");
+    const refreshButton = document.querySelector("#mobile-refresh-button");
     const closeBtn = document.querySelector("#sidebar-close-btn");
 
     function openSidebar() {
         if (sidebar) sidebar.classList.add("open");
         if (backdrop) backdrop.classList.add("active");
+        if (mobileToggle) {
+            mobileToggle.setAttribute("aria-expanded", "true");
+            mobileToggle.setAttribute("aria-label", "ปิดเมนู");
+        }
         document.body.style.overflow = "hidden";
     }
 
     function closeSidebar() {
         if (sidebar) sidebar.classList.remove("open");
         if (backdrop) backdrop.classList.remove("active");
+        if (mobileToggle) {
+            mobileToggle.setAttribute("aria-expanded", "false");
+            mobileToggle.setAttribute("aria-label", "เปิดเมนู");
+        }
         document.body.style.overflow = "";
     }
 
     if (mobileToggle) mobileToggle.addEventListener("click", openSidebar);
+    if (refreshButton) refreshButton.addEventListener("click", () => window.location.reload());
     if (closeBtn) closeBtn.addEventListener("click", closeSidebar);
     if (backdrop) backdrop.addEventListener("click", closeSidebar);
+
+    let touchStart = null;
+    document.addEventListener("touchstart", (event) => {
+        const touch = event.changedTouches[0];
+        if (touch) touchStart = { x: touch.clientX, y: touch.clientY, target: event.target };
+    }, { passive: true });
+
+    document.addEventListener("touchend", (event) => {
+        const start = touchStart;
+        touchStart = null;
+        const touch = event.changedTouches[0];
+        if (!start || !touch || !window.matchMedia("(max-width: 960px)").matches) return;
+
+        const deltaX = touch.clientX - start.x;
+        const deltaY = touch.clientY - start.y;
+        if (Math.abs(deltaX) < 70 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+
+        const target = start.target instanceof Element ? start.target : null;
+        const isSidebarOpen = sidebar && sidebar.classList.contains("open");
+        if (isSidebarOpen) {
+            if (deltaX < 0 && target && sidebar.contains(target)) closeSidebar();
+            return;
+        }
+
+        if (deltaX < 0) {
+            if (target && target.closest("a, button, input, textarea, select, [contenteditable='true'], .table-scroll, .category-filters")) return;
+            openSidebar();
+        } else if (start.x <= 32) {
+            openSidebar();
+        }
+    }, { passive: true });
+    document.addEventListener("touchcancel", () => {
+        touchStart = null;
+    }, { passive: true });
 
     // Sidebar Admin Accordion
     const adminAccordion = document.querySelector("#sidebar-admin-accordion");
