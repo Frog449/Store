@@ -40,8 +40,12 @@ if ($actionFilter !== '') {
 }
 
 if ($search !== '') {
-    $sql .= ' AND (`username` LIKE :q OR `user_name` LIKE :q OR `target` LIKE :q OR `details` LIKE :q)';
-    $params['q'] = '%' . $search . '%';
+    $sql .= ' AND (`username` LIKE :q_username OR `user_name` LIKE :q_user_name OR `target` LIKE :q_target OR `details` LIKE :q_details)';
+    $searchPattern = '%' . $search . '%';
+    $params['q_username'] = $searchPattern;
+    $params['q_user_name'] = $searchPattern;
+    $params['q_target'] = $searchPattern;
+    $params['q_details'] = $searchPattern;
 }
 
 $sql .= ' ORDER BY id DESC LIMIT 250';

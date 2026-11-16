@@ -1720,8 +1720,13 @@ function inventory_borrow_records(string $statusFilter = 'all', string $search =
     }
 
     if ($search !== '') {
-        $sql .= ' AND (`borrower_name` LIKE :q OR `product_name` LIKE :q OR `product_code` LIKE :q OR `location` LIKE :q OR `notes` LIKE :q)';
-        $params['q'] = '%' . $search . '%';
+        $sql .= ' AND (`borrower_name` LIKE :q_borrower OR `product_name` LIKE :q_product OR `product_code` LIKE :q_code OR `location` LIKE :q_location OR `notes` LIKE :q_notes)';
+        $searchPattern = '%' . $search . '%';
+        $params['q_borrower'] = $searchPattern;
+        $params['q_product'] = $searchPattern;
+        $params['q_code'] = $searchPattern;
+        $params['q_location'] = $searchPattern;
+        $params['q_notes'] = $searchPattern;
     }
 
     $sql .= ' ORDER BY (`status` = "borrowed") DESC, `borrow_date` DESC, `borrow_time` DESC, `id` DESC LIMIT ' . (int) $limit;
