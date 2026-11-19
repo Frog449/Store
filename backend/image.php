@@ -27,7 +27,7 @@ $filename = isset($_GET['file']) && is_string($_GET['file']) ? trim($_GET['file'
 
 if (!preg_match('/\A[a-f0-9]{32}\.(?:jpg|png|webp)\z/', $filename)) {
     // If invalid filename or missing, return generic category SVG instead of broken 400
-    $svg = inventory_category_placeholder_svg('สินค้าทั่วไป');
+    $svg = inventory_category_placeholder_svg('General');
     header('Content-Type: image/svg+xml; charset=utf-8');
     header('Cache-Control: public, max-age=3600');
     echo $svg;

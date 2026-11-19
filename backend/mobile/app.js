@@ -107,8 +107,9 @@ function filterProducts() {
     let visibleCount = 0;
 
     cards.forEach((card) => {
-        const matchesQuery = card.dataset.search.includes(query);
-        const matchesCategory = activeCategory === "all" || card.dataset.category === activeCategory;
+        const matchesQuery = (card.dataset.search || "").toLocaleLowerCase("th").includes(query);
+        const cardCategories = (card.dataset.categories || card.dataset.category || "").split("|").filter(Boolean);
+        const matchesCategory = activeCategory === "all" || cardCategories.includes(activeCategory);
         const matchesStatus = activeStatus === "all" || card.dataset.statusKey === activeStatus;
         const visible = matchesQuery && matchesCategory && matchesStatus;
         card.hidden = !visible;
@@ -160,6 +161,45 @@ if (searchInput) {
         });
     });
 
+    const productSort = document.querySelector("#product-sort");
+    const productGrid = document.querySelector("#product-grid");
+    if (productSort && productGrid) {
+        productSort.addEventListener("change", () => {
+            const mode = productSort.value;
+            const sorted = [...cards].sort((a, b) => {
+                const orderDiff = Number(a.dataset.order || 0) - Number(b.dataset.order || 0);
+                if (mode === "newest") {
+                    const tsDiff = Number(b.dataset.latestTs || 0) - Number(a.dataset.latestTs || 0);
+                    if (tsDiff !== 0) return tsDiff;
+                    const idDiff = Number(b.dataset.latestId || 0) - Number(a.dataset.latestId || 0);
+                    return idDiff !== 0 ? idDiff : -orderDiff;
+                }
+                if (mode === "oldest") {
+                    const tsDiff = Number(a.dataset.earliestTs || 0) - Number(b.dataset.earliestTs || 0);
+                    if (tsDiff !== 0) return tsDiff;
+                    const idDiff = Number(a.dataset.earliestId || 0) - Number(b.dataset.earliestId || 0);
+                    return idDiff !== 0 ? idDiff : orderDiff;
+                }
+                if (mode === "stock-desc") {
+                    const diff = Number(b.dataset.stockNum || 0) - Number(a.dataset.stockNum || 0);
+                    return diff !== 0 ? diff : orderDiff;
+                }
+                if (mode === "stock-asc") {
+                    const diff = Number(a.dataset.stockNum || 0) - Number(b.dataset.stockNum || 0);
+                    return diff !== 0 ? diff : orderDiff;
+                }
+                return orderDiff;
+            });
+            const frag = document.createDocumentFragment();
+            sorted.forEach((card) => frag.appendChild(card));
+            if (emptySearch && emptySearch.parentNode === productGrid) {
+                productGrid.insertBefore(frag, emptySearch);
+            } else {
+                productGrid.appendChild(frag);
+            }
+        });
+    }
+
     document.addEventListener("keydown", (event) => {
         if (event.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
             event.preventDefault();
@@ -168,10 +208,90 @@ if (searchInput) {
     });
 }
 
+// Multi-select Checkbox Dropdown (GL Description)
+function updateMultiDropdownLabel(dropdown) {
+    const labelEl = dropdown.querySelector("[data-multi-label]");
+    if (!labelEl) return;
+    const checked = [...dropdown.querySelectorAll('input[type="checkbox"]:checked')].map((cb) => cb.value);
+    const placeholder = dropdown.dataset.placeholder || "เลือกหมวดหมู่...";
+    labelEl.textContent = checked.length > 0 ? checked.join(", ") : placeholder;
+    dropdown.classList.toggle("has-value", checked.length > 0);
+}
+
+function syncMultiDropdown(dropdown, rawValue) {
+    if (!dropdown) return;
+    const selectedSet = new Set(
+        String(rawValue || "")
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean)
+    );
+    dropdown.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        cb.checked = selectedSet.has(cb.value);
+    });
+    updateMultiDropdownLabel(dropdown);
+}
+
+(function initMultiDropdowns() {
+    const dropdowns = [...document.querySelectorAll("[data-multi-dropdown]")];
+    if (dropdowns.length === 0) return;
+
+    const closeAll = (except = null) => {
+        dropdowns.forEach((dd) => {
+            if (dd === except) return;
+            const menu = dd.querySelector("[data-multi-menu]");
+            const toggle = dd.querySelector("[data-multi-toggle]");
+            if (menu) menu.hidden = true;
+            if (toggle) toggle.setAttribute("aria-expanded", "false");
+            dd.classList.remove("open");
+        });
+    };
+
+    dropdowns.forEach((dd) => {
+        const toggle = dd.querySelector("[data-multi-toggle]");
+        const menu = dd.querySelector("[data-multi-menu]");
+        updateMultiDropdownLabel(dd);
+
+        if (toggle && menu) {
+            toggle.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const willOpen = menu.hidden;
+                closeAll(willOpen ? dd : null);
+                menu.hidden = !willOpen;
+                toggle.setAttribute("aria-expanded", String(willOpen));
+                dd.classList.toggle("open", willOpen);
+            });
+        }
+
+        dd.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+            cb.addEventListener("change", () => updateMultiDropdownLabel(dd));
+        });
+    });
+
+    document.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target || !target.closest("[data-multi-dropdown]")) {
+            closeAll();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closeAll();
+        }
+    });
+})();
+
 const productDetailDialog = document.querySelector("#product-detail-dialog");
 if (productDetailDialog) {
     const detailTitle = document.querySelector("#product-detail-title");
     const detailCode = document.querySelector("#product-detail-code");
+    const detailBorrowLink = document.querySelector("#product-detail-borrow");
+    const detailIssueLink = document.querySelector("#product-detail-issue");
+    const detailAccountToggle = document.querySelector("#product-detail-account-toggle");
+    const detailAccountCount = document.querySelector("#product-detail-account-count");
+    const detailAccountList = document.querySelector("#product-detail-account-list");
     const editButton = document.querySelector("#product-detail-edit");
     const deleteForm = productDetailDialog.querySelector("[data-product-delete-form]");
     const editDialog = document.querySelector("#product-edit-dialog");
@@ -186,6 +306,8 @@ if (productDetailDialog) {
     const removeImageField = editForm ? editForm.querySelector('[name="remove_image"]') : null;
     const detailFields = [...productDetailDialog.querySelectorAll("[data-detail]")];
     let activeProductCard = null;
+    let activeVariants = [];
+    let activeVariant = null;
     let previewObjectUrl = null;
 
     if (detailImage && detailImageEmpty) {
@@ -201,30 +323,126 @@ if (productDetailDialog) {
         });
     }
 
-    const openProductDetails = (card) => {
-        activeProductCard = card;
-        const trigger = card.dataset;
+    const renderActiveVariant = (variant, totalStock) => {
+        activeVariant = variant;
         if (deleteForm && deleteForm.elements && deleteForm.elements.product_code) {
-            deleteForm.elements.product_code.value = trigger.code;
+            deleteForm.elements.product_code.value = variant.code;
         }
         if (detailTitle) {
-            detailTitle.textContent = trigger.name;
+            detailTitle.textContent = variant.name;
         }
         if (detailCode) {
-            detailCode.textContent = `รหัสสินค้า ${trigger.code}`;
+            detailCode.textContent = `Stock Code ${variant.stockCode || "-"}`;
+        }
+        if (detailBorrowLink) {
+            const scParam = variant.stockCode && variant.stockCode !== "-"
+                ? `&stock_code=${encodeURIComponent(variant.stockCode)}`
+                : "";
+            detailBorrowLink.href = `borrow.php?borrow_product=${encodeURIComponent(variant.code || "")}${scParam}`;
+        }
+        if (detailIssueLink) {
+            detailIssueLink.href = `issue.php?product=${encodeURIComponent(variant.code || "")}`;
         }
         detailFields.forEach((field) => {
-            field.textContent = trigger[field.dataset.detail] || "-";
+            const key = field.dataset.detail;
+            if (key === "stock" && activeVariants.length > 1) {
+                field.textContent = `${totalStock} (ตัวนี้ ${variant.stock})`;
+            } else {
+                field.textContent = variant[key] || "-";
+            }
         });
         if (detailImage && detailImageEmpty) {
-            detailImage.hidden = !trigger.image;
-            detailImageEmpty.hidden = Boolean(trigger.image);
-            if (trigger.image) {
-                detailImage.src = trigger.image;
+            detailImage.hidden = !variant.image;
+            detailImageEmpty.hidden = Boolean(variant.image);
+            if (variant.image) {
+                detailImage.src = variant.image;
             } else {
                 detailImage.removeAttribute("src");
             }
         }
+        if (detailAccountList) {
+            detailAccountList.querySelectorAll(".account-code-item-btn").forEach((btn) => {
+                btn.classList.toggle("active", btn.dataset.variantCode === variant.code);
+            });
+        }
+    };
+
+    const renderAccountCodeList = (variants, totalStock) => {
+        if (!detailAccountList || !detailAccountToggle || !detailAccountCount) return;
+        detailAccountList.replaceChildren();
+        detailAccountList.hidden = true;
+        detailAccountToggle.setAttribute("aria-expanded", "false");
+
+        if (variants.length > 1) {
+            detailAccountCount.textContent = `${variants.length} ▾`;
+            detailAccountCount.hidden = false;
+            detailAccountToggle.disabled = false;
+            detailAccountToggle.classList.add("has-multiple");
+            detailAccountToggle.title = "คลิกเพื่อดูรายการ Account Code1 ทั้งหมดของ Stock Code นี้";
+        } else {
+            detailAccountCount.textContent = "";
+            detailAccountCount.hidden = true;
+            detailAccountToggle.disabled = true;
+            detailAccountToggle.classList.remove("has-multiple");
+            detailAccountToggle.removeAttribute("title");
+            return;
+        }
+
+        const header = document.createElement("div");
+        header.className = "account-code-list-title";
+        header.textContent = `รายการ Account Code1 ของ Stock Code นี้ (${variants.length} รายการ)`;
+        detailAccountList.append(header);
+
+        const listWrap = document.createElement("div");
+        listWrap.className = "account-code-list-items";
+        variants.forEach((v) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "account-code-item-btn";
+            btn.dataset.variantCode = v.code;
+
+            const codeSpan = document.createElement("strong");
+            codeSpan.textContent = v.accountCode1 || "-";
+
+            const metaSpan = document.createElement("small");
+            const metaParts = [`คงเหลือ ${v.stock} ${v.unit || ""}`.trim()];
+            if (v.apex) metaParts.push(`Apex ${v.apex}`);
+            metaSpan.textContent = metaParts.join(" · ");
+
+            btn.append(codeSpan, metaSpan);
+            btn.addEventListener("click", () => {
+                renderActiveVariant(v, totalStock);
+            });
+            listWrap.append(btn);
+        });
+        detailAccountList.append(listWrap);
+    };
+
+    if (detailAccountToggle && detailAccountList) {
+        detailAccountToggle.addEventListener("click", () => {
+            if (activeVariants.length <= 1) return;
+            const willOpen = detailAccountList.hidden;
+            detailAccountList.hidden = !willOpen;
+            detailAccountToggle.setAttribute("aria-expanded", String(willOpen));
+        });
+    }
+
+    const openProductDetails = (card) => {
+        activeProductCard = card;
+        const trigger = card.dataset;
+        let parsedVariants = [];
+        try {
+            parsedVariants = trigger.variants ? JSON.parse(trigger.variants) : [];
+        } catch (e) {
+            parsedVariants = [];
+        }
+        if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
+            parsedVariants = [{ ...trigger }];
+        }
+        activeVariants = parsedVariants;
+        const totalStock = trigger.totalStock || trigger.stock || "0";
+        renderAccountCodeList(activeVariants, totalStock);
+        renderActiveVariant(activeVariants[0], totalStock);
         productDetailDialog.showModal();
     };
 
@@ -262,15 +480,24 @@ if (productDetailDialog) {
 
     if (editButton && editDialog && editForm) {
         editButton.addEventListener("click", () => {
-            const values = activeProductCard.dataset;
+            const values = activeVariant || activeProductCard.dataset;
             if (editForm.elements.original_code) editForm.elements.original_code.value = values.code;
             if (editForm.elements.code) editForm.elements.code.value = values.code;
             if (editForm.elements.name) editForm.elements.name.value = values.name;
+            [["account_code1", "accountCode1"], ["stock_code", "stockCode"], ["section_code", "sectionCode"], ["section_name", "sectionName"], ["apex", "apex"], ["notes", "notes"]].forEach(([field, key]) => {
+                if (editForm.elements[field]) editForm.elements[field].value = values[key] || "";
+            });
+            const editGlDropdown = editForm.querySelector("#edit-gl-description-dropdown");
+            if (editGlDropdown) {
+                syncMultiDropdown(editGlDropdown, values.glDescription || values.category || "");
+            }
             if (editForm.elements.category) editForm.elements.category.value = values.category;
             if (editForm.elements.item_type) editForm.elements.item_type.value = values.type;
             if (editForm.elements.unit) editForm.elements.unit.value = values.unit;
             if (editForm.elements.location) editForm.elements.location.value = values.location;
-            if (editForm.elements.reorder_point) editForm.elements.reorder_point.value = values.minimum;
+            if (editForm.elements.reorder_point) editForm.elements.reorder_point.value = String(values.minimum || "").replace(/,/g, "");
+            if (editForm.elements.buy_date) editForm.elements.buy_date.value = values.buyDateInput || "";
+            if (editForm.elements.buy_price) editForm.elements.buy_price.value = values.buyPriceRaw || "";
             if (editImagePreview) editImagePreview.dataset.currentImage = values.image;
             resetEditImage(values.image);
 
@@ -281,7 +508,7 @@ if (productDetailDialog) {
             }
 
             const codeEl = editDialog.querySelector("#product-edit-code");
-            if (codeEl) codeEl.textContent = `รหัสสินค้า ${values.code}`;
+            if (codeEl) codeEl.textContent = `Stock Code ${values.stockCode || "-"}`;
             productDetailDialog.close();
             editDialog.showModal();
         });
@@ -444,7 +671,7 @@ const initProductCombobox = (combobox) => {
         codeHidden.value = option.dataset.code || "";
         searchField.value = option.dataset.name || "";
         searchField.setCustomValidity("");
-        if (codeDisplay) codeDisplay.value = option.dataset.code || "";
+        if (codeDisplay) codeDisplay.value = option.dataset.stockCode || option.dataset.code || "";
         if (unitField) unitField.value = option.dataset.unit || "";
         options.forEach((opt) => opt.classList.toggle("selected", opt === option));
         closeList();
@@ -454,7 +681,8 @@ const initProductCombobox = (combobox) => {
         const query = queryText.trim().toLocaleLowerCase("th");
         let visibleCount = 0;
         options.forEach((opt) => {
-            const matches = query === "" || (opt.dataset.search || "").includes(query);
+            const haystack = (opt.dataset.search || "").toLocaleLowerCase("th");
+            const matches = query === "" || haystack.includes(query);
             opt.hidden = !matches;
             opt.classList.remove("highlighted");
             if (matches) visibleCount++;
@@ -471,8 +699,13 @@ const initProductCombobox = (combobox) => {
     searchField.addEventListener("input", () => {
         searchField.setCustomValidity("");
         const typed = searchField.value.trim();
+        const typedLower = typed.toLocaleLowerCase("th");
         const exactMatch = options.find(
-            (opt) => opt.dataset.name === typed || opt.dataset.code === typed
+            (opt) =>
+                (opt.dataset.name || "").toLocaleLowerCase("th") === typedLower ||
+                (opt.dataset.code || "").toLocaleLowerCase("th") === typedLower ||
+                (opt.dataset.stockCode || "").toLocaleLowerCase("th") === typedLower ||
+                ((opt.dataset.accountCode1 || "") !== "" && (opt.dataset.accountCode1 || "") !== "-" && (opt.dataset.accountCode1 || "").toLocaleLowerCase("th") === typedLower)
         );
         if (!exactMatch) {
             codeHidden.value = "";
@@ -542,8 +775,10 @@ const initProductCombobox = (combobox) => {
                 const typed = searchField.value.trim().toLocaleLowerCase("th");
                 const match = options.find(
                     (opt) =>
-                        opt.dataset.name.toLocaleLowerCase("th") === typed ||
-                        opt.dataset.code.toLocaleLowerCase("th") === typed
+                        (opt.dataset.name || "").toLocaleLowerCase("th") === typed ||
+                        (opt.dataset.code || "").toLocaleLowerCase("th") === typed ||
+                        (opt.dataset.stockCode || "").toLocaleLowerCase("th") === typed ||
+                        ((opt.dataset.accountCode1 || "") !== "" && (opt.dataset.accountCode1 || "") !== "-" && (opt.dataset.accountCode1 || "").toLocaleLowerCase("th") === typed)
                 );
                 if (match) {
                     selectOption(match);
@@ -560,6 +795,32 @@ const initProductCombobox = (combobox) => {
 };
 
 document.querySelectorAll("[data-product-combobox]").forEach(initProductCombobox);
+
+const issueHistorySearch = document.querySelector("#issue-history-search");
+if (issueHistorySearch) {
+    const issueRows = [...document.querySelectorAll(".issue-history-row")];
+    const issueEmpty = document.querySelector("#issue-history-empty");
+    const filterIssueHistory = () => {
+        const query = issueHistorySearch.value.trim().toLocaleLowerCase("th");
+        let visible = 0;
+        issueRows.forEach((row) => {
+            const haystack = (row.dataset.search || "").toLocaleLowerCase("th");
+            const matches = query === "" || haystack.includes(query);
+            row.hidden = !matches;
+            if (matches) visible++;
+        });
+        if (issueEmpty) {
+            issueEmpty.hidden = !(issueRows.length > 0 && visible === 0);
+        }
+    };
+    issueHistorySearch.addEventListener("input", filterIssueHistory);
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) {
+            event.preventDefault();
+            issueHistorySearch.focus();
+        }
+    });
+}
 
 const historySearch = document.querySelector("#history-search");
 const historyTabs = document.querySelectorAll("[data-history-tab]");
@@ -583,7 +844,7 @@ if (historySearch || historyTabs.length > 0) {
         const matchingRows = { receipt: [], issue: [] };
         historyRows.forEach((row) => {
             const rowType = row.dataset.type;
-            const matchesQuery = query === "" || (row.dataset.search || "").includes(query);
+            const matchesQuery = query === "" || (row.dataset.search || "").toLocaleLowerCase("th").includes(query);
             row.hidden = true;
             if (matchesQuery && matchingRows[rowType]) {
                 matchingRows[rowType].push(row);

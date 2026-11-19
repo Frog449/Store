@@ -1,8 +1,63 @@
 <?php
 $stockStatus = $product['stock'] <= 0 ? 'negative' : ($product['stock'] <= $product['minimum'] ? 'low' : 'normal');
 $stockLabel = $stockStatus === 'negative' ? 'หมด' : ($stockStatus === 'low' ? 'ควรสั่งซื้อ' : 'ปกติ');
-$productImageUrl = inventory_product_image_url($product['image_filename'] ?? null, $product['category'] ?? null);
+$glList = $product['gl_list'] ?? inventory_product_gl_list($product);
+$glDisplay = implode(', ', $glList);
+$primaryGl = $glList[0] ?? 'General';
+$productImageUrl = inventory_product_image_url($product['image_filename'] ?? null, $primaryGl);
 $hasCustomImage = inventory_has_custom_image($product['image_filename'] ?? null);
+$variants = $product['variants'] ?? [$product];
+$variantCount = count($variants);
+
+$variantPayloads = [];
+$searchTokens = [
+    $product['name'] ?? '',
+    $product['id'] ?? '',
+    $product['stock_code'] ?? '',
+    $glDisplay,
+    $product['section_code'] ?? '',
+    $product['section_name'] ?? '',
+    $product['apex'] ?? '',
+];
+foreach ($variants as $v) {
+    $vGlList = inventory_product_gl_list($v);
+    $vPrimaryGl = $vGlList[0] ?? 'General';
+    $vAc1 = trim((string) ($v['account_code1'] ?? ''));
+    $searchTokens[] = $vAc1;
+    $searchTokens[] = (string) ($v['id'] ?? '');
+    $variantPayloads[] = [
+        'code' => (string) $v['id'],
+        'stockCode' => (string) ($v['stock_code'] ?? $v['id']),
+        'accountCode1' => $vAc1 !== '' ? $vAc1 : '-',
+        'name' => (string) $v['name'],
+        'glDescription' => implode(', ', $vGlList),
+        'category' => $vPrimaryGl,
+        'type' => $vPrimaryGl,
+        'sectionCode' => (string) ($v['section_code'] ?? ''),
+        'sectionName' => (string) ($v['section_name'] ?? ''),
+        'apex' => (string) ($v['apex'] ?? ''),
+        'unit' => (string) ($v['unit'] ?? ''),
+        'location' => (string) ($v['location'] ?? ''),
+        'minimum' => inventory_quantity($v['minimum'] ?? 0),
+        'received' => inventory_quantity($v['received'] ?? 0),
+        'issued' => inventory_quantity($v['issued'] ?? 0),
+        'stock' => inventory_quantity($v['stock'] ?? 0),
+        'notes' => (string) ($v['notes'] ?? ''),
+        'buyDate' => (string) ($v['buy_date'] ?? ''),
+        'buyDateInput' => str_replace(' ', 'T', substr((string) ($v['buy_date'] ?? ''), 0, 16)),
+        'buyPrice' => isset($v['buy_price']) && $v['buy_price'] !== null && $v['buy_price'] !== '' ? number_format((float) $v['buy_price'], 2) : '',
+        'buyPriceRaw' => isset($v['buy_price']) && $v['buy_price'] !== null && $v['buy_price'] !== '' ? number_format((float) $v['buy_price'], 2, '.', '') : '',
+        'image' => inventory_product_image_url($v['image_filename'] ?? null, $vPrimaryGl),
+        'hasCustomImage' => inventory_has_custom_image($v['image_filename'] ?? null) ? '1' : '0',
+    ];
+}
+
+$searchHaystack = mb_strtolower(implode(' ', $searchTokens), 'UTF-8');
+$primaryAc1 = trim((string) ($product['account_code1'] ?? ''));
+$cardAc1Label = $primaryAc1 !== '' ? $primaryAc1 : '-';
+if ($variantCount > 1) {
+    $cardAc1Label .= ' (+' . ($variantCount - 1) . ')';
+}
 ?>
 <article
     class="product-card product-detail-trigger"
@@ -10,17 +65,38 @@ $hasCustomImage = inventory_has_custom_image($product['image_filename'] ?? null)
     role="button"
     aria-haspopup="dialog"
     aria-label="ดูรายละเอียด <?= h($product['name']) ?>"
-    data-search="<?= h(strtolower($product['name'] . ' ' . $product['id'])) ?>"
+    data-search="<?= h($searchHaystack) ?>"
     data-code="<?= h($product['id']) ?>"
     data-name="<?= h($product['name']) ?>"
-    data-category="<?= h($product['category']) ?>"
-    data-type="<?= h($product['type']) ?>"
+    data-account-code1="<?= h($primaryAc1 !== '' ? $primaryAc1 : '-') ?>"
+    data-stock-code="<?= h($product['stock_code'] ?? $product['id']) ?>"
+    data-gl-description="<?= h($glDisplay) ?>"
+    data-categories="<?= h(implode('|', $glList)) ?>"
+    data-section-code="<?= h($product['section_code'] ?? '') ?>"
+    data-section-name="<?= h($product['section_name'] ?? '') ?>"
+    data-apex="<?= h($product['apex'] ?? '') ?>"
+    data-notes="<?= h($product['notes'] ?? '') ?>"
+    data-buy-date="<?= h($product['buy_date'] ?? '') ?>"
+    data-buy-date-input="<?= h(str_replace(' ', 'T', substr((string) ($product['buy_date'] ?? ''), 0, 16))) ?>"
+    data-buy-price="<?= h(isset($product['buy_price']) && $product['buy_price'] !== null && $product['buy_price'] !== '' ? number_format((float) $product['buy_price'], 2) : '') ?>"
+    data-buy-price-raw="<?= h(isset($product['buy_price']) && $product['buy_price'] !== null && $product['buy_price'] !== '' ? number_format((float) $product['buy_price'], 2, '.', '') : '') ?>"
+    data-category="<?= h($primaryGl) ?>"
+    data-type="<?= h($primaryGl) ?>"
     data-unit="<?= h($product['unit']) ?>"
     data-location="<?= h($product['location']) ?>"
     data-minimum="<?= h(inventory_quantity($product['minimum'])) ?>"
     data-received="<?= h(inventory_quantity($product['received'])) ?>"
     data-issued="<?= h(inventory_quantity($product['issued'])) ?>"
     data-stock="<?= h(inventory_quantity($product['stock'])) ?>"
+    data-total-stock="<?= h(inventory_quantity($product['stock'])) ?>"
+    data-stock-num="<?= (int) $product['stock'] ?>"
+    data-order="<?= (int) $index ?>"
+    data-latest-id="<?= (int) ($product['latest_row_id'] ?? $product['row_id'] ?? $index) ?>"
+    data-earliest-id="<?= (int) ($product['earliest_row_id'] ?? $product['row_id'] ?? $index) ?>"
+    data-latest-ts="<?= (int) (strtotime((string) ($product['latest_created_at'] ?? $product['created_at'] ?? '')) ?: 0) ?>"
+    data-earliest-ts="<?= (int) (strtotime((string) ($product['earliest_created_at'] ?? $product['created_at'] ?? '')) ?: 0) ?>"
+    data-variant-count="<?= (int) $variantCount ?>"
+    data-variants="<?= h(json_encode($variantPayloads, JSON_UNESCAPED_UNICODE)) ?>"
     data-status="<?= h($stockLabel) ?>"
     data-status-key="<?= h($stockStatus) ?>"
     data-image="<?= h($productImageUrl) ?>"
@@ -29,18 +105,22 @@ $hasCustomImage = inventory_has_custom_image($product['image_filename'] ?? null)
 >
     <div class="product-visual visual-<?= h($product['art'] ?? 'coupler') ?>">
         <span class="visual-grid"></span>
-        <span class="product-badge"><?= h($product['type']) ?></span>
+        <span class="product-badge"><?= h($primaryGl) ?></span>
         <span class="part-number">PART / <?= str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) ?></span>
         <img class="product-photo" src="<?= h($productImageUrl) ?>" alt="<?= h($product['name']) ?>" loading="lazy">
-        <span class="visual-index">0<?= (int) ($index + 1) ?></span>
+        <span class="visual-index"><?= h($cardAc1Label) ?></span>
     </div>
     <div class="product-content">
-        <div class="product-category"><?= h($product['category']) ?><span class="category-dot"></span><?= h($product['unit']) ?></div>
+        <div class="product-category"><?= h($glDisplay) ?><span class="category-dot"></span><?= h($product['unit']) ?></div>
         <h3><?= h($product['name']) ?></h3>
-        <div class="product-code">รหัสสินค้า <span><?= h($product['id']) ?></span></div>
+        <div class="product-code">Stock Code <span><?= h($product['stock_code'] ?? $product['id']) ?></span></div>
         <div class="product-meta">
             <span class="stock-status status-<?= h($stockStatus) ?>"><i></i><?= h($stockLabel) ?></span>
-            <span class="location">ชั้น <?= h($product['location']) ?></span>
+            <?php if (!empty($product['apex'])): ?>
+                <span class="location">Apex <?= h($product['apex']) ?></span>
+            <?php elseif (!empty($product['location'])): ?>
+                <span class="location">ชั้น <?= h($product['location']) ?></span>
+            <?php endif; ?>
         </div>
         <div class="product-bottom">
             <div class="quantity-info"><strong><?= number_format((float)$product['stock']) ?></strong><span><?= h($product['unit']) ?> <small>คงเหลือ</small></span></div>

@@ -57,9 +57,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
 }
 
 $limit = 250; // ล็อกจำกัดจำนวนรายการล่าสุดที่ 250 รายการ
+$isAdmin = auth_is_admin();
+$allUsers = $isAdmin ? inventory_users() : [];
+$selectedUserParam = ($isAdmin && isset($_GET['user']) && is_string($_GET['user'])) ? trim($_GET['user']) : 'all';
+$issueFilterUserId = null;
+$issueFilterUserName = null;
+$selectedUserLabel = '';
+
+if ($isAdmin) {
+    if ($selectedUserParam !== '' && $selectedUserParam !== 'all' && ctype_digit($selectedUserParam)) {
+        $targetId = (int) $selectedUserParam;
+        foreach ($allUsers as $u) {
+            if ((int) $u['id'] === $targetId) {
+                $issueFilterUserId = $targetId;
+                $issueFilterUserName = (string) $u['name'];
+                $selectedUserLabel = (string) $u['name'];
+                break;
+            }
+        }
+    }
+} else {
+    $issueFilterUserId = (int) ($currentUser['id'] ?? 0);
+    $issueFilterUserName = (string) ($currentUser['name'] ?? '');
+}
+
 $receipts = inventory_movements('receipt', $limit);
-$issues = inventory_movements('issue', $limit);
-$movementCounts = inventory_movement_counts();
+$issues = inventory_movements('issue', $limit, $issueFilterUserId, $issueFilterUserName);
+$movementCounts = inventory_movement_counts($issueFilterUserId, $issueFilterUserName);
 
 $totalReceiptQty = 0.0;
 foreach ($receipts as $r) {
@@ -137,6 +161,18 @@ require __DIR__ . '/includes/header.php';
             </button>
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <?php if ($isAdmin): ?>
+                <form method="get" style="margin:0;">
+                    <select name="user" class="user-filter-select" aria-label="กรองประวัติเบิกตามผู้ใช้งาน" onchange="this.form.submit()">
+                        <option value="all" <?= $issueFilterUserId === null ? 'selected' : '' ?>>ผู้เบิกทั้งหมด</option>
+                        <?php foreach ($allUsers as $u): ?>
+                            <option value="<?= (int) $u['id'] ?>" <?= $issueFilterUserId === (int) $u['id'] ? 'selected' : '' ?>>
+                                <?= h($u['name']) ?> (@<?= h($u['username']) ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+            <?php endif; ?>
             <span class="result-count" id="history-result-count">แสดง <?= count($receipts) + count($issues) ?>
                 รายการ</span>
             <label class="search-box" style="min-width:280px;">
@@ -144,7 +180,7 @@ require __DIR__ . '/includes/header.php';
                     <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8" />
                     <path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
                 </svg>
-                <input id="history-search" type="search" placeholder="ค้นหารหัส, ชื่อสินค้า, เลขที่เอกสาร..."
+                <input id="history-search" type="search" placeholder="ค้นหาชื่อ, Stock Code, Account Code1, เลขที่เอกสาร..."
                     autocomplete="off">
                 <kbd>/</kbd>
             </label>
@@ -207,17 +243,19 @@ require __DIR__ . '/includes/header.php';
                 <tbody>
                     <?php foreach ($receipts as $row): ?>
                         <?php
-                        $searchText = strtolower(implode(' ', [
+                        $searchText = mb_strtolower(implode(' ', [
                             (string) ($row['movement_date'] ?? ''),
                             (string) ($row['document_no'] ?? ''),
                             (string) ($row['product_code'] ?? ''),
+                            (string) ($row['stock_code'] ?? ''),
+                            (string) ($row['account_code1'] ?? ''),
                             (string) ($row['product_name'] ?? ''),
                             (string) ($row['supplier'] ?? ''),
                             (string) ($row['received_by'] ?? ''),
                             (string) ($row['department'] ?? ''),
                             (string) ($row['created_by_name'] ?? ''),
                             (string) ($row['notes'] ?? ''),
-                        ]));
+                        ]), 'UTF-8');
                         ?>
                         <tr class="history-row" data-type="receipt" data-search="<?= h($searchText) ?>">
                             <?php if (auth_is_admin()): ?>
@@ -271,7 +309,7 @@ require __DIR__ . '/includes/header.php';
         <div class="panel-heading">
             <div>
                 <div class="eyebrow section-eyebrow" style="color:#c53030;">STOCK OUT</div>
-                <h2>ประวัติเบิกสินค้าออก</h2>
+                <h2><?= $isAdmin ? ($selectedUserLabel !== '' ? 'ประวัติเบิกสินค้าออกของ ' . h($selectedUserLabel) : 'ประวัติเบิกสินค้าออกทั้งหมด') : 'ประวัติเบิกสินค้าออกของคุณ (' . h((string) ($currentUser['name'] ?? '')) . ')' ?></h2>
                 <p>รายการเบิกจ่ายสินค้าออกจากคลัง ผู้ขอเบิก แผนกที่นำไปใช้ และผู้อนุมัติ</p>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
@@ -322,17 +360,19 @@ require __DIR__ . '/includes/header.php';
                 <tbody>
                     <?php foreach ($issues as $row): ?>
                         <?php
-                        $searchText = strtolower(implode(' ', [
+                        $searchText = mb_strtolower(implode(' ', [
                             (string) ($row['movement_date'] ?? ''),
                             (string) ($row['document_no'] ?? ''),
                             (string) ($row['product_code'] ?? ''),
+                            (string) ($row['stock_code'] ?? ''),
+                            (string) ($row['account_code1'] ?? ''),
                             (string) ($row['product_name'] ?? ''),
                             (string) ($row['requested_by'] ?? ''),
                             (string) ($row['department'] ?? ''),
                             (string) ($row['approved_by'] ?? ''),
                             (string) ($row['created_by_name'] ?? ''),
                             (string) ($row['notes'] ?? ''),
-                        ]));
+                        ]), 'UTF-8');
                         ?>
                         <tr class="history-row" data-type="issue" data-search="<?= h($searchText) ?>">
                             <?php if (auth_is_admin()): ?>

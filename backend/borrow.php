@@ -26,6 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new DomainException('ผู้ใช้ระดับ Viewer ไม่สามารถบันทึกคืนพัสดุได้');
             }
             $borrowId = (int) ($_POST['borrow_id'] ?? 0);
+            if (!auth_is_admin()) {
+                $existingBorrow = inventory_borrow_record_by_id($borrowId);
+                $isOwner = $existingBorrow !== null && (
+                    (int) ($existingBorrow['created_by_user_id'] ?? 0) === (int) ($currentUser['id'] ?? 0)
+                    || trim((string) ($existingBorrow['borrower_name'] ?? '')) === trim((string) ($currentUser['name'] ?? ''))
+                );
+                if (!$isOwner) {
+                    throw new DomainException('คุณสามารถบันทึกคืนได้เฉพาะรายการยืมของคุณเองเท่านั้น');
+                }
+            }
             inventory_return_borrow_record($borrowId, $_POST, $_FILES['return_photo'] ?? null);
             inventory_flash_redirect('บันทึกคืนพัสดุเรียบร้อยแล้ว', 'borrow.php');
         } elseif ($action === 'delete_borrow') {
@@ -105,13 +115,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $statusFilter = isset($_GET['status']) && is_string($_GET['status']) ? trim($_GET['status']) : 'all';
 $searchQuery = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']) : '';
+$isAdmin = auth_is_admin();
+$allUsers = $isAdmin ? inventory_users() : [];
+$selectedUserParam = ($isAdmin && isset($_GET['user']) && is_string($_GET['user'])) ? trim($_GET['user']) : 'all';
+$filterUserId = null;
+$filterUserName = null;
+$selectedUserLabel = '';
+
+if ($isAdmin) {
+    if ($selectedUserParam !== '' && $selectedUserParam !== 'all' && ctype_digit($selectedUserParam)) {
+        $targetId = (int) $selectedUserParam;
+        foreach ($allUsers as $u) {
+            if ((int) $u['id'] === $targetId) {
+                $filterUserId = $targetId;
+                $filterUserName = (string) $u['name'];
+                $selectedUserLabel = (string) $u['name'];
+                break;
+            }
+        }
+    }
+} else {
+    $filterUserId = (int) ($currentUser['id'] ?? 0);
+    $filterUserName = (string) ($currentUser['name'] ?? '');
+}
 
 $limit = 250; // ล็อกจำกัดจำนวนรายการล่าสุดที่ 250 รายการ
-$counts = inventory_borrow_counts();
-$records = inventory_borrow_records($statusFilter, $searchQuery, $limit);
+$counts = inventory_borrow_counts($filterUserId, $filterUserName);
+$records = inventory_borrow_records($statusFilter, $searchQuery, $limit, $filterUserId, $filterUserName);
 $pageProducts = inventory_products();
 $settings = inventory_get_settings();
 $unitOptions = inventory_unit_options();
+
+$preselectBorrowCode = isset($_GET['borrow_product']) && is_string($_GET['borrow_product']) ? trim($_GET['borrow_product']) : '';
+$preselectStockCode = isset($_GET['stock_code']) && is_string($_GET['stock_code']) ? trim($_GET['stock_code']) : '';
+$preselectBorrowProduct = null;
+if (($preselectBorrowCode !== '' || $preselectStockCode !== '') && !auth_is_viewer()) {
+    foreach ($pageProducts as $p) {
+        if ($p['id'] === $preselectBorrowCode || ($preselectStockCode !== '' && $preselectStockCode !== '-' && ($p['stock_code'] ?? '') === $preselectStockCode)) {
+            $preselectBorrowProduct = [
+                'code' => $p['id'],
+                'stock_code' => (string) ($p['stock_code'] ?? $p['id']),
+                'account_code1' => (string) ($p['account_code1'] ?? '-'),
+                'name' => $p['name'],
+                'unit' => $p['unit'],
+            ];
+            break;
+        }
+    }
+}
+$borrowCatalogList = [];
+foreach ($pageProducts as $p) {
+    $ac1 = trim((string) ($p['account_code1'] ?? ''));
+    $borrowCatalogList[] = [
+        'code' => (string) $p['id'],
+        'stock_code' => (string) ($p['stock_code'] ?? $p['id']),
+        'account_code1' => $ac1 !== '' ? $ac1 : '-',
+        'name' => (string) $p['name'],
+        'unit' => (string) ($p['unit'] ?? 'PCS'),
+        'stock' => (int) ($p['stock'] ?? 0),
+    ];
+}
+
+$buildBorrowUrl = static function (string $status) use ($searchQuery, $isAdmin, $filterUserId): string {
+    $params = [];
+    if ($status !== 'all') {
+        $params['status'] = $status;
+    }
+    if ($searchQuery !== '') {
+        $params['q'] = $searchQuery;
+    }
+    if ($isAdmin && $filterUserId !== null) {
+        $params['user'] = (string) $filterUserId;
+    }
+    return 'borrow.php' . ($params !== [] ? '?' . http_build_query($params) : '');
+};
 
 require __DIR__ . '/includes/header.php';
 ?>
@@ -119,9 +196,10 @@ require __DIR__ . '/includes/header.php';
     <div class="page-heading">
         <div>
             <div class="eyebrow section-eyebrow">BORROW & RETURN TRACKING</div>
-            <h1>ยืม–คืนพัสดุและอุปกรณ์<span class="heading-period">.</span></h1>
-            <p>บันทึกการยืมพัสดุ ตรวจสอบรายการที่ยังไม่คืน พร้อมระบบแจ้งเตือน Telegram และบันทึกลง Google Sheets
-                อัตโนมัติ</p>
+            <h1><?= $isAdmin ? 'ยืม–คืนพัสดุและอุปกรณ์ (ทั้งหมด)' : 'ประวัติยืม–คืนพัสดุของคุณ' ?><span class="heading-period">.</span></h1>
+            <p><?= $isAdmin
+                ? ($selectedUserLabel !== '' ? 'กำลังแสดงประวัติยืม-คืนของผู้ใช้งาน: ' . h($selectedUserLabel) : 'แสดงประวัติการยืม-คืนพัสดุของผู้ใช้งานทั้งหมด พร้อมตัวกรองรายบุคคล')
+                : 'แสดงรายการยืม-คืนพัสดุของ ' . h((string) ($currentUser['name'] ?? '')) . ' เท่านั้น' ?></p>
         </div>
         <div class="page-kpis">
             <?php if (!auth_is_viewer()): ?>
@@ -144,7 +222,7 @@ require __DIR__ . '/includes/header.php';
             <div>
                 <strong><?= number_format($counts['total']) ?> <small
                         style="font-size:11px;font-weight:normal;">รายการ</small></strong>
-                <span>รายการยืมทั้งหมด</span>
+                <span><?= $isAdmin && $filterUserId === null ? 'รายการยืมทั้งหมด' : 'รายการยืมของบัญชีนี้' ?></span>
             </div>
         </div>
         <div class="stat-item">
@@ -181,29 +259,41 @@ require __DIR__ . '/includes/header.php';
     <div class="catalog-toolbar" style="margin-bottom:18px;flex-wrap:wrap;gap:10px 14px;">
         <div class="category-filters" role="group" aria-label="กรองสถานะการยืม">
             <a class="filter-chip <?= $statusFilter === 'all' ? 'selected' : '' ?>"
-                href="borrow.php<?= $searchQuery !== '' ? '?q=' . urlencode($searchQuery) : '' ?>">
+                href="<?= h($buildBorrowUrl('all')) ?>">
                 ทั้งหมด <span><?= $counts['total'] ?></span>
             </a>
             <a class="filter-chip <?= $statusFilter === 'borrowed' ? 'selected' : '' ?>"
-                href="borrow.php?status=borrowed<?= $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '' ?>">
+                href="<?= h($buildBorrowUrl('borrowed')) ?>">
                 กำลังยืม<span><?= $counts['borrowed'] ?></span>
             </a>
             <a class="filter-chip <?= $statusFilter === 'returned' ? 'selected' : '' ?>"
-                href="borrow.php?status=returned<?= $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '' ?>">
+                href="<?= h($buildBorrowUrl('returned')) ?>">
                 คืนแล้ว <span><?= $counts['returned'] ?></span>
             </a>
         </div>
-        <form method="get" class="search-box" style="margin-left:auto;min-width:280px;">
+        <form method="get" style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;">
             <?php if ($statusFilter !== 'all'): ?>
                 <input type="hidden" name="status" value="<?= h($statusFilter) ?>">
             <?php endif; ?>
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8" />
-                <path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-            </svg>
-            <input type="search" name="q" placeholder="ค้นหาชื่อผู้ยืม, พัสดุ, สถานที่..."
-                value="<?= h($searchQuery) ?>" autocomplete="off">
-            <kbd>/</kbd>
+            <?php if ($isAdmin): ?>
+                <select name="user" class="user-filter-select" aria-label="กรองตามผู้ใช้งาน" onchange="this.form.submit()">
+                    <option value="all" <?= $filterUserId === null ? 'selected' : '' ?>>ผู้ใช้งานทั้งหมด</option>
+                    <?php foreach ($allUsers as $u): ?>
+                        <option value="<?= (int) $u['id'] ?>" <?= $filterUserId === (int) $u['id'] ? 'selected' : '' ?>>
+                            <?= h($u['name']) ?> (@<?= h($u['username']) ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            <?php endif; ?>
+            <div class="search-box" style="min-width:260px;">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8" />
+                    <path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+                <input type="search" name="q" placeholder="ค้นหาชื่อ, Stock Code, Account Code1, ผู้ยืม..."
+                    value="<?= h($searchQuery) ?>" autocomplete="off">
+                <kbd>/</kbd>
+            </div>
         </form>
     </div>
 
@@ -211,7 +301,7 @@ require __DIR__ . '/includes/header.php';
     <section class="inventory-panel table-panel">
         <div class="panel-heading">
             <div>
-                <h2>รายการยืม–คืนพัสดุ</h2>
+                <h2><?= $isAdmin ? ($selectedUserLabel !== '' ? 'ประวัติยืม–คืนของ ' . h($selectedUserLabel) : 'ประวัติยืม–คืนพัสดุทั้งหมด') : 'ประวัติยืม–คืนพัสดุของคุณ' ?></h2>
                 <p>แสดงรายการยืมพัสดุและอุปกรณ์ สถานะการคืน วันที่เวลา และสถานที่นำไปใช้งาน</p>
             </div>
             <span class="result-count">แสดง <?= count($records) ?> รายการล่าสุด (จำกัด 250 รายการ)</span>
@@ -248,6 +338,7 @@ require __DIR__ . '/includes/header.php';
                             <td>
                                 <strong style="display:block;color:#0758b4;"><?= h($r['product_name']) ?></strong>
                                 <small style="color:#64748b;font-size:11px;">
+                                    <?= !empty($r['account_code1']) && $r['account_code1'] !== '-' ? 'Account Code1: <strong>' . h($r['account_code1']) . '</strong> • ' : '' ?>
                                     <?= !empty($r['product_code']) ? 'รหัส: ' . h($r['product_code']) . ' • ' : '' ?>
                                     จำนวน: <strong><?= inventory_quantity($r['quantity']) ?></strong> <?= h($r['unit']) ?>
                                 </small>
@@ -346,7 +437,7 @@ require __DIR__ . '/includes/header.php';
                     <input type="hidden" name="product_code" data-combobox-code value="">
                     <div class="product-combobox-input-wrap">
                         <input type="text" name="product_name" data-combobox-search
-                            placeholder="พิมพ์ชื่อสินค้าหรือเลือกรหัสสินค้าในคลัง หรือพิมพ์ชื่ออุปกรณ์..."
+                            placeholder="พิมพ์ชื่อสินค้า, Stock Code หรือ Account Code1 เพื่อค้นหา..."
                             autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
                             aria-controls="borrow-item-list" required>
                         <button type="button" class="product-combobox-toggle" data-combobox-toggle
@@ -354,12 +445,19 @@ require __DIR__ . '/includes/header.php';
                     </div>
                     <div class="product-combobox-list" id="borrow-item-list" data-combobox-list role="listbox" hidden>
                         <?php foreach ($pageProducts as $product): ?>
+                            <?php
+                            $pAc1 = trim((string) ($product['account_code1'] ?? ''));
+                            $pSc = (string) ($product['stock_code'] ?? $product['id']);
+                            ?>
                             <button type="button" class="product-combobox-option" role="option"
-                                data-code="<?= h($product['id']) ?>" data-name="<?= h($product['name']) ?>"
+                                data-code="<?= h($product['id']) ?>"
+                                data-stock-code="<?= h($pSc) ?>"
+                                data-account-code1="<?= h($pAc1 !== '' ? $pAc1 : '-') ?>"
+                                data-name="<?= h($product['name']) ?>"
                                 data-unit="<?= h($product['unit']) ?>"
-                                data-search="<?= h(strtolower($product['name'] . ' ' . $product['id'])) ?>">
-                                <strong><?= h($product['name']) ?></strong>
-                                <small>รหัส <?= h($product['id']) ?> • คงเหลือ <?= inventory_quantity($product['stock']) ?>
+                                data-search="<?= h(mb_strtolower($product['name'] . ' ' . $product['id'] . ' ' . $pSc . ' ' . $pAc1, 'UTF-8')) ?>">
+                                <strong><?= h($product['name']) ?><?= ($pAc1 !== '' && $pAc1 !== '-') ? ' [' . h($pAc1) . ']' : '' ?></strong>
+                                <small>Stock Code <?= h($pSc) ?> • คงเหลือ <?= inventory_quantity($product['stock']) ?>
                                     <?= h($product['unit']) ?></small>
                             </button>
                         <?php endforeach; ?>
@@ -368,6 +466,18 @@ require __DIR__ . '/includes/header.php';
                     </div>
                 </div>
             </label>
+
+            <input type="hidden" name="account_code1" id="borrow-account-code-value" value="">
+            <div class="form-field form-span-2" id="borrow-account-code-wrap" hidden>
+                <span class="form-field-label">เลือก Account Code1 ที่ต้องการยืม *</span>
+                <div class="multi-dropdown" id="borrow-account-dropdown" data-multi-dropdown data-placeholder="ติ๊กเลือก Account Code1 ที่ต้องการยืม">
+                    <button type="button" class="multi-dropdown-toggle" data-multi-toggle aria-expanded="false">
+                        <span class="multi-dropdown-label" data-multi-label>ติ๊กเลือก Account Code1 ที่ต้องการยืม</span>
+                        <span class="multi-dropdown-arrow">▾</span>
+                    </button>
+                    <div class="multi-dropdown-menu" id="borrow-account-code-menu" data-multi-menu hidden></div>
+                </div>
+            </div>
 
             <label>
                 จำนวน
@@ -614,7 +724,147 @@ require __DIR__ . '/includes/header.php';
         dialog.showModal();
     }
 
-    function openBorrowDialog() {
+    const BORROW_CATALOG = <?= json_encode($borrowCatalogList, JSON_UNESCAPED_UNICODE) ?>;
+    let borrowAccountRequired = false;
+
+    function refreshBorrowAccountSelection(syncQty) {
+        const dialog = document.querySelector('#borrow-dialog');
+        if (!dialog) return;
+        const dropdown = dialog.querySelector('#borrow-account-dropdown');
+        const menu = dialog.querySelector('#borrow-account-code-menu');
+        const labelEl = dropdown ? dropdown.querySelector('[data-multi-label]') : null;
+        const hiddenAc1 = dialog.querySelector('#borrow-account-code-value');
+        const hiddenCode = dialog.querySelector('input[name="product_code"]');
+        const qtyInput = dialog.querySelector('input[name="quantity"]');
+        if (!dropdown || !menu || !hiddenAc1) return;
+
+        const checked = [...menu.querySelectorAll('input[type="checkbox"]:checked')];
+        const acValues = checked.map((cb) => cb.dataset.accountCode1 || '-');
+        const placeholder = dropdown.dataset.placeholder || 'ติ๊กเลือก Account Code1 ที่ต้องการยืม';
+
+        if (labelEl) {
+            labelEl.textContent = acValues.length > 0 ? acValues.join(', ') : placeholder;
+        }
+        dropdown.classList.toggle('has-value', acValues.length > 0);
+        hiddenAc1.value = acValues.join(', ');
+
+        if (checked.length > 0) {
+            if (hiddenCode) hiddenCode.value = checked[0].value || '';
+            if (syncQty && qtyInput) qtyInput.value = String(checked.length);
+        } else if (borrowAccountRequired) {
+            if (hiddenCode) hiddenCode.value = '';
+        }
+    }
+
+    function syncBorrowAccountSelector(stockCode, selectedProductCode, forceChooseIfMultiple) {
+        const dialog = document.querySelector('#borrow-dialog');
+        if (!dialog) return;
+        const wrap = dialog.querySelector('#borrow-account-code-wrap');
+        const dropdown = dialog.querySelector('#borrow-account-dropdown');
+        const menu = dialog.querySelector('#borrow-account-code-menu');
+        const hiddenAc1 = dialog.querySelector('#borrow-account-code-value');
+        const hiddenCode = dialog.querySelector('input[name="product_code"]');
+        if (!wrap || !dropdown || !menu || !hiddenAc1) return;
+
+        const cleanSc = String(stockCode || '').trim();
+        let variants = [];
+        if (cleanSc !== '' && cleanSc !== '-' && cleanSc !== '—') {
+            variants = BORROW_CATALOG.filter((p) => p.stock_code === cleanSc);
+        } else if (selectedProductCode) {
+            const single = BORROW_CATALOG.find((p) => p.code === selectedProductCode);
+            if (single) variants = [single];
+        }
+
+        menu.replaceChildren();
+        menu.hidden = true;
+        dropdown.classList.remove('open');
+        const toggleBtn = dropdown.querySelector('[data-multi-toggle]');
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+
+        if (variants.length > 1) {
+            dropdown.dataset.placeholder = `ติ๊กเลือก Account Code1 ที่ต้องการยืม (${variants.length} ตัว)`;
+            variants.forEach((v) => {
+                const label = document.createElement('label');
+                label.className = 'multi-dropdown-option';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = v.code;
+                cb.dataset.accountCode1 = v.account_code1 || '-';
+                if (!forceChooseIfMultiple && selectedProductCode && v.code === selectedProductCode) {
+                    cb.checked = true;
+                }
+                cb.addEventListener('change', () => refreshBorrowAccountSelection(true));
+
+                const span = document.createElement('span');
+                span.textContent = `${v.account_code1 || '-'} (คงเหลือ ${v.stock} ${v.unit})`;
+
+                label.append(cb, span);
+                menu.append(label);
+            });
+
+            wrap.hidden = false;
+            borrowAccountRequired = true;
+            refreshBorrowAccountSelection(false);
+        } else if (variants.length === 1) {
+            const v = variants[0];
+            dropdown.dataset.placeholder = 'ติ๊กเลือก Account Code1';
+            const label = document.createElement('label');
+            label.className = 'multi-dropdown-option';
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = v.code;
+            cb.dataset.accountCode1 = v.account_code1 || '-';
+            cb.checked = true;
+            cb.addEventListener('change', () => refreshBorrowAccountSelection(false));
+
+            const span = document.createElement('span');
+            span.textContent = `${v.account_code1 || '-'} (คงเหลือ ${v.stock} ${v.unit})`;
+
+            label.append(cb, span);
+            menu.append(label);
+
+            borrowAccountRequired = false;
+            wrap.hidden = !(v.account_code1 && v.account_code1 !== '-');
+            if (hiddenCode) hiddenCode.value = v.code;
+            refreshBorrowAccountSelection(false);
+        } else {
+            wrap.hidden = true;
+            borrowAccountRequired = false;
+            hiddenAc1.value = '';
+        }
+    }
+
+    (function initBorrowAccountPicker() {
+        const dialog = document.querySelector('#borrow-dialog');
+        if (!dialog) return;
+        const form = dialog.querySelector('#borrow-form');
+        const dropdown = dialog.querySelector('#borrow-account-dropdown');
+        const menu = dialog.querySelector('#borrow-account-code-menu');
+
+        if (form && dropdown && menu) {
+            form.addEventListener('submit', (event) => {
+                if (!borrowAccountRequired) return;
+                const checkedCount = menu.querySelectorAll('input[type="checkbox"]:checked').length;
+                if (checkedCount === 0) {
+                    event.preventDefault();
+                    menu.hidden = false;
+                    dropdown.classList.add('open');
+                    const toggleBtn = dropdown.querySelector('[data-multi-toggle]');
+                    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+                    alert('กรุณาติ๊กเลือก Account Code1 ที่ต้องการยืมอย่างน้อย 1 รายการ');
+                }
+            });
+        }
+        dialog.querySelectorAll('#borrow-item-list .product-combobox-option').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                syncBorrowAccountSelector(btn.dataset.stockCode || '', btn.dataset.code || '', false);
+            });
+        });
+    })();
+
+    function openBorrowDialog(preselect) {
         const dialog = document.querySelector('#borrow-dialog');
         const now = new Date();
         const pad = (n) => String(n).padStart(2, '0');
@@ -626,8 +876,26 @@ require __DIR__ . '/includes/header.php';
         if (dateInput) dateInput.value = dateStr;
         if (timeInput) timeInput.value = timeStr;
 
+        if (preselect && (preselect.code || preselect.stock_code)) {
+            const codeInput = dialog.querySelector('input[name="product_code"]');
+            const nameInput = dialog.querySelector('input[name="product_name"]');
+            const unitSelect = dialog.querySelector('select[name="unit"]');
+            if (codeInput) codeInput.value = preselect.code || '';
+            if (nameInput) nameInput.value = preselect.name || '';
+            if (unitSelect && preselect.unit) unitSelect.value = preselect.unit;
+            syncBorrowAccountSelector(preselect.stock_code || '', preselect.code || '', true);
+        } else {
+            syncBorrowAccountSelector('', '', false);
+        }
+
         dialog.showModal();
     }
+
+    <?php if ($preselectBorrowProduct !== null): ?>
+    window.addEventListener('DOMContentLoaded', () => {
+        openBorrowDialog(<?= json_encode($preselectBorrowProduct, JSON_UNESCAPED_UNICODE) ?>);
+    });
+    <?php endif; ?>
 
     function openReturnDialog(record) {
         const dialog = document.querySelector('#return-dialog');
@@ -660,6 +928,7 @@ require __DIR__ . '/includes/header.php';
             ['สถานะ', isBorrowed ? 'กำลังยืม' : 'คืนแล้ว'],
             ['ผู้ยืม', record.borrower_name],
             ['พัสดุ / อุปกรณ์', record.product_name],
+            ['Account Code1', record.account_code1 || '—'],
             ['รหัสสินค้า', record.product_code || '—'],
             ['จำนวน', qtyInt + ' ' + record.unit],
             ['สถานที่นำไปใช้', record.location],

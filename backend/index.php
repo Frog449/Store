@@ -7,10 +7,15 @@ $pageTitle = 'Store Automeation | ภาพรวมคลังสินค้�
 $pageDescription = 'ภาพรวมคลังสินค้า จำนวนสินค้า สถานะสต๊อก และรายการรับเบิก';
 $activePage = 'overview';
 
+$isAdmin = auth_is_admin();
+$scopeUserId = $isAdmin ? null : (int) ($currentUser['id'] ?? 0);
+$scopeUserName = $isAdmin ? null : (string) ($currentUser['name'] ?? '');
+
 $statusCounts = ['normal' => 0, 'reorder' => 0, 'negative' => 0];
-$categoryCounts = array_fill_keys(inventory_category_options(), 0);
-$categoryStockTotals = array_fill_keys(inventory_category_options(), 0.0);
-$categoryRoundStats = inventory_category_round_stats();
+$glOptions = inventory_gl_description_options();
+$categoryCounts = array_fill_keys($glOptions, 0);
+$categoryStockTotals = array_fill_keys($glOptions, 0.0);
+$categoryRoundStats = inventory_category_round_stats($scopeUserId, $scopeUserName);
 $productsToReorder = 0;
 
 foreach ($products as $product) {
@@ -23,26 +28,29 @@ foreach ($products as $product) {
         $statusCounts['normal']++;
     }
 
-    $category = trim($product['category']) !== '' ? $product['category'] : 'ไม่ระบุหมวดหมู่';
-    if (!array_key_exists($category, $categoryCounts)) {
-        $categoryCounts[$category] = 0;
-        $categoryStockTotals[$category] = 0.0;
+    foreach (inventory_product_gl_list($product) as $category) {
+        if (!array_key_exists($category, $categoryCounts)) {
+            $categoryCounts[$category] = 0;
+            $categoryStockTotals[$category] = 0.0;
+        }
+        $categoryCounts[$category] = ($categoryCounts[$category] ?? 0) + 1;
+        $categoryStockTotals[$category] = ($categoryStockTotals[$category] ?? 0.0) + (float) $product['stock'];
     }
-    $categoryCounts[$category] = ($categoryCounts[$category] ?? 0) + 1;
-    $categoryStockTotals[$category] = ($categoryStockTotals[$category] ?? 0.0) + (float) $product['stock'];
 }
 
-$movementCounts = inventory_movement_counts();
+$movementCounts = inventory_movement_counts($scopeUserId, $scopeUserName);
+$borrowCounts = inventory_borrow_counts($scopeUserId, $scopeUserName);
 $categoryPalette = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#f97316', '#ec4899'];
 $categoryGradientStops = [];
 $categoryLegend = [];
 $categoryOffset = 0.0;
 $categoryIndex = 0;
 $productCount = count($products);
+$totalCategoryAssignments = array_sum($categoryCounts);
 
 foreach ($categoryCounts as $category => $count) {
     $color = $categoryPalette[$categoryIndex % count($categoryPalette)];
-    $nextOffset = $productCount > 0 ? $categoryOffset + ($count / $productCount * 100) : 100;
+    $nextOffset = $totalCategoryAssignments > 0 ? $categoryOffset + ($count / $totalCategoryAssignments * 100) : 100;
     $categoryGradientStops[] = $color . ' ' . number_format($categoryOffset, 2, '.', '') . '% ' . number_format($nextOffset, 2, '.', '') . '%';
     $categoryLegend[] = [
         'name'           => $category,
@@ -57,7 +65,7 @@ foreach ($categoryCounts as $category => $count) {
 }
 
 $categoryGradient = $categoryGradientStops === []
-    || $productCount === 0
+    || $totalCategoryAssignments === 0
     ? 'conic-gradient(#52525b 0 100%)'
     : 'conic-gradient(' . implode(', ', $categoryGradientStops) . ')';
 
@@ -85,8 +93,12 @@ require __DIR__ . '/includes/header.php';
                     <strong><?= number_format($movementCounts['receipts'] ?? 0) ?></strong>
                 </div>
                 <div class="dashboard-row">
-                    <span>รายการเบิกสินค้าทั้งหมด</span>
-                    <strong><?= number_format($movementCounts['issues'] ?? 0) ?></strong>
+                    <span><?= $isAdmin ? 'รายการเบิกสินค้าทั้งหมด' : 'รายการเบิกสินค้าของคุณ' ?></span>
+                    <strong><a href="issue.php" style="color:inherit;text-decoration:none;"><?= number_format($movementCounts['issues'] ?? 0) ?></a></strong>
+                </div>
+                <div class="dashboard-row">
+                    <span><?= $isAdmin ? 'รายการยืม–คืนทั้งหมด' : 'รายการยืม–คืนของคุณ' ?></span>
+                    <strong><a href="borrow.php" style="color:inherit;text-decoration:none;"><?= number_format($borrowCounts['total'] ?? 0) ?></a></strong>
                 </div>
             </div>
         </section>
@@ -113,21 +125,27 @@ require __DIR__ . '/includes/header.php';
                     </span>
                     <strong style="color:#dc2626;"><?= number_format($statusCounts['negative']) ?></strong>
                 </div>
+                <div class="dashboard-row" style="<?= ($borrowCounts['borrowed'] ?? 0) > 0 ? 'background:#eff6ff;' : '' ?>">
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#3b82f6;flex-shrink:0;"></span>กำลังยืม
+                    </span>
+                    <strong style="color:#2563eb;"><a href="borrow.php?status=borrowed" style="color:inherit;text-decoration:none;"><?= number_format($borrowCounts['borrowed'] ?? 0) ?></a></strong>
+                </div>
             </div>
         </section>
     </div>
 
     <!-- Panel 3: Categories & Donut Chart -->
     <section class="dashboard-panel dashboard-category-panel" aria-labelledby="dashboard-categories">
-        <h2 class="dashboard-panel-heading" id="dashboard-categories">จำนวนสินค้าแยกตามหมวดหมู่</h2>
+        <h2 class="dashboard-panel-heading" id="dashboard-categories">จำนวนสินค้าแยกตาม GL Description</h2>
         <div class="dashboard-category-content">
             <div class="dashboard-category-table">
                 <div class="dashboard-category-row dashboard-category-header">
-                    <span>หมวดหมู่</span>
+                    <span>GL Description</span>
                     <span>รายการสินค้า</span>
                     <span>จำนวนสินค้า</span>
                     <span>รายการรับเข้า</span>
-                    <span>รายการเบิกออก</span>
+                    <span><?= $isAdmin ? 'รายการเบิกออก' : 'เบิกออกของคุณ' ?></span>
                 </div>
                 <?php foreach ($categoryLegend as $category): ?>
                     <div class="dashboard-category-row">

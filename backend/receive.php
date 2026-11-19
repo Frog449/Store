@@ -10,8 +10,8 @@ if (auth_is_viewer()) {
 $pageTitle = 'รับสินค้าเข้าคลัง | Store Automeation';
 $pageDescription = 'เพิ่มสินค้าใหม่พร้อมรับเข้าครั้งแรก หรือบันทึกรับสินค้าเดิมเข้าคลัง';
 $activePage = 'receive';
-$categoryOptions = inventory_category_options();
-$typeOptions = inventory_type_options();
+$glDescriptionOptions = inventory_gl_description_options();
+$apexOptions = inventory_apex_options();
 $unitOptions = inventory_unit_options();
 $uploadedProductImage = null;
 
@@ -21,26 +21,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         if (!auth_is_admin()) {
             throw new DomainException('เฉพาะ Admin (ผู้ดูแลระบบ) เท่านั้นที่สามารถเพิ่มสินค้าใหม่เข้าระบบได้ (Staff สามารถบันทึกรับสินค้าเดิมได้)');
         }
-        $code = inventory_text('code', 'รหัสสินค้า', 80, true);
+        $accountCode1 = inventory_text('account_code1', 'Account Code1', 100);
+        if ($accountCode1 === '') {
+            $accountCode1 = '-';
+        }
+        $rawStockCode = inventory_text('stock_code', 'Stock Code', 80);
+        $isPlaceholderCode = ($rawStockCode === '' || $rawStockCode === '-' || $rawStockCode === '—');
+        $stockCode = $isPlaceholderCode ? '-' : $rawStockCode;
+        if (!$isPlaceholderCode && inventory_product_exists_pair($stockCode, $accountCode1)) {
+            throw new DomainException('สินค้าที่มี Stock Code และ Account Code1 นี้มีในรายการแล้ว กรุณาตรวจสอบหรือเลือกรับสินค้าเดิม');
+        }
+        $code = ($isPlaceholderCode || inventory_product($stockCode) !== null)
+            ? inventory_generate_internal_code()
+            : $stockCode;
+        $notes = inventory_text('notes', 'หมายเหตุ', 500);
+        $glDescription = inventory_gl_description_input('gl_description');
+        $glList = inventory_normalize_gl_list($glDescription);
+        $primaryCategory = $glList[0] ?? 'General';
+        $reorderRaw = trim((string) ($_POST['reorder_point'] ?? ''));
+        $reorderPoint = $reorderRaw === '' ? 0.0 : inventory_number('reorder_point', 'จุดสั่งซื้อขั้นต่ำ');
         $newProduct = [
             'code' => $code,
-            'name' => inventory_text('name', 'ชื่อสินค้า', 250, true),
-            'category' => inventory_choice('category', 'หมวดหมู่', inventory_category_options()),
-            'item_type' => inventory_choice('item_type', 'ประเภท', inventory_type_options()),
-            'unit' => inventory_choice('unit', 'หน่วยนับ', inventory_unit_options()),
-            'location' => inventory_text('location', 'ตำแหน่งจัดเก็บ', 80),
-            'reorder_point' => inventory_number('reorder_point', 'จุดสั่งซื้อขั้นต่ำ'),
-            'art' => 'coupler',
+            'stock_code' => $stockCode,
+            'account_code1' => $accountCode1,
+            'gl_description' => $glDescription,
+            'section_code' => inventory_text('section_code', 'Section code', 100),
+            'section_name' => inventory_text('section_name', 'Section Name', 255),
+            'apex' => inventory_apex_input('apex'),
+            'name' => inventory_text('name', 'Name', 250, true),
+            'category' => $primaryCategory,
+            'item_type' => $primaryCategory,
+            'unit' => inventory_choice('unit', 'Unit', inventory_unit_options()),
+            'reorder_point' => $reorderPoint,
+            'buy_date' => inventory_optional_datetime('buy_date'),
+            'buy_price' => inventory_optional_number('buy_price', 'BuyPrice/Unit', 2),
+            'notes' => $notes,
         ];
         $firstReceipt = [
-            'movement_date' => inventory_date(),
-            'document_no' => inventory_text('document_no', 'เลขที่เอกสาร', 100),
+            'movement_date' => date('Y-m-d'),
+            'document_no' => '',
             'product_code' => $code,
-            'quantity' => inventory_number('quantity', 'จำนวนรับ', false),
+            'quantity' => inventory_number('quantity', 'Quantity', false),
             'supplier' => '',
-            'received_by' => inventory_text('received_by', 'ผู้รับสินค้า', 150),
+            'received_by' => (string) ($currentUser['name'] ?? ''),
             'department' => '',
-            'notes' => inventory_text('notes', 'หมายเหตุ', 500),
+            'notes' => $notes,
         ];
         $uploadedProductImage = inventory_store_product_image($_FILES['product_image'] ?? null);
         $newProduct['image_filename'] = $uploadedProductImage;
@@ -138,7 +163,7 @@ require __DIR__ . '/includes/header.php';
                         value="<?= h($selectedProductCode) ?>">
                     <div class="product-combobox-input-wrap">
                         <input type="text" id="receive-product-search" data-combobox-search
-                            placeholder="พิมพ์ชื่อสินค้า หรือรหัสสินค้าเพื่อค้นหา..." autocomplete="off" role="combobox"
+                            placeholder="พิมพ์ชื่อสินค้า, Stock Code หรือ Account Code1 เพื่อค้นหา..." autocomplete="off" role="combobox"
                             aria-autocomplete="list" aria-expanded="false" aria-controls="receive-product-list" required
                             value="<?= h($selectedProductName) ?>">
                         <button type="button" class="product-combobox-toggle" id="receive-product-toggle"
@@ -147,13 +172,20 @@ require __DIR__ . '/includes/header.php';
                     <div class="product-combobox-list" id="receive-product-list" data-combobox-list role="listbox"
                         hidden>
                         <?php foreach ($pageProducts as $product): ?>
+                            <?php
+                            $rSc = (string) ($product['stock_code'] ?? $product['id']);
+                            $rAc1 = (string) ($product['account_code1'] ?? '');
+                            ?>
                             <button type="button" class="product-combobox-option" role="option"
-                                data-code="<?= h($product['id']) ?>" data-name="<?= h($product['name']) ?>"
+                                data-code="<?= h($product['id']) ?>"
+                                data-stock-code="<?= h($rSc) ?>"
+                                data-account-code1="<?= h($rAc1) ?>"
+                                data-name="<?= h($product['name']) ?>"
                                 data-unit="<?= h($product['unit']) ?>"
                                 data-stock="<?= h(inventory_quantity($product['stock'])) ?>"
-                                data-search="<?= h(strtolower($product['name'] . ' ' . $product['id'])) ?>">
-                                <strong><?= h($product['name']) ?></strong>
-                                <small>รหัส <?= h($product['id']) ?> • คงเหลือ <?= inventory_quantity($product['stock']) ?>
+                                data-search="<?= h(mb_strtolower($product['name'] . ' ' . $product['id'] . ' ' . $rSc . ' ' . $rAc1, 'UTF-8')) ?>">
+                                <strong><?= h($product['name']) ?><?= $rAc1 !== '' && $rAc1 !== '-' ? ' [' . h($rAc1) . ']' : '' ?></strong>
+                                <small>Stock Code <?= h($rSc) ?> • คงเหลือ <?= inventory_quantity($product['stock']) ?>
                                     <?= h($product['unit']) ?></small>
                             </button>
                         <?php endforeach; ?>
@@ -184,32 +216,61 @@ require __DIR__ . '/includes/header.php';
             <form class="inventory-form" method="post" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>"><input type="hidden" name="action"
                     value="create_product_receipt">
-                <label>รหัสสินค้า <input name="code" maxlength="80" required
-                        value="<?= h((string) ($_POST['code'] ?? '')) ?>"></label>
-                <label class="form-span-2">ชื่อสินค้า <input name="name" maxlength="250" required
+                <label>Account Code1 <input name="account_code1" maxlength="100"
+                        placeholder="ถ้าไม่มีใส่ -"
+                        value="<?= h((string) ($_POST['account_code1'] ?? '')) ?>"></label>
+                <label>Stock Code <input name="stock_code" maxlength="80"
+                        placeholder="ถ้าไม่มีใส่ -"
+                        value="<?= h((string) ($_POST['stock_code'] ?? '')) ?>"></label>
+                <?php
+                $postedGlRaw = $_POST['gl_description'] ?? [];
+                $postedGlList = is_array($postedGlRaw) ? $postedGlRaw : inventory_normalize_gl_list((string) $postedGlRaw);
+                ?>
+                <div class="form-field form-span-2">
+                    <span class="form-field-label">GL Description</span>
+                    <div class="multi-dropdown" data-multi-dropdown data-placeholder="เลือก GL Description (เลือกได้หลายหมวด)">
+                        <button type="button" class="multi-dropdown-toggle" data-multi-toggle aria-expanded="false">
+                            <span class="multi-dropdown-label" data-multi-label><?= $postedGlList !== [] ? h(implode(', ', $postedGlList)) : 'เลือก GL Description (เลือกได้หลายหมวด)' ?></span>
+                            <span class="multi-dropdown-arrow">▾</span>
+                        </button>
+                        <div class="multi-dropdown-menu" data-multi-menu hidden>
+                            <?php foreach ($glDescriptionOptions as $option): ?>
+                                <label class="multi-dropdown-option">
+                                    <input type="checkbox" name="gl_description[]" value="<?= h($option) ?>" <?= in_array($option, $postedGlList, true) ? 'checked' : '' ?>>
+                                    <span><?= h($option) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+                <label>Section code <input name="section_code" maxlength="100"
+                        value="<?= h((string) ($_POST['section_code'] ?? '')) ?>"></label>
+                <label>Section Name <input name="section_name" maxlength="255"
+                        value="<?= h((string) ($_POST['section_name'] ?? '')) ?>"></label>
+                <label>Apex <select name="apex">
+                        <option value="">เลือก Apex</option>
+                        <?php foreach ($apexOptions as $option): ?>
+                            <option value="<?= h($option) ?>" <?= ($_POST['apex'] ?? '') === $option ? 'selected' : '' ?>>
+                                <?= h($option) ?></option><?php endforeach; ?>
+                    </select></label>
+                <label class="form-span-2">Name <input name="name" maxlength="250" required
                         value="<?= h((string) ($_POST['name'] ?? '')) ?>"></label>
-                <label>หมวดหมู่ <select name="category" required>
-                        <option value="">เลือกหมวดหมู่</option>
-                        <?php foreach ($categoryOptions as $option): ?>
-                            <option value="<?= h($option) ?>" <?= ($_POST['category'] ?? '') === $option ? 'selected' : '' ?>>
-                                <?= h($option) ?></option><?php endforeach; ?>
-                    </select></label>
-                <label>ประเภท <select name="item_type" required>
-                        <option value="">เลือกประเภท</option>
-                        <?php foreach ($typeOptions as $option): ?>
-                            <option value="<?= h($option) ?>" <?= ($_POST['item_type'] ?? '') === $option ? 'selected' : '' ?>>
-                                <?= h($option) ?></option><?php endforeach; ?>
-                    </select></label>
-                <label>หน่วยนับ <select name="unit" required>
+                <label>Unit <select name="unit" required>
                         <option value="">เลือกหน่วยนับ</option>
                         <?php foreach ($unitOptions as $option): ?>
                             <option value="<?= h($option) ?>" <?= ($_POST['unit'] ?? '') === $option ? 'selected' : '' ?>>
                                 <?= h($option) ?></option><?php endforeach; ?>
                     </select></label>
-                <label>ตำแหน่งจัดเก็บ <input name="location" maxlength="80"
-                        value="<?= h((string) ($_POST['location'] ?? '')) ?>" placeholder="เช่น A1"></label>
-                <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="1" min="0" required
-                        value="<?= h((string) ($_POST['reorder_point'] ?? '0')) ?>"></label>
+                <label>Quantity <input type="number" name="quantity" min="1" step="1" required
+                        value="<?= h((string) ($_POST['quantity'] ?? '')) ?>"></label>
+                <label>จุดสั่งซื้อขั้นต่ำ <input type="number" name="reorder_point" min="0" step="1"
+                        placeholder="ไม่บังคับ"
+                        value="<?= h((string) ($_POST['reorder_point'] ?? '')) ?>"></label>
+                <label>Buydate <input type="datetime-local" name="buy_date"
+                        value="<?= h((string) ($_POST['buy_date'] ?? '')) ?>"></label>
+                <label>BuyPrice/Unit <input type="number" name="buy_price" min="0" step="0.01"
+                        placeholder="ไม่บังคับ"
+                        value="<?= h((string) ($_POST['buy_price'] ?? '')) ?>"></label>
                 <label class="product-image-upload-field form-span-2">รูปสินค้า
                     <input class="product-image-upload" type="file" name="product_image"
                         accept="image/jpeg,image/png,image/webp">
@@ -217,14 +278,6 @@ require __DIR__ . '/includes/header.php';
                     <span class="product-image-preview"><img alt="ตัวอย่างรูปสินค้า"
                             hidden><span>ยังไม่ได้เลือกรูปสินค้า</span></span>
                 </label>
-                <label>วันที่รับ <input type="date" name="movement_date" required
-                        value="<?= h((string) ($_POST['movement_date'] ?? date('Y-m-d'))) ?>"></label>
-                <label>เลขที่เอกสาร <input name="document_no" maxlength="100"
-                        value="<?= h((string) ($_POST['document_no'] ?? '')) ?>" placeholder="ถ้ามี"></label>
-                <label>จำนวนรับครั้งแรก <input type="number" name="quantity" min="0" step="1" required
-                        value="<?= h((string) ($_POST['quantity'] ?? '')) ?>"></label>
-                <label>ผู้รับสินค้า <input name="received_by" maxlength="150"
-                        value="<?= h((string) ($_POST['received_by'] ?? '')) ?>"></label>
                 <label class="form-span-2">หมายเหตุ <input name="notes" maxlength="500"
                         value="<?= h((string) ($_POST['notes'] ?? '')) ?>"></label>
                 <div class="form-actions form-span-2"><button class="primary-button"

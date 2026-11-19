@@ -107,6 +107,15 @@ function inventory_ensure_schema(PDO $db): void
         'art' => 'VARCHAR(32) NOT NULL DEFAULT \'coupler\'',
         'image_filename' => 'VARCHAR(80) NULL',
         'created_at' => 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
+        'account_code1' => 'VARCHAR(100) NOT NULL DEFAULT \'\'',
+        'stock_code' => 'VARCHAR(100) NOT NULL DEFAULT \'\'',
+        'gl_description' => 'VARCHAR(255) NOT NULL DEFAULT \'\'',
+        'section_code' => 'VARCHAR(100) NOT NULL DEFAULT \'\'',
+        'section_name' => 'VARCHAR(255) NOT NULL DEFAULT \'\'',
+        'apex' => 'VARCHAR(100) NOT NULL DEFAULT \'\'',
+        'notes' => 'TEXT NULL',
+        'buy_date' => 'VARCHAR(32) NOT NULL DEFAULT \'\'',
+        'buy_price' => 'DECIMAL(14,2) NULL DEFAULT NULL',
     ] as $column => $definition) {
         if (!isset($columns[$column])) {
             $db->exec('ALTER TABLE `product` ADD COLUMN `' . $column . '` ' . $definition);
@@ -117,6 +126,33 @@ function inventory_ensure_schema(PDO $db): void
         'UPDATE `product`
          SET `code` = CONCAT(\'legacy-\', `รหัสสินค้า`)
          WHERE `code` IS NULL OR `code` = \'\''
+    );
+    $db->exec(
+        'UPDATE `product`
+         SET `stock_code` = `code`
+         WHERE `stock_code` IS NULL OR `stock_code` = \'\''
+    );
+    $thaiToEnglishCategories = [
+        'อะไหล่เครื่องจักร' => 'Machine Parts',
+        'วัสดุสิ้นเปลือง' => 'Consumables',
+        'เครื่องมือช่าง' => 'Tools',
+        'วัตถุดิบ' => 'Raw Materials',
+        'สินค้าทั่วไป' => 'General',
+        'อื่นๆ' => 'Others',
+        'อะไหล่' => 'Machine Parts',
+        'อุปกรณ์' => 'Equipment',
+    ];
+    foreach ($thaiToEnglishCategories as $th => $en) {
+        $stmt = $db->prepare('UPDATE `product` SET `หมวดหมู่` = :en WHERE `หมวดหมู่` = :th');
+        $stmt->execute(['en' => $en, 'th' => $th]);
+        $stmt = $db->prepare('UPDATE `product` SET `ประเภท` = :en WHERE `ประเภท` = :th');
+        $stmt->execute(['en' => $en, 'th' => $th]);
+    }
+    $db->exec(
+        'UPDATE `product`
+         SET `gl_description` = `หมวดหมู่`
+         WHERE (`gl_description` IS NULL OR `gl_description` = \'\')
+           AND `หมวดหมู่` IS NOT NULL AND `หมวดหมู่` != \'\''
     );
     if (!inventory_has_unique_index($db, 'product', 'code')) {
         $db->exec('ALTER TABLE `product` ADD UNIQUE KEY `uq_product_code_ref` (`code`)');
@@ -313,6 +349,15 @@ function inventory_ensure_schema(PDO $db): void
         );
     }
 
+    if (inventory_table_exists($db, 'borrow_records')) {
+        $borrowCols = inventory_table_columns($db, 'borrow_records');
+        if (!isset($borrowCols['account_code1'])) {
+            $db->exec("ALTER TABLE `borrow_records` ADD COLUMN `account_code1` VARCHAR(500) NOT NULL DEFAULT '' AFTER `product_code`");
+        } elseif (stripos((string) ($borrowCols['account_code1']['Type'] ?? ''), 'varchar(100)') !== false) {
+            $db->exec("ALTER TABLE `borrow_records` MODIFY COLUMN `account_code1` VARCHAR(500) NOT NULL DEFAULT ''");
+        }
+    }
+
     $legacyProducts = $db->query(
         'SELECT p.`code`, p.`รับเข้ารวม` AS received, p.`เบิกออกรวม` AS issued,
                 r.total AS recorded_receipts, i.total AS recorded_issues
@@ -444,15 +489,21 @@ function inventory_product_image_url(?string $filename, ?string $category = null
     if (inventory_has_custom_image($filename)) {
         return 'image.php?file=' . rawurlencode((string) $filename);
     }
-    $cat = $category !== null && trim($category) !== '' ? trim($category) : 'สินค้าทั่วไป';
+    $raw = $category !== null ? trim($category) : '';
+    $parts = $raw !== '' ? inventory_normalize_gl_list($raw) : [];
+    $cat = $parts[0] ?? 'General';
     return 'image.php?cat=' . rawurlencode($cat);
 }
 
 function inventory_category_placeholder_svg(string $category): string
 {
-    $cleanCat = trim($category);
+    $parts = inventory_normalize_gl_list($category);
+    $cleanCat = $parts[0] ?? trim($category);
+    $lowerCat = strtolower($cleanCat);
 
-    if (str_contains($cleanCat, 'อะไหล่') || str_contains($cleanCat, 'เครื่องจักร')) {
+    if (str_contains($lowerCat, 'equipment') || str_contains($lowerCat, 'machine') || str_contains($cleanCat, 'อะไหล่') || str_contains($cleanCat, 'เครื่องจักร')) {
+        $badgeLabel = str_contains($lowerCat, 'equipment') ? 'Equipment' : 'Machine Parts';
+        $subLabel = str_contains($lowerCat, 'equipment') ? 'EQUIPMENT' : 'MACHINE PARTS';
         return <<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
   <defs>
@@ -499,11 +550,11 @@ function inventory_category_placeholder_svg(string $category): string
   </g>
   <rect x="115" y="228" width="170" height="30" rx="15" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" filter="url(#sh_mach)"/>
   <circle cx="132" cy="243" r="5" fill="#2563eb"/>
-  <text x="146" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#1e293b">อะไหล่เครื่องจักร</text>
-  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#64748b">SPARE PARTS</text>
+  <text x="146" y="247" font-family="'DM Sans', sans-serif" font-size="11.5" font-weight="600" fill="#1e293b">{$badgeLabel}</text>
+  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#64748b">{$subLabel}</text>
 </svg>
 SVG;
-    } elseif (str_contains($cleanCat, 'สิ้นเปลือง')) {
+    } elseif (str_contains($lowerCat, 'consumable') || str_contains($cleanCat, 'สิ้นเปลือง')) {
         return <<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
   <defs>
@@ -529,11 +580,11 @@ SVG;
   </g>
   <rect x="120" y="228" width="160" height="30" rx="15" fill="#ffffff" stroke="#fcd34d" stroke-width="1.2" filter="url(#sh_cons)"/>
   <circle cx="137" cy="243" r="5" fill="#d97706"/>
-  <text x="151" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#78350f">วัสดุสิ้นเปลือง</text>
+  <text x="151" y="247" font-family="'DM Sans', sans-serif" font-size="11.5" font-weight="600" fill="#78350f">Consumables</text>
   <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#b45309">CONSUMABLES</text>
 </svg>
 SVG;
-    } elseif (str_contains($cleanCat, 'เครื่องมือ')) {
+    } elseif (str_contains($lowerCat, 'tool') || str_contains($cleanCat, 'เครื่องมือ')) {
         return <<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
   <defs>
@@ -562,13 +613,13 @@ SVG;
       <rect x="-7" y="-58" width="14" height="18" fill="#f0fdfa"/>
     </g>
   </g>
-  <rect x="122" y="228" width="156" height="30" rx="15" fill="#ffffff" stroke="#99f6e4" stroke-width="1.2" filter="url(#sh_tool)"/>
-  <circle cx="139" cy="243" r="5" fill="#0f766e"/>
-  <text x="153" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#134e4a">เครื่องมือช่าง</text>
-  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#0f766e">HARDWARE TOOLS</text>
+  <rect x="135" y="228" width="130" height="30" rx="15" fill="#ffffff" stroke="#99f6e4" stroke-width="1.2" filter="url(#sh_tool)"/>
+  <circle cx="152" cy="243" r="5" fill="#0f766e"/>
+  <text x="168" y="247" font-family="'DM Sans', sans-serif" font-size="11.5" font-weight="600" fill="#134e4a">Tools</text>
+  <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#0f766e">TOOLS</text>
 </svg>
 SVG;
-    } elseif (str_contains($cleanCat, 'วัตถุดิบ')) {
+    } elseif (str_contains($lowerCat, 'raw') || str_contains($cleanCat, 'วัตถุดิบ')) {
         return <<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
   <defs>
@@ -592,13 +643,14 @@ SVG;
     <path d="M-45,4 L25,-14 L25,14 L-45,32 Z" fill="#818cf8" stroke="#4338ca" stroke-width="1.5"/>
     <ellipse cx="25" cy="0" rx="14" ry="14" fill="#a5b4fc" stroke="#4338ca" stroke-width="2"/>
   </g>
-  <rect x="135" y="228" width="130" height="30" rx="15" fill="#ffffff" stroke="#c7d2fe" stroke-width="1.2" filter="url(#sh_raw)"/>
-  <circle cx="152" cy="243" r="5" fill="#4f46e5"/>
-  <text x="166" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#312e81">วัตถุดิบ</text>
+  <rect x="115" y="228" width="170" height="30" rx="15" fill="#ffffff" stroke="#c7d2fe" stroke-width="1.2" filter="url(#sh_raw)"/>
+  <circle cx="132" cy="243" r="5" fill="#4f46e5"/>
+  <text x="146" y="247" font-family="'DM Sans', sans-serif" font-size="11.5" font-weight="600" fill="#312e81">Raw Materials</text>
   <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#4f46e5">RAW MATERIALS</text>
 </svg>
 SVG;
     } else {
+        $badgeLabel = str_contains($lowerCat, 'other') ? 'Others' : 'General';
         return <<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
   <defs>
@@ -626,9 +678,9 @@ SVG;
     <line x1="-24" y1="22" x2="-24" y2="32" stroke="#1e293b" stroke-width="1.5"/>
     <line x1="-18" y1="24" x2="-18" y2="34" stroke="#1e293b" stroke-width="1"/>
   </g>
-  <rect x="125" y="228" width="150" height="30" rx="15" fill="#ffffff" stroke="#fecdd3" stroke-width="1.2" filter="url(#sh_gen)"/>
-  <circle cx="142" cy="243" r="5" fill="#e11d48"/>
-  <text x="156" y="247" font-family="'Noto Sans Thai', sans-serif" font-size="11.5" font-weight="600" fill="#881337">สินค้าทั่วไป</text>
+  <rect x="130" y="228" width="140" height="30" rx="15" fill="#ffffff" stroke="#fecdd3" stroke-width="1.2" filter="url(#sh_gen)"/>
+  <circle cx="147" cy="243" r="5" fill="#e11d48"/>
+  <text x="163" y="247" font-family="'DM Sans', sans-serif" font-size="11.5" font-weight="600" fill="#881337">{$badgeLabel}</text>
   <text x="200" y="278" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.5" fill="#be123c">GENERAL SUPPLY</text>
 </svg>
 SVG;
@@ -699,14 +751,215 @@ function inventory_has_unique_index(PDO $db, string $table, string $column): boo
     return false;
 }
 
+function inventory_gl_description_options(): array
+{
+    return ['Equipment', 'Tools', 'Machine Parts', 'Consumables', 'Raw Materials', 'General', 'Others'];
+}
+
 function inventory_category_options(): array
 {
-    return ['อะไหล่เครื่องจักร', 'วัสดุสิ้นเปลือง', 'เครื่องมือช่าง', 'สินค้าทั่วไป', 'วัตถุดิบ', 'อื่นๆ'];
+    return inventory_gl_description_options();
 }
 
 function inventory_type_options(): array
 {
-    return [...inventory_category_options(), 'อะไหล่'];
+    return [...inventory_gl_description_options(), 'Spare Part'];
+}
+
+function inventory_apex_options(): array
+{
+    return ['A-1', 'A-2', 'A-3'];
+}
+
+function inventory_normalize_gl_list(string $raw): array
+{
+    $thaiMap = [
+        'อะไหล่เครื่องจักร' => 'Machine Parts',
+        'อะไหล่' => 'Machine Parts',
+        'วัสดุสิ้นเปลือง' => 'Consumables',
+        'เครื่องมือช่าง' => 'Tools',
+        'วัตถุดิบ' => 'Raw Materials',
+        'สินค้าทั่วไป' => 'General',
+        'อื่นๆ' => 'Others',
+        'อุปกรณ์' => 'Equipment',
+    ];
+    $items = [];
+    foreach (explode(',', $raw) as $part) {
+        $token = trim($part);
+        if ($token === '') {
+            continue;
+        }
+        $mapped = $thaiMap[$token] ?? $token;
+        if (!in_array($mapped, $items, true)) {
+            $items[] = $mapped;
+        }
+    }
+    return $items;
+}
+
+function inventory_product_gl_list(array $product): array
+{
+    $raw = trim((string) ($product['gl_description'] ?? ''));
+    if ($raw === '') {
+        $raw = trim((string) ($product['category'] ?? ''));
+    }
+    $list = inventory_normalize_gl_list($raw);
+    return $list !== [] ? $list : ['General'];
+}
+
+function inventory_gl_description_input(string $key = 'gl_description'): string
+{
+    $allowed = inventory_gl_description_options();
+    $input = $_POST[$key] ?? [];
+    if (is_string($input)) {
+        $rawList = explode(',', $input);
+    } elseif (is_array($input)) {
+        $rawList = $input;
+    } else {
+        return '';
+    }
+
+    $selected = [];
+    foreach ($rawList as $item) {
+        if (!is_string($item)) {
+            continue;
+        }
+        $val = trim($item);
+        if ($val === '') {
+            continue;
+        }
+        if (!in_array($val, $allowed, true)) {
+            throw new DomainException('กรุณาเลือก GL Description จากรายการที่กำหนด');
+        }
+        if (!in_array($val, $selected, true)) {
+            $selected[] = $val;
+        }
+    }
+    return implode(', ', $selected);
+}
+
+function inventory_apex_input(string $key = 'apex'): string
+{
+    $val = inventory_text($key, 'Apex', 100);
+    if ($val === '') {
+        return '';
+    }
+    if (!in_array($val, inventory_apex_options(), true)) {
+        throw new DomainException('กรุณาเลือก Apex จากรายการ (A-1, A-2, A-3)');
+    }
+    return $val;
+}
+
+function inventory_generate_internal_code(): string
+{
+    return 'ITEM-' . date('YmdHis') . '-' . bin2hex(random_bytes(2));
+}
+
+function inventory_product_exists_pair(string $stockCode, string $accountCode1): bool
+{
+    $sc = trim($stockCode);
+    $ac = trim($accountCode1);
+    if ($sc === '' || $sc === '-' || $ac === '' || $ac === '-') {
+        return false;
+    }
+    $stmt = inventory_db()->prepare(
+        'SELECT 1 FROM `product` WHERE `stock_code` = :sc AND `account_code1` = :ac LIMIT 1'
+    );
+    $stmt->execute(['sc' => $sc, 'ac' => $ac]);
+    return $stmt->fetchColumn() !== false;
+}
+
+function inventory_group_products_by_stock_code(array $products): array
+{
+    $groups = [];
+    $order = [];
+    foreach ($products as $p) {
+        $sc = trim((string) ($p['stock_code'] ?? ''));
+        $groupKey = ($sc !== '' && $sc !== '-' && $sc !== '—')
+            ? 'sc:' . $sc
+            : 'id:' . (string) $p['id'];
+
+        if (!isset($groups[$groupKey])) {
+            $item = $p;
+            $item['variants'] = [$p];
+            $item['variant_count'] = 1;
+            $item['gl_list'] = inventory_product_gl_list($p);
+            $item['latest_row_id'] = (int) ($p['row_id'] ?? 0);
+            $item['earliest_row_id'] = (int) ($p['row_id'] ?? 0);
+            $item['latest_created_at'] = (string) ($p['created_at'] ?? '');
+            $item['earliest_created_at'] = (string) ($p['created_at'] ?? '');
+            $groups[$groupKey] = $item;
+            $order[] = $groupKey;
+        } else {
+            $groups[$groupKey]['variants'][] = $p;
+            $groups[$groupKey]['variant_count']++;
+            $groups[$groupKey]['stock'] = (int) $groups[$groupKey]['stock'] + (int) ($p['stock'] ?? 0);
+            $groups[$groupKey]['quantity'] = $groups[$groupKey]['stock'];
+            $groups[$groupKey]['received'] = (int) $groups[$groupKey]['received'] + (int) ($p['received'] ?? 0);
+            $groups[$groupKey]['issued'] = (int) $groups[$groupKey]['issued'] + (int) ($p['issued'] ?? 0);
+            $pRowId = (int) ($p['row_id'] ?? 0);
+            if ($pRowId > $groups[$groupKey]['latest_row_id']) {
+                $groups[$groupKey]['latest_row_id'] = $pRowId;
+            }
+            if ($pRowId > 0 && ($groups[$groupKey]['earliest_row_id'] === 0 || $pRowId < $groups[$groupKey]['earliest_row_id'])) {
+                $groups[$groupKey]['earliest_row_id'] = $pRowId;
+            }
+            $pCreated = (string) ($p['created_at'] ?? '');
+            if ($pCreated !== '' && ($groups[$groupKey]['latest_created_at'] === '' || $pCreated > $groups[$groupKey]['latest_created_at'])) {
+                $groups[$groupKey]['latest_created_at'] = $pCreated;
+            }
+            if ($pCreated !== '' && ($groups[$groupKey]['earliest_created_at'] === '' || $pCreated < $groups[$groupKey]['earliest_created_at'])) {
+                $groups[$groupKey]['earliest_created_at'] = $pCreated;
+            }
+            foreach (inventory_product_gl_list($p) as $gl) {
+                if (!in_array($gl, $groups[$groupKey]['gl_list'], true)) {
+                    $groups[$groupKey]['gl_list'][] = $gl;
+                }
+            }
+            if (empty($groups[$groupKey]['image_filename']) && !empty($p['image_filename'])) {
+                $groups[$groupKey]['image_filename'] = $p['image_filename'];
+            }
+        }
+    }
+
+    $result = [];
+    foreach ($order as $key) {
+        $result[] = $groups[$key];
+    }
+    return $result;
+}
+
+function inventory_optional_number(string $key, string $label, int $decimals = 0): ?float
+{
+    $input = $_POST[$key] ?? '';
+    if (!is_string($input) && !is_numeric($input)) {
+        throw new DomainException("กรุณากรอก{$label}เป็นตัวเลข");
+    }
+    $raw = trim((string) $input);
+    if ($raw === '') {
+        return null;
+    }
+    if (!is_numeric($raw)) {
+        throw new DomainException("กรุณากรอก{$label}เป็นตัวเลข");
+    }
+    $value = round((float) $raw, $decimals);
+    if (!is_finite($value) || $value < 0) {
+        throw new DomainException("{$label}ต้องไม่ติดลบ");
+    }
+    return (float) $value;
+}
+
+function inventory_optional_datetime(string $key = 'buy_date'): string
+{
+    $raw = trim((string) ($_POST[$key] ?? ''));
+    if ($raw === '') {
+        return '';
+    }
+    $normalized = str_replace('T', ' ', $raw);
+    if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/', $normalized) !== 1) {
+        throw new DomainException('กรุณาระบุ Buydate (วันที่และเวลา) ให้ถูกต้อง');
+    }
+    return substr($normalized, 0, 16);
 }
 
 function inventory_unit_options(): array
@@ -942,7 +1195,19 @@ function inventory_migrate_opening_stock(PDO $db): void
 function inventory_products(): array
 {
     $statement = inventory_db()->query(
-        'SELECT p.`code`, p.`ชื่อสินค้า` AS name, p.`หมวดหมู่` AS category,
+        'SELECT p.`รหัสสินค้า` AS row_id,
+                p.`code`,
+                COALESCE(p.`stock_code`, p.`code`) AS stock_code,
+                COALESCE(p.`account_code1`, \'\') AS account_code1,
+                COALESCE(p.`gl_description`, \'\') AS gl_description,
+                COALESCE(p.`section_code`, \'\') AS section_code,
+                COALESCE(p.`section_name`, \'\') AS section_name,
+                COALESCE(p.`apex`, \'\') AS apex,
+                COALESCE(p.`notes`, \'\') AS notes,
+                COALESCE(p.`buy_date`, \'\') AS buy_date,
+                p.`buy_price` AS buy_price,
+                p.`created_at`,
+                p.`ชื่อสินค้า` AS name, p.`หมวดหมู่` AS category,
                 p.`ประเภท` AS item_type, p.`หน่วยนับ` AS unit, p.`ตำแหน่งจัดเก็บ` AS location,
                 p.`จุดสั่งซื้อขั้นต่ำ` AS reorder_point, p.`art`, p.`image_filename`,
                 COALESCE(r.total, 0) AS received,
@@ -958,7 +1223,18 @@ function inventory_products(): array
     $products = [];
     foreach ($statement->fetchAll() as $row) {
         $products[] = [
+            'row_id' => (int) ($row['row_id'] ?? 0),
             'id' => $row['code'],
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'stock_code' => $row['stock_code'],
+            'account_code1' => $row['account_code1'],
+            'gl_description' => $row['gl_description'],
+            'section_code' => $row['section_code'],
+            'section_name' => $row['section_name'],
+            'apex' => $row['apex'],
+            'notes' => $row['notes'],
+            'buy_date' => $row['buy_date'],
+            'buy_price' => $row['buy_price'] !== null ? (float) $row['buy_price'] : null,
             'name' => $row['name'],
             'category' => $row['category'],
             'type' => $row['item_type'],
@@ -968,6 +1244,7 @@ function inventory_products(): array
             'received' => (int) round((float) $row['received']),
             'issued' => (int) round((float) $row['issued']),
             'stock' => (int) round((float) $row['stock']),
+            'quantity' => (int) round((float) $row['stock']),
             'art' => $row['art'],
             'image_filename' => $row['image_filename'],
         ];
@@ -978,7 +1255,17 @@ function inventory_products(): array
 function inventory_product(string $code): ?array
 {
     $statement = inventory_db()->prepare(
-        'SELECT p.`รหัสสินค้า` AS id, p.`code`, p.`ชื่อสินค้า` AS name, p.`หมวดหมู่` AS category,
+        'SELECT p.`รหัสสินค้า` AS id, p.`code`,
+                COALESCE(p.`stock_code`, p.`code`) AS stock_code,
+                COALESCE(p.`account_code1`, \'\') AS account_code1,
+                COALESCE(p.`gl_description`, \'\') AS gl_description,
+                COALESCE(p.`section_code`, \'\') AS section_code,
+                COALESCE(p.`section_name`, \'\') AS section_name,
+                COALESCE(p.`apex`, \'\') AS apex,
+                COALESCE(p.`notes`, \'\') AS notes,
+                COALESCE(p.`buy_date`, \'\') AS buy_date,
+                p.`buy_price` AS buy_price,
+                p.`ชื่อสินค้า` AS name, p.`หมวดหมู่` AS category,
                 p.`ประเภท` AS item_type, p.`หน่วยนับ` AS unit, p.`ตำแหน่งจัดเก็บ` AS location,
                 p.`จุดสั่งซื้อขั้นต่ำ` AS reorder_point, p.`art`, p.`image_filename`,
                 COALESCE(r.total, 0) AS received, COALESCE(i.total, 0) AS issued,
@@ -993,35 +1280,68 @@ function inventory_product(string $code): ?array
     if ($product === false) {
         return null;
     }
+    $product['stock_code'] = $product['stock_code'] ?? $product['code'];
+    $product['account_code1'] = $product['account_code1'] ?? '';
+    $product['gl_description'] = $product['gl_description'] ?? '';
+    $product['section_code'] = $product['section_code'] ?? '';
+    $product['section_name'] = $product['section_name'] ?? '';
+    $product['apex'] = $product['apex'] ?? '';
+    $product['notes'] = $product['notes'] ?? '';
+    $product['buy_date'] = $product['buy_date'] ?? '';
+    $product['buy_price'] = isset($product['buy_price']) && $product['buy_price'] !== '' ? (float) $product['buy_price'] : null;
     $product['reorder_point'] = (int) round((float) ($product['reorder_point'] ?? 0));
     $product['received'] = (int) round((float) ($product['received'] ?? 0));
     $product['issued'] = (int) round((float) ($product['issued'] ?? 0));
     $product['stock'] = (int) round((float) ($product['stock'] ?? 0));
+    $product['quantity'] = $product['stock'];
     $product['minimum'] = $product['reorder_point'];
     return $product;
 }
 
-function inventory_movements(string $kind, int $limit = 250): array
+function inventory_movements(string $kind, int $limit = 250, ?int $userId = null, ?string $userName = null): array
 {
     $limit = min(250, max(1, $limit));
     if ($kind === 'receipt') {
         $table = 'receipts';
         $extraColumns = 'm.supplier, m.received_by, m.department';
+        $nameCol = 'm.received_by';
     } elseif ($kind === 'issue') {
         $table = 'issues';
         $extraColumns = 'm.requested_by, m.department, m.approved_by';
+        $nameCol = 'm.requested_by';
     } else {
         throw new InvalidArgumentException('รายการเคลื่อนไหวไม่ถูกต้อง');
     }
 
+    $where = '';
+    $params = [];
+    if ($userId !== null) {
+        $cleanName = trim((string) ($userName ?? ''));
+        if ($cleanName !== '') {
+            $where = "WHERE (m.created_by_user_id = :uid OR {$nameCol} = :uname)";
+            $params['uid'] = $userId;
+            $params['uname'] = $cleanName;
+        } else {
+            $where = 'WHERE m.created_by_user_id = :uid';
+            $params['uid'] = $userId;
+        }
+    }
+
     $statement = inventory_db()->prepare(
-        "SELECT m.id, m.movement_date, m.document_no, m.product_code, p.`ชื่อสินค้า` AS product_name,
+        "SELECT m.id, m.movement_date, m.document_no, m.product_code,
+                COALESCE(p.`stock_code`, p.`code`) AS stock_code,
+                COALESCE(p.`account_code1`, '') AS account_code1,
+                p.`ชื่อสินค้า` AS product_name,
                 m.quantity, p.`หน่วยนับ` AS unit, {$extraColumns}, m.notes, m.created_by_user_id, m.created_by_name
          FROM {$table} m
          JOIN `product` p ON p.`code` = m.product_code
+         {$where}
          ORDER BY m.movement_date DESC, m.id DESC
          LIMIT :limit"
     );
+    foreach ($params as $k => $v) {
+        $statement->bindValue(':' . $k, $v, $k === 'uid' ? PDO::PARAM_INT : PDO::PARAM_STR);
+    }
     $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
     $statement->execute();
     $rows = $statement->fetchAll();
@@ -1034,43 +1354,88 @@ function inventory_movements(string $kind, int $limit = 250): array
     return $rows;
 }
 
-function inventory_movement_counts(): array
+function inventory_movement_counts(?int $userId = null, ?string $userName = null): array
 {
-    $counts = inventory_db()->query(
-        'SELECT (SELECT COUNT(*) FROM `receipts`) AS receipts,
-                (SELECT COUNT(*) FROM `issues`) AS issues'
-    )->fetch();
+    $db = inventory_db();
+    $receipts = (int) $db->query('SELECT COUNT(*) FROM `receipts`')->fetchColumn();
+    if ($userId === null) {
+        $issues = (int) $db->query('SELECT COUNT(*) FROM `issues`')->fetchColumn();
+    } else {
+        $cleanName = trim((string) ($userName ?? ''));
+        if ($cleanName !== '') {
+            $stmt = $db->prepare('SELECT COUNT(*) FROM `issues` WHERE created_by_user_id = :uid OR requested_by = :uname');
+            $stmt->execute(['uid' => $userId, 'uname' => $cleanName]);
+        } else {
+            $stmt = $db->prepare('SELECT COUNT(*) FROM `issues` WHERE created_by_user_id = :uid');
+            $stmt->execute(['uid' => $userId]);
+        }
+        $issues = (int) $stmt->fetchColumn();
+    }
     return [
-        'receipts' => (int) $counts['receipts'],
-        'issues' => (int) $counts['issues'],
+        'receipts' => $receipts,
+        'issues' => $issues,
     ];
 }
 
-function inventory_category_round_stats(): array
+function inventory_category_round_stats(?int $userId = null, ?string $userName = null): array
 {
     $db = inventory_db();
     $stats = [];
 
     $receiptRows = $db->query(
-        'SELECT p.`หมวดหมู่` AS category, COUNT(r.id) AS rounds
+        'SELECT COALESCE(NULLIF(p.`gl_description`, \'\'), p.`หมวดหมู่`) AS gl_desc, COUNT(r.id) AS rounds
          FROM `receipts` r
          JOIN `product` p ON p.`code` = r.product_code
-         GROUP BY p.`หมวดหมู่`'
+         GROUP BY gl_desc'
     )->fetchAll();
     foreach ($receiptRows as $row) {
-        $cat = trim((string) ($row['category'] ?? '')) !== '' ? (string) $row['category'] : 'ไม่ระบุหมวดหมู่';
-        $stats[$cat]['receipt_rounds'] = (int) $row['rounds'];
+        $cats = inventory_normalize_gl_list((string) ($row['gl_desc'] ?? ''));
+        if ($cats === []) {
+            $cats = ['General'];
+        }
+        foreach ($cats as $cat) {
+            $stats[$cat]['receipt_rounds'] = ($stats[$cat]['receipt_rounds'] ?? 0) + (int) $row['rounds'];
+        }
     }
 
-    $issueRows = $db->query(
-        'SELECT p.`หมวดหมู่` AS category, COUNT(i.id) AS rounds
-         FROM `issues` i
-         JOIN `product` p ON p.`code` = i.product_code
-         GROUP BY p.`หมวดหมู่`'
-    )->fetchAll();
+    if ($userId === null) {
+        $issueRows = $db->query(
+            'SELECT COALESCE(NULLIF(p.`gl_description`, \'\'), p.`หมวดหมู่`) AS gl_desc, COUNT(i.id) AS rounds
+             FROM `issues` i
+             JOIN `product` p ON p.`code` = i.product_code
+             GROUP BY gl_desc'
+        )->fetchAll();
+    } else {
+        $cleanName = trim((string) ($userName ?? ''));
+        if ($cleanName !== '') {
+            $stmt = $db->prepare(
+                'SELECT COALESCE(NULLIF(p.`gl_description`, \'\'), p.`หมวดหมู่`) AS gl_desc, COUNT(i.id) AS rounds
+                 FROM `issues` i
+                 JOIN `product` p ON p.`code` = i.product_code
+                 WHERE i.created_by_user_id = :uid OR i.requested_by = :uname
+                 GROUP BY gl_desc'
+            );
+            $stmt->execute(['uid' => $userId, 'uname' => $cleanName]);
+        } else {
+            $stmt = $db->prepare(
+                'SELECT COALESCE(NULLIF(p.`gl_description`, \'\'), p.`หมวดหมู่`) AS gl_desc, COUNT(i.id) AS rounds
+                 FROM `issues` i
+                 JOIN `product` p ON p.`code` = i.product_code
+                 WHERE i.created_by_user_id = :uid
+                 GROUP BY gl_desc'
+            );
+            $stmt->execute(['uid' => $userId]);
+        }
+        $issueRows = $stmt->fetchAll();
+    }
     foreach ($issueRows as $row) {
-        $cat = trim((string) ($row['category'] ?? '')) !== '' ? (string) $row['category'] : 'ไม่ระบุหมวดหมู่';
-        $stats[$cat]['issue_rounds'] = (int) $row['rounds'];
+        $cats = inventory_normalize_gl_list((string) ($row['gl_desc'] ?? ''));
+        if ($cats === []) {
+            $cats = ['General'];
+        }
+        foreach ($cats as $cat) {
+            $stats[$cat]['issue_rounds'] = ($stats[$cat]['issue_rounds'] ?? 0) + (int) $row['rounds'];
+        }
     }
 
     return $stats;
@@ -1155,15 +1520,29 @@ function audit_log(string $action, string $target = '', string $details = ''): v
 function inventory_save_product(array $values, ?string $originalCode = null): void
 {
     $db = inventory_db();
+    $stockCode = isset($values['stock_code']) && trim((string) $values['stock_code']) !== ''
+        ? trim((string) $values['stock_code'])
+        : '-';
+    $glList = inventory_normalize_gl_list((string) ($values['gl_description'] ?? ''));
+    $defaultCat = $glList[0] ?? 'General';
     $parameters = [
         'code' => $values['code'],
+        'stock_code' => $stockCode,
+        'account_code1' => $values['account_code1'] ?? '',
+        'gl_description' => $values['gl_description'] ?? '',
+        'section_code' => $values['section_code'] ?? '',
+        'section_name' => $values['section_name'] ?? '',
+        'apex' => $values['apex'] ?? '',
+        'notes' => $values['notes'] ?? '',
+        'buy_date' => $values['buy_date'] ?? '',
+        'buy_price' => $values['buy_price'] ?? null,
         'name' => $values['name'],
-        'category' => $values['category'],
-        'item_type' => $values['item_type'],
+        'category' => $values['category'] ?? $defaultCat,
+        'item_type' => $values['item_type'] ?? $defaultCat,
         'unit' => $values['unit'],
-        'location' => $values['location'],
-        'reorder_point' => $values['reorder_point'],
-        'art' => $values['art'],
+        'location' => $values['location'] ?? '',
+        'reorder_point' => $values['reorder_point'] ?? 0,
+        'art' => $values['art'] ?? 'coupler',
         'image_filename' => $values['image_filename'] ?? null,
     ];
 
@@ -1171,16 +1550,33 @@ function inventory_save_product(array $values, ?string $originalCode = null): vo
     try {
         if ($originalCode === null) {
             $statement = $db->prepare(
-                'INSERT INTO `product` (`code`, `ชื่อสินค้า`, `หมวดหมู่`, `ประเภท`, `หน่วยนับ`, `ตำแหน่งจัดเก็บ`,
-                                        `จุดสั่งซื้อขั้นต่ำ`, `art`, `image_filename`)
-                 VALUES (:code, :name, :category, :item_type, :unit, :location, :reorder_point, :art, :image_filename)'
+                'INSERT INTO `product` (`code`, `stock_code`, `account_code1`, `gl_description`, `section_code`,
+                                        `section_name`, `apex`, `notes`, `buy_date`, `buy_price`, `ชื่อสินค้า`, `หมวดหมู่`, `ประเภท`,
+                                        `หน่วยนับ`, `ตำแหน่งจัดเก็บ`, `จุดสั่งซื้อขั้นต่ำ`, `art`, `image_filename`)
+                 VALUES (:code, :stock_code, :account_code1, :gl_description, :section_code,
+                         :section_name, :apex, :notes, :buy_date, :buy_price, :name, :category, :item_type,
+                         :unit, :location, :reorder_point, :art, :image_filename)'
             );
         } else {
             $statement = $db->prepare(
                 'UPDATE `product`
-                 SET `ชื่อสินค้า` = :name, `หมวดหมู่` = :category, `ประเภท` = :item_type, `หน่วยนับ` = :unit,
+                 SET `stock_code` = :stock_code,
+                     `account_code1` = :account_code1,
+                     `gl_description` = :gl_description,
+                     `section_code` = :section_code,
+                     `section_name` = :section_name,
+                     `apex` = :apex,
+                     `notes` = :notes,
+                     `buy_date` = :buy_date,
+                     `buy_price` = :buy_price,
+                     `ชื่อสินค้า` = :name,
+                     `หมวดหมู่` = :category,
+                     `ประเภท` = :item_type,
+                     `หน่วยนับ` = :unit,
                      `ตำแหน่งจัดเก็บ` = :location,
-                     `จุดสั่งซื้อขั้นต่ำ` = :reorder_point, `art` = :art, `image_filename` = :image_filename
+                     `จุดสั่งซื้อขั้นต่ำ` = :reorder_point,
+                     `art` = :art,
+                     `image_filename` = :image_filename
                  WHERE `code` = :code'
             );
             $parameters['code'] = $originalCode;
@@ -1192,9 +1588,9 @@ function inventory_save_product(array $values, ?string $originalCode = null): vo
         inventory_sync_product_summary($db, $originalCode ?? $values['code']);
         $db->commit();
         if ($originalCode === null) {
-            audit_log('product_create', $values['code'], "เพิ่มสินค้าใหม่: {$values['name']} (จุดสั่งซื้อ: {$values['reorder_point']} {$values['unit']})");
+            audit_log('product_create', $values['code'], "เพิ่มสินค้าใหม่: {$values['name']} (Stock Code: {$stockCode})");
         } else {
-            audit_log('product_update', $values['code'], "แก้ไขข้อมูลสินค้า: {$values['name']} (จุดสั่งซื้อ: {$values['reorder_point']} {$values['unit']})");
+            audit_log('product_update', $values['code'], "แก้ไขข้อมูลสินค้า: {$values['name']} (Stock Code: {$stockCode})");
         }
 
         $savedCode = $originalCode ?? $values['code'];
@@ -1257,20 +1653,35 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
 
     $db->beginTransaction();
     try {
+        $stockCode = isset($product['stock_code']) && trim((string) $product['stock_code']) !== ''
+            ? trim((string) $product['stock_code'])
+            : '-';
         $insertProduct = $db->prepare(
-            'INSERT INTO `product` (`code`, `ชื่อสินค้า`, `หมวดหมู่`, `ประเภท`, `หน่วยนับ`, `ตำแหน่งจัดเก็บ`,
-                                    `จุดสั่งซื้อขั้นต่ำ`, `art`, `image_filename`)
-             VALUES (:code, :name, :category, :item_type, :unit, :location, :reorder_point, :art, :image_filename)'
+            'INSERT INTO `product` (`code`, `stock_code`, `account_code1`, `gl_description`, `section_code`,
+                                    `section_name`, `apex`, `notes`, `buy_date`, `buy_price`, `ชื่อสินค้า`, `หมวดหมู่`, `ประเภท`,
+                                    `หน่วยนับ`, `ตำแหน่งจัดเก็บ`, `จุดสั่งซื้อขั้นต่ำ`, `art`, `image_filename`)
+             VALUES (:code, :stock_code, :account_code1, :gl_description, :section_code,
+                     :section_name, :apex, :notes, :buy_date, :buy_price, :name, :category, :item_type,
+                     :unit, :location, :reorder_point, :art, :image_filename)'
         );
         $insertProduct->execute([
             'code' => $product['code'],
+            'stock_code' => $stockCode,
+            'account_code1' => $product['account_code1'] ?? '',
+            'gl_description' => $product['gl_description'] ?? '',
+            'section_code' => $product['section_code'] ?? '',
+            'section_name' => $product['section_name'] ?? '',
+            'apex' => $product['apex'] ?? '',
+            'notes' => $product['notes'] ?? '',
+            'buy_date' => $product['buy_date'] ?? '',
+            'buy_price' => $product['buy_price'] ?? null,
             'name' => $product['name'],
-            'category' => $product['category'],
-            'item_type' => $product['item_type'],
+            'category' => $product['category'] ?? (inventory_normalize_gl_list((string) ($product['gl_description'] ?? ''))[0] ?? 'General'),
+            'item_type' => $product['item_type'] ?? (inventory_normalize_gl_list((string) ($product['gl_description'] ?? ''))[0] ?? 'General'),
             'unit' => $product['unit'],
-            'location' => $product['location'],
-            'reorder_point' => $product['reorder_point'],
-            'art' => $product['art'],
+            'location' => $product['location'] ?? '',
+            'reorder_point' => $product['reorder_point'] ?? 0,
+            'art' => $product['art'] ?? 'coupler',
             'image_filename' => $product['image_filename'] ?? null,
         ]);
 
@@ -1684,16 +2095,29 @@ function inventory_get_settings(): array
 /**
  * สรุปจำนวนการยืมพัสดุ
  */
-function inventory_borrow_counts(): array
+function inventory_borrow_counts(?int $userId = null, ?string $userName = null): array
 {
     try {
-        $row = inventory_db()->query(
-            'SELECT 
+        $sql = 'SELECT 
                 COUNT(*) AS total,
                 SUM(CASE WHEN `status` = "borrowed" THEN 1 ELSE 0 END) AS borrowed,
                 SUM(CASE WHEN `status` = "returned" THEN 1 ELSE 0 END) AS returned
-             FROM `borrow_records`'
-        )->fetch();
+             FROM `borrow_records`';
+        $params = [];
+        if ($userId !== null) {
+            $cleanName = trim((string) ($userName ?? ''));
+            if ($cleanName !== '') {
+                $sql .= ' WHERE (`created_by_user_id` = :uid OR `borrower_name` = :uname)';
+                $params['uid'] = $userId;
+                $params['uname'] = $cleanName;
+            } else {
+                $sql .= ' WHERE `created_by_user_id` = :uid';
+                $params['uid'] = $userId;
+            }
+        }
+        $stmt = inventory_db()->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch();
         return [
             'total' => (int) ($row['total'] ?? 0),
             'borrowed' => (int) ($row['borrowed'] ?? 0),
@@ -1707,29 +2131,47 @@ function inventory_borrow_counts(): array
 /**
  * ดึงรายการยืม-คืนพัสดุ
  */
-function inventory_borrow_records(string $statusFilter = 'all', string $search = '', int $limit = 250): array
+function inventory_borrow_records(string $statusFilter = 'all', string $search = '', int $limit = 250, ?int $userId = null, ?string $userName = null): array
 {
     $limit = min(250, max(1, $limit));
-    $sql = 'SELECT * FROM `borrow_records` WHERE 1=1';
+    $sql = 'SELECT b.*, COALESCE(p.`stock_code`, b.`product_code`) AS product_stock_code
+            FROM `borrow_records` b
+            LEFT JOIN `product` p ON p.`code` = b.`product_code`
+            WHERE 1=1';
     $params = [];
 
+    if ($userId !== null) {
+        $cleanName = trim((string) ($userName ?? ''));
+        if ($cleanName !== '') {
+            $sql .= ' AND (b.`created_by_user_id` = :uid OR b.`borrower_name` = :uname)';
+            $params['uid'] = $userId;
+            $params['uname'] = $cleanName;
+        } else {
+            $sql .= ' AND b.`created_by_user_id` = :uid';
+            $params['uid'] = $userId;
+        }
+    }
+
     if ($statusFilter === 'borrowed') {
-        $sql .= ' AND `status` = "borrowed"';
+        $sql .= ' AND b.`status` = "borrowed"';
     } elseif ($statusFilter === 'returned') {
-        $sql .= ' AND `status` = "returned"';
+        $sql .= ' AND b.`status` = "returned"';
     }
 
     if ($search !== '') {
-        $sql .= ' AND (`borrower_name` LIKE :q_borrower OR `product_name` LIKE :q_product OR `product_code` LIKE :q_code OR `location` LIKE :q_location OR `notes` LIKE :q_notes)';
+        $sql .= ' AND (b.`borrower_name` LIKE :q_borrower OR b.`product_name` LIKE :q_product OR b.`product_code` LIKE :q_code OR b.`account_code1` LIKE :q_ac1 OR p.`stock_code` LIKE :q_sc OR p.`account_code1` LIKE :q_pac1 OR b.`location` LIKE :q_location OR b.`notes` LIKE :q_notes)';
         $searchPattern = '%' . $search . '%';
         $params['q_borrower'] = $searchPattern;
         $params['q_product'] = $searchPattern;
         $params['q_code'] = $searchPattern;
+        $params['q_ac1'] = $searchPattern;
+        $params['q_sc'] = $searchPattern;
+        $params['q_pac1'] = $searchPattern;
         $params['q_location'] = $searchPattern;
         $params['q_notes'] = $searchPattern;
     }
 
-    $sql .= ' ORDER BY (`status` = "borrowed") DESC, `borrow_date` DESC, `borrow_time` DESC, `id` DESC LIMIT ' . (int) $limit;
+    $sql .= ' ORDER BY (b.`status` = "borrowed") DESC, b.`borrow_date` DESC, b.`borrow_time` DESC, b.`id` DESC LIMIT ' . (int) $limit;
 
     $stmt = inventory_db()->prepare($sql);
     $stmt->execute($params);
@@ -1769,10 +2211,25 @@ function inventory_create_borrow_record(array $data, ?array $photoUpload = null)
 
     $productCode = trim((string) ($data['product_code'] ?? ''));
     $productName = trim((string) ($data['product_name'] ?? ''));
-    if ($productName === '' && $productCode !== '') {
+    $rawAc1 = $data['account_code1'] ?? '';
+    if (is_array($rawAc1)) {
+        $acList = array_values(array_unique(array_filter(array_map(static fn($v): string => trim((string) $v), $rawAc1), static fn($v): bool => $v !== '')));
+        $accountCode1 = implode(', ', $acList);
+    } else {
+        $accountCode1 = trim((string) $rawAc1);
+    }
+    if (strlen($accountCode1) > 500) {
+        $accountCode1 = substr($accountCode1, 0, 500);
+    }
+    if ($productCode !== '') {
         $prod = inventory_product($productCode);
         if ($prod) {
-            $productName = (string) $prod['name'];
+            if ($productName === '') {
+                $productName = (string) $prod['name'];
+            }
+            if ($accountCode1 === '' && !empty($prod['account_code1'])) {
+                $accountCode1 = (string) $prod['account_code1'];
+            }
         }
     }
     if ($productName === '') {
@@ -1814,13 +2271,14 @@ function inventory_create_borrow_record(array $data, ?array $photoUpload = null)
     $db = inventory_db();
     $stmt = $db->prepare(
         'INSERT INTO `borrow_records`
-         (`borrower_name`, `product_code`, `product_name`, `borrow_date`, `borrow_time`, `location`, `borrow_photo`, `quantity`, `unit`, `notes`, `status`, `created_by_user_id`, `created_by_name`)
+         (`borrower_name`, `product_code`, `account_code1`, `product_name`, `borrow_date`, `borrow_time`, `location`, `borrow_photo`, `quantity`, `unit`, `notes`, `status`, `created_by_user_id`, `created_by_name`)
          VALUES
-         (:borrower_name, :product_code, :product_name, :borrow_date, :borrow_time, :location, :borrow_photo, :quantity, :unit, :notes, "borrowed", :created_by_user_id, :created_by_name)'
+         (:borrower_name, :product_code, :account_code1, :product_name, :borrow_date, :borrow_time, :location, :borrow_photo, :quantity, :unit, :notes, "borrowed", :created_by_user_id, :created_by_name)'
     );
     $stmt->execute([
         'borrower_name' => $borrowerName,
         'product_code' => $productCode,
+        'account_code1' => $accountCode1,
         'product_name' => $productName,
         'borrow_date' => $borrowDate,
         'borrow_time' => $borrowTime,
@@ -1834,7 +2292,8 @@ function inventory_create_borrow_record(array $data, ?array $photoUpload = null)
     ]);
 
     $newId = (int) $db->lastInsertId();
-    audit_log('borrow_create', "borrow#{$newId}", "บันทึกการยืม: {$productName} โดย {$borrowerName} (สถานที่: {$location})");
+    $acLabel = ($accountCode1 !== '' && $accountCode1 !== '-') ? " [Account Code1: {$accountCode1}]" : '';
+    audit_log('borrow_create', "borrow#{$newId}", "บันทึกการยืม: {$productName}{$acLabel} โดย {$borrowerName} (สถานที่: {$location})");
 
     $record = inventory_borrow_record_by_id($newId);
     if ($record) {

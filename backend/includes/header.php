@@ -24,7 +24,7 @@ $resourcePrefix = app_resource_prefix();
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="<?= $resourcePrefix ?>assets/favicon.png?v=<?= filemtime(__DIR__ . '/../assets/favicon.png') ?>">
     <link rel="shortcut icon" href="<?= $resourcePrefix ?>favicon.ico?v=<?= filemtime(__DIR__ . '/../favicon.ico') ?>">
-    <link rel="stylesheet" href="style.css?v=3.9">
+    <link rel="stylesheet" href="style.css?v=4.5">
     <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -70,7 +70,7 @@ $resourcePrefix = app_resource_prefix();
                 </a>
                 <a class="sidebar-link <?= $activePage === 'issue' ? 'active' : '' ?>" href="issue.php">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
-                    <span>เบิกสินค้าออก</span>
+                    <span>ประวัติเบิกสินค้า</span>
                 </a>
             <?php endif; ?>
 
