@@ -116,6 +116,9 @@ function inventory_ensure_schema(PDO $db): void
         'notes' => 'TEXT NULL',
         'buy_date' => 'VARCHAR(32) NOT NULL DEFAULT \'\'',
         'buy_price' => 'DECIMAL(14,2) NULL DEFAULT NULL',
+        'cal_no' => 'VARCHAR(100) NOT NULL DEFAULT \'\'',
+        'cal_date' => 'VARCHAR(10) NOT NULL DEFAULT \'\'',
+        'cal_exp' => 'VARCHAR(10) NOT NULL DEFAULT \'\'',
     ] as $column => $definition) {
         if (!isset($columns[$column])) {
             $db->exec('ALTER TABLE `product` ADD COLUMN `' . $column . '` ' . $definition);
@@ -129,7 +132,10 @@ function inventory_ensure_schema(PDO $db): void
     );
     $db->exec(
         'UPDATE `product`
-         SET `stock_code` = `code`
+         SET `stock_code` = CASE
+            WHEN `code` LIKE \'ITEM-%\' OR `code` LIKE \'legacy-%\' THEN \'-\'
+            ELSE `code`
+         END
          WHERE `stock_code` IS NULL OR `stock_code` = \'\''
     );
     $thaiToEnglishCategories = [
@@ -163,8 +169,10 @@ function inventory_ensure_schema(PDO $db): void
             'CREATE TABLE IF NOT EXISTS `receipts` (
             `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `movement_date` DATE NOT NULL,
+            `movement_time` VARCHAR(8) NOT NULL DEFAULT \'\',
             `document_no` VARCHAR(100) NOT NULL DEFAULT \'\',
             `product_code` VARCHAR(80) NOT NULL,
+            `account_code1` VARCHAR(100) NOT NULL DEFAULT \'\',
             `quantity` DECIMAL(14,3) NOT NULL,
             `supplier` VARCHAR(150) NOT NULL DEFAULT \'\',
             `received_by` VARCHAR(150) NOT NULL DEFAULT \'\',
@@ -269,6 +277,12 @@ function inventory_ensure_schema(PDO $db): void
 
     if (inventory_table_exists($db, 'receipts')) {
         $receiptCols = inventory_table_columns($db, 'receipts');
+        if (!isset($receiptCols['movement_time'])) {
+            $db->exec("ALTER TABLE `receipts` ADD COLUMN `movement_time` VARCHAR(8) NOT NULL DEFAULT '' AFTER `movement_date`");
+        }
+        if (!isset($receiptCols['account_code1'])) {
+            $db->exec("ALTER TABLE `receipts` ADD COLUMN `account_code1` VARCHAR(100) NOT NULL DEFAULT '' AFTER `product_code`");
+        }
         if (!isset($receiptCols['created_by_user_id'])) {
             $db->exec("ALTER TABLE `receipts` ADD COLUMN `created_by_user_id` BIGINT UNSIGNED NULL");
         }
@@ -869,6 +883,63 @@ function inventory_product_exists_pair(string $stockCode, string $accountCode1):
     return $stmt->fetchColumn() !== false;
 }
 
+function inventory_find_product_by_pair(string $stockCode, string $accountCode1): ?array
+{
+    $sc = trim($stockCode);
+    $ac = trim($accountCode1);
+    if ($sc === '' || $sc === '-' || $ac === '' || $ac === '-') {
+        return null;
+    }
+    $stmt = inventory_db()->prepare(
+        'SELECT `code` FROM `product` WHERE `stock_code` = :sc AND `account_code1` = :ac LIMIT 1'
+    );
+    $stmt->execute(['sc' => $sc, 'ac' => $ac]);
+    $code = $stmt->fetchColumn();
+    if ($code === false || $code === null) {
+        return null;
+    }
+    return inventory_product((string) $code);
+}
+
+function inventory_receipt_datetime(
+    string $datetimeKey = 'movement_datetime',
+    string $dateKey = 'movement_date',
+    string $timeKey = 'movement_time'
+): array {
+    $rawDatetime = $_POST[$datetimeKey] ?? '';
+    if (is_string($rawDatetime) && trim($rawDatetime) !== '') {
+        $normalized = str_replace('T', ' ', trim($rawDatetime));
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}):(\d{2})(?::\d{2})?)?$/', $normalized, $matches) !== 1) {
+            throw new DomainException('กรุณาระบุวันที่และเวลาให้ถูกต้อง');
+        }
+        $date = $matches[1];
+        if (!inventory_is_valid_date_value($date)) {
+            throw new DomainException('กรุณาระบุวันที่ให้ถูกต้อง');
+        }
+        $time = '';
+        if (isset($matches[2], $matches[3]) && $matches[2] !== '') {
+            if ((int) $matches[2] > 23 || (int) $matches[3] > 59) {
+                throw new DomainException('กรุณาระบุเวลาให้ถูกต้อง');
+            }
+            $time = $matches[2] . ':' . $matches[3];
+        }
+        return ['date' => $date, 'time' => $time];
+    }
+
+    $date = inventory_date($dateKey);
+    $rawTime = $_POST[$timeKey] ?? '';
+    $time = '';
+    if (is_string($rawTime) && trim($rawTime) !== '') {
+        if (preg_match('/^(\d{2}):(\d{2})(?::\d{2})?$/', trim($rawTime), $matches) !== 1
+            || (int) $matches[1] > 23
+            || (int) $matches[2] > 59) {
+            throw new DomainException('กรุณาระบุเวลาให้ถูกต้อง');
+        }
+        $time = $matches[1] . ':' . $matches[2];
+    }
+    return ['date' => $date, 'time' => $time];
+}
+
 function inventory_group_products_by_stock_code(array $products): array
 {
     $groups = [];
@@ -949,17 +1020,61 @@ function inventory_optional_number(string $key, string $label, int $decimals = 0
     return (float) $value;
 }
 
-function inventory_optional_datetime(string $key = 'buy_date'): string
+function inventory_is_valid_date_value(string $value): bool
 {
-    $raw = trim((string) ($_POST[$key] ?? ''));
-    if ($raw === '') {
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+        return false;
+    }
+    [$year, $month, $day] = array_map('intval', explode('-', $value));
+    return checkdate($month, $day, $year);
+}
+
+function inventory_optional_date(string $key, string $label): string
+{
+    $input = $_POST[$key] ?? '';
+    if (!is_string($input)) {
+        throw new DomainException("กรุณาระบุ{$label}ให้ถูกต้อง");
+    }
+    $value = trim($input);
+    if ($value === '') {
         return '';
     }
-    $normalized = str_replace('T', ' ', $raw);
-    if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/', $normalized) !== 1) {
-        throw new DomainException('กรุณาระบุ Buydate (วันที่และเวลา) ให้ถูกต้อง');
+    if (!inventory_is_valid_date_value($value)) {
+        throw new DomainException("กรุณาระบุ{$label}ให้ถูกต้อง");
     }
-    return substr($normalized, 0, 16);
+    return $value;
+}
+
+function inventory_optional_datetime(string $key = 'buy_date'): string
+{
+    $input = $_POST[$key] ?? '';
+    $timeInput = $_POST[$key . '_time'] ?? '';
+    if (!is_string($input) || !is_string($timeInput)) {
+        throw new DomainException('กรุณาระบุ Buydate ให้ถูกต้อง');
+    }
+    $date = trim($input);
+    $time = trim($timeInput);
+    if ($date === '' && $time === '') {
+        return '';
+    }
+
+    $legacyDateTime = str_replace('T', ' ', $date);
+    if (preg_match('/^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})(?::\d{2})?$/', $legacyDateTime, $matches) === 1) {
+        $date = $matches[1];
+        $time = $time !== '' ? $time : $matches[2] . ':' . $matches[3];
+    }
+    if (!inventory_is_valid_date_value($date)) {
+        throw new DomainException('กรุณาระบุ Buydate ให้ถูกต้อง');
+    }
+    if ($time === '') {
+        return $date;
+    }
+    if (preg_match('/^(\d{2}):(\d{2})(?::\d{2})?$/', $time, $matches) !== 1
+        || (int) $matches[1] > 23
+        || (int) $matches[2] > 59) {
+        throw new DomainException('กรุณาระบุเวลา Buydate ให้ถูกต้อง');
+    }
+    return $date . ' ' . $matches[1] . ':' . $matches[2];
 }
 
 function inventory_unit_options(): array
@@ -1206,6 +1321,9 @@ function inventory_products(): array
                 COALESCE(p.`notes`, \'\') AS notes,
                 COALESCE(p.`buy_date`, \'\') AS buy_date,
                 p.`buy_price` AS buy_price,
+                COALESCE(p.`cal_no`, \'\') AS cal_no,
+                COALESCE(p.`cal_date`, \'\') AS cal_date,
+                COALESCE(p.`cal_exp`, \'\') AS cal_exp,
                 p.`created_at`,
                 p.`ชื่อสินค้า` AS name, p.`หมวดหมู่` AS category,
                 p.`ประเภท` AS item_type, p.`หน่วยนับ` AS unit, p.`ตำแหน่งจัดเก็บ` AS location,
@@ -1235,6 +1353,9 @@ function inventory_products(): array
             'notes' => $row['notes'],
             'buy_date' => $row['buy_date'],
             'buy_price' => $row['buy_price'] !== null ? (float) $row['buy_price'] : null,
+            'cal_no' => $row['cal_no'],
+            'cal_date' => $row['cal_date'],
+            'cal_exp' => $row['cal_exp'],
             'name' => $row['name'],
             'category' => $row['category'],
             'type' => $row['item_type'],
@@ -1265,6 +1386,9 @@ function inventory_product(string $code): ?array
                 COALESCE(p.`notes`, \'\') AS notes,
                 COALESCE(p.`buy_date`, \'\') AS buy_date,
                 p.`buy_price` AS buy_price,
+                COALESCE(p.`cal_no`, \'\') AS cal_no,
+                COALESCE(p.`cal_date`, \'\') AS cal_date,
+                COALESCE(p.`cal_exp`, \'\') AS cal_exp,
                 p.`ชื่อสินค้า` AS name, p.`หมวดหมู่` AS category,
                 p.`ประเภท` AS item_type, p.`หน่วยนับ` AS unit, p.`ตำแหน่งจัดเก็บ` AS location,
                 p.`จุดสั่งซื้อขั้นต่ำ` AS reorder_point, p.`art`, p.`image_filename`,
@@ -1289,6 +1413,9 @@ function inventory_product(string $code): ?array
     $product['notes'] = $product['notes'] ?? '';
     $product['buy_date'] = $product['buy_date'] ?? '';
     $product['buy_price'] = isset($product['buy_price']) && $product['buy_price'] !== '' ? (float) $product['buy_price'] : null;
+    $product['cal_no'] = $product['cal_no'] ?? '';
+    $product['cal_date'] = $product['cal_date'] ?? '';
+    $product['cal_exp'] = $product['cal_exp'] ?? '';
     $product['reorder_point'] = (int) round((float) ($product['reorder_point'] ?? 0));
     $product['received'] = (int) round((float) ($product['received'] ?? 0));
     $product['issued'] = (int) round((float) ($product['issued'] ?? 0));
@@ -1305,10 +1432,16 @@ function inventory_movements(string $kind, int $limit = 250, ?int $userId = null
         $table = 'receipts';
         $extraColumns = 'm.supplier, m.received_by, m.department';
         $nameCol = 'm.received_by';
+        $timeSelect = "COALESCE(m.movement_time, '') AS movement_time";
+        $accountSelect = "COALESCE(NULLIF(m.account_code1, ''), NULLIF(p.`account_code1`, ''), '-') AS account_code1";
+        $orderBy = 'm.movement_date DESC, m.movement_time DESC, m.id DESC';
     } elseif ($kind === 'issue') {
         $table = 'issues';
         $extraColumns = 'm.requested_by, m.department, m.approved_by';
         $nameCol = 'm.requested_by';
+        $timeSelect = "'' AS movement_time";
+        $accountSelect = "COALESCE(p.`account_code1`, '') AS account_code1";
+        $orderBy = 'm.movement_date DESC, m.id DESC';
     } else {
         throw new InvalidArgumentException('รายการเคลื่อนไหวไม่ถูกต้อง');
     }
@@ -1328,15 +1461,15 @@ function inventory_movements(string $kind, int $limit = 250, ?int $userId = null
     }
 
     $statement = inventory_db()->prepare(
-        "SELECT m.id, m.movement_date, m.document_no, m.product_code,
+        "SELECT m.id, m.movement_date, {$timeSelect}, m.document_no, m.product_code,
                 COALESCE(p.`stock_code`, p.`code`) AS stock_code,
-                COALESCE(p.`account_code1`, '') AS account_code1,
+                {$accountSelect},
                 p.`ชื่อสินค้า` AS product_name,
                 m.quantity, p.`หน่วยนับ` AS unit, {$extraColumns}, m.notes, m.created_by_user_id, m.created_by_name
          FROM {$table} m
          JOIN `product` p ON p.`code` = m.product_code
          {$where}
-         ORDER BY m.movement_date DESC, m.id DESC
+         ORDER BY {$orderBy}
          LIMIT :limit"
     );
     foreach ($params as $k => $v) {
@@ -1536,6 +1669,9 @@ function inventory_save_product(array $values, ?string $originalCode = null): vo
         'notes' => $values['notes'] ?? '',
         'buy_date' => $values['buy_date'] ?? '',
         'buy_price' => $values['buy_price'] ?? null,
+        'cal_no' => $values['cal_no'] ?? '',
+        'cal_date' => $values['cal_date'] ?? '',
+        'cal_exp' => $values['cal_exp'] ?? '',
         'name' => $values['name'],
         'category' => $values['category'] ?? $defaultCat,
         'item_type' => $values['item_type'] ?? $defaultCat,
@@ -1551,10 +1687,10 @@ function inventory_save_product(array $values, ?string $originalCode = null): vo
         if ($originalCode === null) {
             $statement = $db->prepare(
                 'INSERT INTO `product` (`code`, `stock_code`, `account_code1`, `gl_description`, `section_code`,
-                                        `section_name`, `apex`, `notes`, `buy_date`, `buy_price`, `ชื่อสินค้า`, `หมวดหมู่`, `ประเภท`,
+                                        `section_name`, `apex`, `notes`, `buy_date`, `buy_price`, `cal_no`, `cal_date`, `cal_exp`, `ชื่อสินค้า`, `หมวดหมู่`, `ประเภท`,
                                         `หน่วยนับ`, `ตำแหน่งจัดเก็บ`, `จุดสั่งซื้อขั้นต่ำ`, `art`, `image_filename`)
                  VALUES (:code, :stock_code, :account_code1, :gl_description, :section_code,
-                         :section_name, :apex, :notes, :buy_date, :buy_price, :name, :category, :item_type,
+                         :section_name, :apex, :notes, :buy_date, :buy_price, :cal_no, :cal_date, :cal_exp, :name, :category, :item_type,
                          :unit, :location, :reorder_point, :art, :image_filename)'
             );
         } else {
@@ -1569,6 +1705,9 @@ function inventory_save_product(array $values, ?string $originalCode = null): vo
                      `notes` = :notes,
                      `buy_date` = :buy_date,
                      `buy_price` = :buy_price,
+                     `cal_no` = :cal_no,
+                     `cal_date` = :cal_date,
+                     `cal_exp` = :cal_exp,
                      `ชื่อสินค้า` = :name,
                      `หมวดหมู่` = :category,
                      `ประเภท` = :item_type,
@@ -1635,6 +1774,7 @@ function inventory_delete_product(string $code): ?string
 
         $db->commit();
         audit_log('product_delete', $code, "ลบสินค้าและประวัติที่เกี่ยวข้อง รหัส {$code}");
+        inventory_sync_all_catalog_to_google_sheet();
         return $product['image_filename'] === null ? null : (string) $product['image_filename'];
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -1658,10 +1798,10 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
             : '-';
         $insertProduct = $db->prepare(
             'INSERT INTO `product` (`code`, `stock_code`, `account_code1`, `gl_description`, `section_code`,
-                                    `section_name`, `apex`, `notes`, `buy_date`, `buy_price`, `ชื่อสินค้า`, `หมวดหมู่`, `ประเภท`,
+                                    `section_name`, `apex`, `notes`, `buy_date`, `buy_price`, `cal_no`, `cal_date`, `cal_exp`, `ชื่อสินค้า`, `หมวดหมู่`, `ประเภท`,
                                     `หน่วยนับ`, `ตำแหน่งจัดเก็บ`, `จุดสั่งซื้อขั้นต่ำ`, `art`, `image_filename`)
              VALUES (:code, :stock_code, :account_code1, :gl_description, :section_code,
-                     :section_name, :apex, :notes, :buy_date, :buy_price, :name, :category, :item_type,
+                     :section_name, :apex, :notes, :buy_date, :buy_price, :cal_no, :cal_date, :cal_exp, :name, :category, :item_type,
                      :unit, :location, :reorder_point, :art, :image_filename)'
         );
         $insertProduct->execute([
@@ -1675,6 +1815,9 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
             'notes' => $product['notes'] ?? '',
             'buy_date' => $product['buy_date'] ?? '',
             'buy_price' => $product['buy_price'] ?? null,
+            'cal_no' => $product['cal_no'] ?? '',
+            'cal_date' => $product['cal_date'] ?? '',
+            'cal_exp' => $product['cal_exp'] ?? '',
             'name' => $product['name'],
             'category' => $product['category'] ?? (inventory_normalize_gl_list((string) ($product['gl_description'] ?? ''))[0] ?? 'General'),
             'item_type' => $product['item_type'] ?? (inventory_normalize_gl_list((string) ($product['gl_description'] ?? ''))[0] ?? 'General'),
@@ -1686,15 +1829,31 @@ function inventory_create_product_with_receipt(array $product, array $receipt): 
         ]);
 
         $u = function_exists('auth_user') ? auth_user() : null;
+        $receipt['movement_time'] = trim((string) ($receipt['movement_time'] ?? date('H:i')));
+        $receiptAc1 = trim((string) ($receipt['account_code1'] ?? ($product['account_code1'] ?? '')));
+        $receipt['account_code1'] = ($receiptAc1 === '' || $receiptAc1 === '—') ? '-' : $receiptAc1;
         $receipt['created_by_user_id'] = $u ? $u['id'] : null;
         $receipt['created_by_name'] = $u ? $u['name'] : '';
 
         $insertReceipt = $db->prepare(
-            'INSERT INTO `receipts` (`movement_date`, `document_no`, `product_code`, `quantity`, `supplier`,
+            'INSERT INTO `receipts` (`movement_date`, `movement_time`, `document_no`, `product_code`, `account_code1`, `quantity`, `supplier`,
                                      `received_by`, `department`, `notes`, `created_by_user_id`, `created_by_name`)
-             VALUES (:movement_date, :document_no, :product_code, :quantity, :supplier, :received_by, :department, :notes, :created_by_user_id, :created_by_name)'
+             VALUES (:movement_date, :movement_time, :document_no, :product_code, :account_code1, :quantity, :supplier, :received_by, :department, :notes, :created_by_user_id, :created_by_name)'
         );
-        $insertReceipt->execute($receipt);
+        $insertReceipt->execute([
+            'movement_date' => $receipt['movement_date'],
+            'movement_time' => $receipt['movement_time'],
+            'document_no' => $receipt['document_no'] ?? '',
+            'product_code' => $receipt['product_code'],
+            'account_code1' => $receipt['account_code1'],
+            'quantity' => $receipt['quantity'],
+            'supplier' => $receipt['supplier'] ?? '',
+            'received_by' => $receipt['received_by'] ?? '',
+            'department' => $receipt['department'] ?? '',
+            'notes' => $receipt['notes'] ?? '',
+            'created_by_user_id' => $receipt['created_by_user_id'],
+            'created_by_name' => $receipt['created_by_name'],
+        ]);
         $receiptId = (int) $db->lastInsertId();
         inventory_sync_product_summary($db, $product['code']);
         $db->commit();
@@ -1729,17 +1888,34 @@ function inventory_record_movement(string $kind, array $values): void
     $values['created_by_name'] = $u ? $u['name'] : '';
 
     if ($kind === 'receipt') {
+        $values['movement_time'] = trim((string) ($values['movement_time'] ?? ''));
+        $ac1 = trim((string) ($values['account_code1'] ?? ''));
+        $values['account_code1'] = ($ac1 === '' || $ac1 === '—') ? '-' : $ac1;
         $statement = inventory_db()->prepare(
-            'INSERT INTO receipts (movement_date, document_no, product_code, quantity, supplier, received_by, department, notes, created_by_user_id, created_by_name)
-             VALUES (:movement_date, :document_no, :product_code, :quantity, :supplier, :received_by, :department, :notes, :created_by_user_id, :created_by_name)'
+            'INSERT INTO receipts (movement_date, movement_time, document_no, product_code, account_code1, quantity, supplier, received_by, department, notes, created_by_user_id, created_by_name)
+             VALUES (:movement_date, :movement_time, :document_no, :product_code, :account_code1, :quantity, :supplier, :received_by, :department, :notes, :created_by_user_id, :created_by_name)'
         );
+        $statement->execute([
+            'movement_date' => $values['movement_date'],
+            'movement_time' => $values['movement_time'],
+            'document_no' => $values['document_no'] ?? '',
+            'product_code' => $values['product_code'],
+            'account_code1' => $values['account_code1'],
+            'quantity' => $values['quantity'],
+            'supplier' => $values['supplier'] ?? '',
+            'received_by' => $values['received_by'] ?? '',
+            'department' => $values['department'] ?? '',
+            'notes' => $values['notes'] ?? '',
+            'created_by_user_id' => $values['created_by_user_id'],
+            'created_by_name' => $values['created_by_name'],
+        ]);
     } else {
         $statement = inventory_db()->prepare(
             'INSERT INTO issues (movement_date, document_no, product_code, quantity, requested_by, department, approved_by, notes, created_by_user_id, created_by_name)
              VALUES (:movement_date, :document_no, :product_code, :quantity, :requested_by, :department, :approved_by, :notes, :created_by_user_id, :created_by_name)'
         );
+        $statement->execute($values);
     }
-    $statement->execute($values);
     $values['id'] = (int) inventory_db()->lastInsertId();
     inventory_sync_product_summary(inventory_db(), $values['product_code']);
     if ($kind === 'receipt') {
@@ -1839,6 +2015,7 @@ function inventory_update_movement(string $kind, int $id, array $values): void
     if ($updatedProduct !== null) {
         inventory_sync_google_sheet_product($updatedProduct);
     }
+    inventory_sync_all_catalog_to_google_sheet();
 }
 
 function inventory_sync_product_summary(PDO $db, string $code): void
@@ -1998,6 +2175,7 @@ function inventory_delete_movements(string $kind, array $ids): void
             inventory_sync_google_sheet_product($updatedProduct);
         }
     }
+    inventory_sync_all_catalog_to_google_sheet();
 
     $kindLabel = $kind === 'receipt' ? 'รับเข้าคลัง' : 'เบิกออก';
     audit_log("movement_delete_{$kind}", '', "ลบประวัติ{$kindLabel} {$deletedCount} รายการ (ID: " . implode(', ', $intIds) . ")");
@@ -2126,6 +2304,85 @@ function inventory_borrow_counts(?int $userId = null, ?string $userName = null):
     } catch (Throwable $e) {
         return ['total' => 0, 'borrowed' => 0, 'returned' => 0];
     }
+}
+
+/**
+ * จำนวนสินค้าที่กำลังยืมอยู่ แยกตาม stock_code, product_code และ account_code1
+ */
+function inventory_borrowed_quantities_by_product(): array
+{
+    $byStockCode = [];
+    $byProductCode = [];
+    $byProductCodeGeneric = [];
+    $byAccountCode = [];
+    $borrowersByStockCode = [];
+    $borrowersByProductCode = [];
+    $borrowersByAccountCode = [];
+    try {
+        $stmt = inventory_db()->query(
+            'SELECT b.`product_code`, b.`account_code1`, b.`borrower_name`, b.`quantity`,
+                    COALESCE(p.`stock_code`, \'\') AS stock_code
+             FROM `borrow_records` b
+             LEFT JOIN `product` p ON p.`code` = b.`product_code`
+             WHERE b.`status` = "borrowed"'
+        );
+        foreach ($stmt->fetchAll() as $row) {
+            $qty = (int) round((float) ($row['quantity'] ?? 0));
+            if ($qty <= 0) {
+                continue;
+            }
+            $pCode = trim((string) ($row['product_code'] ?? ''));
+            $sCode = trim((string) ($row['stock_code'] ?? ''));
+            $borrower = trim((string) ($row['borrower_name'] ?? ''));
+            $acRaw = trim((string) ($row['account_code1'] ?? ''));
+
+            if ($pCode !== '') {
+                $byProductCode[$pCode] = ($byProductCode[$pCode] ?? 0) + $qty;
+                if ($borrower !== '') {
+                    $borrowersByProductCode[$pCode][$borrower] = true;
+                }
+            }
+            if ($sCode !== '' && $sCode !== '-' && $sCode !== '—') {
+                $byStockCode[$sCode] = ($byStockCode[$sCode] ?? 0) + $qty;
+                if ($borrower !== '') {
+                    $borrowersByStockCode[$sCode][$borrower] = true;
+                }
+            }
+
+            $acTokens = [];
+            if ($acRaw !== '' && $acRaw !== '-' && $acRaw !== '—') {
+                foreach (explode(',', $acRaw) as $part) {
+                    $tok = trim($part);
+                    if ($tok !== '' && $tok !== '-' && $tok !== '—') {
+                        $acTokens[] = $tok;
+                    }
+                }
+            }
+
+            if ($acTokens !== []) {
+                $perTokenQty = count($acTokens) === 1 ? $qty : max(1, (int) round($qty / count($acTokens)));
+                foreach ($acTokens as $tok) {
+                    $byAccountCode[$tok] = ($byAccountCode[$tok] ?? 0) + $perTokenQty;
+                    if ($borrower !== '') {
+                        $borrowersByAccountCode[$tok][$borrower] = true;
+                    }
+                }
+            } elseif ($pCode !== '') {
+                $byProductCodeGeneric[$pCode] = ($byProductCodeGeneric[$pCode] ?? 0) + $qty;
+            }
+        }
+    } catch (Throwable $e) {
+        // Ignore if borrow_records table does not exist yet
+    }
+    return [
+        'by_stock_code' => $byStockCode,
+        'by_product_code' => $byProductCode,
+        'by_product_code_generic' => $byProductCodeGeneric,
+        'by_account_code' => $byAccountCode,
+        'borrowers_by_stock_code' => array_map('array_keys', $borrowersByStockCode),
+        'borrowers_by_product_code' => array_map('array_keys', $borrowersByProductCode),
+        'borrowers_by_account_code' => array_map('array_keys', $borrowersByAccountCode),
+    ];
 }
 
 /**
@@ -2433,6 +2690,7 @@ function inventory_delete_borrow_record(int $id): void
     }
 
     audit_log('borrow_delete', "borrow#{$id}", "ลบรายการยืม-คืน #{$id} ({$record['product_name']} โดย {$record['borrower_name']})");
+    inventory_sync_all_catalog_to_google_sheet();
 }
 
 /**
@@ -2711,6 +2969,78 @@ function inventory_post_google_sheet(array $payload): array
     }
 }
 
+function inventory_clean_stock_code(?string $raw): string
+{
+    $v = trim((string) ($raw ?? ''));
+    if ($v === '' || $v === '-' || $v === '—' || str_starts_with($v, 'ITEM-') || str_starts_with($v, 'legacy-')) {
+        return '-';
+    }
+    return $v;
+}
+
+function inventory_sheet_display_code(?string $stockCode, ?string $accountCode1, ?string $fallbackCode = ''): string
+{
+    $sc = inventory_clean_stock_code($stockCode !== null && trim($stockCode) !== '' ? $stockCode : $fallbackCode);
+    $ac = trim((string) ($accountCode1 ?? ''));
+    if ($ac === '—') {
+        $ac = '-';
+    }
+    $hasSc = ($sc !== '' && $sc !== '-');
+    $hasAc = ($ac !== '' && $ac !== '-');
+    if ($hasSc && $hasAc) {
+        return $sc . ' [' . $ac . ']';
+    }
+    if ($hasSc) {
+        return $sc;
+    }
+    if ($hasAc) {
+        return $ac;
+    }
+    return '-';
+}
+
+function inventory_sheet_section_location(array $product): string
+{
+    $loc = trim((string) ($product['location'] ?? ''));
+    if ($loc !== '') {
+        return $loc;
+    }
+    $secCode = trim((string) ($product['section_code'] ?? ''));
+    $secName = trim((string) ($product['section_name'] ?? ''));
+    $apex = trim((string) ($product['apex'] ?? ''));
+    $parts = [];
+    if ($secCode !== '' && $secName !== '') {
+        $parts[] = $secCode . ' / ' . $secName;
+    } elseif ($secCode !== '') {
+        $parts[] = $secCode;
+    } elseif ($secName !== '') {
+        $parts[] = $secName;
+    }
+    if ($apex !== '') {
+        $parts[] = '(' . $apex . ')';
+    }
+    return implode(' ', $parts);
+}
+
+function inventory_split_buy_datetime(?string $raw): array
+{
+    $normalized = trim(str_replace('T', ' ', (string) ($raw ?? '')));
+    if ($normalized === '') {
+        return ['date' => '', 'time' => ''];
+    }
+    if (preg_match('/^(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}:\d{2})(?::\d{2})?)?$/', $normalized, $m) === 1) {
+        return [
+            'date' => $m[1],
+            'time' => $m[2] ?? '',
+        ];
+    }
+    $parts = preg_split('/\s+/', $normalized, 2);
+    return [
+        'date' => $parts[0] ?? '',
+        'time' => isset($parts[1]) ? substr($parts[1], 0, 5) : '',
+    ];
+}
+
 /**
  * ส่งข้อมูลการยืม-คืนไปยัง Google Sheet Webhook (Google Apps Script)
  */
@@ -2720,6 +3050,14 @@ function inventory_sync_google_sheet(array $record, string $actionType = 'borrow
     $statusThai = $isBorrow ? 'กำลังยืม' : 'คืนแล้ว';
     $actionThai = $isBorrow ? 'ยืมพัสดุ' : 'คืนพัสดุ';
     $statusCode = $isBorrow ? 'borrowed' : 'returned';
+
+    $prod = !empty($record['product_code']) ? inventory_product((string) $record['product_code']) : null;
+    $stockCode = inventory_clean_stock_code((string) ($record['product_stock_code'] ?? $prod['stock_code'] ?? $record['product_code'] ?? ''));
+    $accountCode1 = trim((string) ($record['account_code1'] ?? $prod['account_code1'] ?? ''));
+    if ($accountCode1 === '') {
+        $accountCode1 = '-';
+    }
+    $displayCode = inventory_sheet_display_code($stockCode, $accountCode1, (string) ($record['product_code'] ?? ''));
 
     $payload = [
         'event' => 'borrow_sync',
@@ -2732,7 +3070,10 @@ function inventory_sync_google_sheet(array $record, string $actionType = 'borrow
         'product_name' => (string) $record['product_name'],
         'item' => (string) $record['product_name'],
         'product' => (string) $record['product_name'],
-        'product_code' => (string) ($record['product_code'] ?? ''),
+        'internal_code' => (string) ($record['product_code'] ?? ''),
+        'product_code' => $displayCode,
+        'stock_code' => $stockCode,
+        'account_code1' => $accountCode1,
         'quantity' => (int) round((float) ($record['quantity'] ?? 1)),
         'unit' => (string) ($record['unit'] ?? ''),
         'borrow_date' => (string) $record['borrow_date'],
@@ -2769,8 +3110,16 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
 
     $isReceipt = ($kind === 'receipt');
     $isNew = $isNewProduct || !empty($movement['is_new']);
+    $internalCode = (string) ($product['code'] ?? $product['id'] ?? $movement['product_code'] ?? '');
+    $stockCode = inventory_clean_stock_code((string) ($product['stock_code'] ?? $movement['stock_code'] ?? $internalCode));
+    $accountCode1 = trim((string) ($product['account_code1'] ?? $movement['account_code1'] ?? ''));
+    if ($accountCode1 === '') {
+        $accountCode1 = '-';
+    }
+    $displayCode = inventory_sheet_display_code($stockCode, $accountCode1, $internalCode);
     $productName = $product['name'] ?? (string) $movement['product_code'];
-    $category = $product['category'] ?? '';
+    $glDescription = trim((string) ($product['gl_description'] ?? ''));
+    $category = $glDescription !== '' ? $glDescription : (string) ($product['category'] ?? '');
     $unit = $product['unit'] ?? '';
     $quantity = (int) round((float) ($movement['quantity'] ?? 0));
     $currentStock = (int) round((float) ($product['stock'] ?? 0));
@@ -2783,6 +3132,7 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
     }
 
     $actionName = $isNew ? 'รับสินค้าใหม่ [NEW]' : ($isReceipt ? 'รับสินค้า' : 'เบิกสินค้า');
+    $buyParts = inventory_split_buy_datetime((string) ($product['buy_date'] ?? ''));
 
     $payload = [
         'event' => 'movement_sync',
@@ -2792,15 +3142,31 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
         'id' => (int) ($movement['id'] ?? 0),
         'movement_date' => (string) ($movement['movement_date'] ?? date('Y-m-d')),
         'movement_time' => date('H:i:s'),
-        'product_code' => (string) $movement['product_code'],
+        'internal_code' => $internalCode,
+        'product_code' => $displayCode,
+        'stock_code' => $stockCode,
+        'account_code1' => $accountCode1,
         'product_name' => $productName,
+        'name' => $productName,
         'display_name' => $isNew ? ($productName . ' [NEW]') : $productName,
+        'gl_description' => $category,
         'category' => $category,
+        'section_code' => (string) ($product['section_code'] ?? ''),
+        'section_name' => (string) ($product['section_name'] ?? ''),
+        'apex' => (string) ($product['apex'] ?? ''),
         'quantity' => $quantity,
         'unit' => $unit,
         'current_stock' => $currentStock,
-        'reorder_point' => (int) round((float) ($product['reorder_point'] ?? 0)),
-        'location' => (string) ($product['location'] ?? ''),
+        'reorder_point' => (int) round((float) ($product['reorder_point'] ?? $product['minimum'] ?? 0)),
+        'buy_date' => $buyParts['date'],
+        'buy_time' => $buyParts['time'],
+        'buy_date_time' => $buyParts['time'],
+        'buy_price' => isset($product['buy_price']) && $product['buy_price'] !== null && $product['buy_price'] !== '' ? (float) $product['buy_price'] : '',
+        'cal_no' => (string) ($product['cal_no'] ?? ''),
+        'cal_date' => (string) ($product['cal_date'] ?? ''),
+        'cal_exp' => (string) ($product['cal_exp'] ?? ''),
+        'product_notes' => (string) ($product['notes'] ?? ''),
+        'location' => inventory_sheet_section_location($product ?? []),
         'document_no' => (string) ($movement['document_no'] ?? ''),
         'received_by' => (string) ($movement['received_by'] ?? ''),
         'requested_by' => (string) ($movement['requested_by'] ?? ''),
@@ -2818,17 +3184,46 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
  */
 function inventory_sync_google_sheet_product(array $product): array
 {
+    $internalCode = (string) ($product['code'] ?? $product['id'] ?? '');
+    $stockCode = inventory_clean_stock_code((string) ($product['stock_code'] ?? $internalCode));
+    $accountCode1 = trim((string) ($product['account_code1'] ?? ''));
+    if ($accountCode1 === '') {
+        $accountCode1 = '-';
+    }
+    $displayCode = inventory_sheet_display_code($stockCode, $accountCode1, $internalCode);
+    $glDescription = trim((string) ($product['gl_description'] ?? ''));
+    $category = $glDescription !== '' ? $glDescription : (string) ($product['category'] ?? '');
+    $buyParts = inventory_split_buy_datetime((string) ($product['buy_date'] ?? ''));
+    $stockQty = (int) round((float) ($product['stock'] ?? 0));
+
     $payload = [
         'event' => 'catalog_sync',
         'action' => 'catalog_update',
-        'product_code' => (string) ($product['code'] ?? $product['id'] ?? ''),
+        'internal_code' => $internalCode,
+        'product_code' => $displayCode,
+        'stock_code' => $stockCode,
+        'account_code1' => $accountCode1,
         'product_name' => (string) ($product['name'] ?? ''),
-        'category' => (string) ($product['category'] ?? ''),
-        'item_type' => (string) ($product['item_type'] ?? ''),
+        'name' => (string) ($product['name'] ?? ''),
+        'gl_description' => $category,
+        'category' => $category,
+        'item_type' => (string) ($product['item_type'] ?? $product['type'] ?? ''),
+        'section_code' => (string) ($product['section_code'] ?? ''),
+        'section_name' => (string) ($product['section_name'] ?? ''),
+        'apex' => (string) ($product['apex'] ?? ''),
         'unit' => (string) ($product['unit'] ?? ''),
-        'current_stock' => (int) round((float) ($product['stock'] ?? 0)),
+        'quantity' => $stockQty,
+        'current_stock' => $stockQty,
         'reorder_point' => (int) round((float) ($product['reorder_point'] ?? $product['minimum'] ?? 0)),
-        'location' => (string) ($product['location'] ?? ''),
+        'buy_date' => $buyParts['date'],
+        'buy_time' => $buyParts['time'],
+        'buy_date_time' => $buyParts['time'],
+        'buy_price' => isset($product['buy_price']) && $product['buy_price'] !== null && $product['buy_price'] !== '' ? (float) $product['buy_price'] : '',
+        'cal_no' => (string) ($product['cal_no'] ?? ''),
+        'cal_date' => (string) ($product['cal_date'] ?? ''),
+        'cal_exp' => (string) ($product['cal_exp'] ?? ''),
+        'notes' => (string) ($product['notes'] ?? ''),
+        'location' => inventory_sheet_section_location($product),
         'timestamp' => date('Y-m-d H:i:s'),
     ];
 
@@ -2836,21 +3231,187 @@ function inventory_sync_google_sheet_product(array $product): array
 }
 
 /**
- * ซิงค์รายการสินค้าทั้งหมดไปยังแท็บ "รายการสินค้า" บน Google Sheet (ไม่ส่งแจ้งเตือน Telegram)
+ * ซิงค์ข้อมูลทั้งหมด (รายการสินค้า + ประวัติรับ-เบิก + ยืม-คืน) ไปยัง Google Sheet ให้ตรงกัน 100%
  */
 function inventory_sync_all_catalog_to_google_sheet(): array
 {
     $all = inventory_products();
     $list = [];
+    $productMap = [];
     foreach ($all as $p) {
+        $internalCode = (string) ($p['id'] ?? $p['code'] ?? '');
+        $stockCode = inventory_clean_stock_code((string) ($p['stock_code'] ?? $internalCode));
+        $accountCode1 = trim((string) ($p['account_code1'] ?? ''));
+        if ($accountCode1 === '') {
+            $accountCode1 = '-';
+        }
+        $displayCode = inventory_sheet_display_code($stockCode, $accountCode1, $internalCode);
+        $glDescription = trim((string) ($p['gl_description'] ?? ''));
+        $category = $glDescription !== '' ? $glDescription : (string) ($p['category'] ?? '');
+        $buyParts = inventory_split_buy_datetime((string) ($p['buy_date'] ?? ''));
+        $stockQty = (int) round((float) ($p['stock'] ?? 0));
+
+        $productMap[$internalCode] = [
+            'stock_code' => $stockCode,
+            'account_code1' => $accountCode1,
+            'display_code' => $displayCode,
+            'name' => (string) $p['name'],
+            'unit' => (string) ($p['unit'] ?? 'PCS'),
+            'stock' => $stockQty,
+        ];
+
         $list[] = [
-            'product_code' => (string) $p['id'],
+            'internal_code' => $internalCode,
+            'product_code' => $displayCode,
+            'stock_code' => $stockCode,
+            'account_code1' => $accountCode1,
             'product_name' => (string) $p['name'],
-            'category' => (string) ($p['category'] ?? ''),
-            'current_stock' => (int) round((float) ($p['stock'] ?? 0)),
+            'name' => (string) $p['name'],
+            'gl_description' => $category,
+            'category' => $category,
+            'section_code' => (string) ($p['section_code'] ?? ''),
+            'section_name' => (string) ($p['section_name'] ?? ''),
+            'apex' => (string) ($p['apex'] ?? ''),
+            'quantity' => $stockQty,
+            'current_stock' => $stockQty,
             'unit' => (string) ($p['unit'] ?? ''),
             'reorder_point' => (int) round((float) ($p['minimum'] ?? 0)),
-            'location' => (string) ($p['location'] ?? ''),
+            'buy_date' => $buyParts['date'],
+            'buy_time' => $buyParts['time'],
+            'buy_date_time' => $buyParts['time'],
+            'buy_price' => isset($p['buy_price']) && $p['buy_price'] !== null && $p['buy_price'] !== '' ? (float) $p['buy_price'] : '',
+            'cal_no' => (string) ($p['cal_no'] ?? ''),
+            'cal_date' => (string) ($p['cal_date'] ?? ''),
+            'cal_exp' => (string) ($p['cal_exp'] ?? ''),
+            'notes' => (string) ($p['notes'] ?? ''),
+            'location' => inventory_sheet_section_location($p),
+        ];
+    }
+
+    // รวบรวมประวัติรับ-เบิกทั้งหมดเรียงตามลำดับเวลาเพื่อคำนวณยอดคงเหลือหลังทำรายการให้ตรงกัน 100%
+    $db = inventory_db();
+    $rawMovements = [];
+    $receiptRows = $db->query(
+        'SELECT r.id, r.movement_date, r.document_no, r.product_code, r.quantity, r.received_by, r.notes, r.created_by_name, r.created_at
+         FROM `receipts` r
+         ORDER BY r.movement_date ASC, r.id ASC'
+    )->fetchAll();
+    foreach ($receiptRows as $r) {
+        $rawMovements[] = [
+            'kind' => 'receipt',
+            'id' => (int) $r['id'],
+            'movement_date' => (string) $r['movement_date'],
+            'created_at' => (string) ($r['created_at'] ?? $r['movement_date']),
+            'document_no' => (string) ($r['document_no'] ?? ''),
+            'internal_code' => (string) $r['product_code'],
+            'quantity' => (int) round((float) $r['quantity']),
+            'actor' => (string) ($r['received_by'] ?? ''),
+            'approver' => '-',
+            'notes' => (string) ($r['notes'] ?? ''),
+            'created_by' => (string) ($r['created_by_name'] ?? ''),
+        ];
+    }
+    $issueRows = $db->query(
+        'SELECT i.id, i.movement_date, i.document_no, i.product_code, i.quantity, i.requested_by, i.approved_by, i.notes, i.created_by_name, i.created_at
+         FROM `issues` i
+         ORDER BY i.movement_date ASC, i.id ASC'
+    )->fetchAll();
+    foreach ($issueRows as $i) {
+        $rawMovements[] = [
+            'kind' => 'issue',
+            'id' => (int) $i['id'],
+            'movement_date' => (string) $i['movement_date'],
+            'created_at' => (string) ($i['created_at'] ?? $i['movement_date']),
+            'document_no' => (string) ($i['document_no'] ?? ''),
+            'internal_code' => (string) $i['product_code'],
+            'quantity' => (int) round((float) $i['quantity']),
+            'actor' => (string) ($i['requested_by'] ?? ''),
+            'approver' => (string) ($i['approved_by'] ?? ''),
+            'notes' => (string) ($i['notes'] ?? ''),
+            'created_by' => (string) ($i['created_by_name'] ?? ''),
+        ];
+    }
+    usort($rawMovements, static function (array $a, array $b): int {
+        $cmp = strcmp($a['movement_date'], $b['movement_date']);
+        if ($cmp !== 0) {
+            return $cmp;
+        }
+        $cmpTs = strcmp($a['created_at'], $b['created_at']);
+        if ($cmpTs !== 0) {
+            return $cmpTs;
+        }
+        return $a['id'] <=> $b['id'];
+    });
+
+    $runningStock = [];
+    $movementsPayload = [];
+    foreach ($rawMovements as $m) {
+        $ic = $m['internal_code'];
+        if (!isset($productMap[$ic])) {
+            continue;
+        }
+        $pInfo = $productMap[$ic];
+        $cur = $runningStock[$ic] ?? 0;
+        if ($m['kind'] === 'receipt') {
+            $cur += $m['quantity'];
+        } else {
+            $cur -= $m['quantity'];
+        }
+        $runningStock[$ic] = $cur;
+
+        $movementsPayload[] = [
+            'timestamp' => $m['created_at'] !== '' ? $m['created_at'] : $m['movement_date'],
+            'movement_date' => $m['movement_date'],
+            'action' => $m['kind'],
+            'action_name' => $m['kind'] === 'receipt' ? 'รับสินค้า' : 'เบิกสินค้า',
+            'internal_code' => $ic,
+            'product_code' => $pInfo['display_code'],
+            'stock_code' => $pInfo['stock_code'],
+            'account_code1' => $pInfo['account_code1'],
+            'product_name' => $pInfo['name'],
+            'quantity' => $m['quantity'],
+            'unit' => $pInfo['unit'],
+            'current_stock' => $cur,
+            'document_no' => $m['document_no'] !== '' ? $m['document_no'] : '-',
+            'actor' => $m['actor'] !== '' ? $m['actor'] : '-',
+            'approver' => $m['approver'] !== '' ? $m['approver'] : '-',
+            'notes' => $m['notes'] !== '' ? $m['notes'] : '-',
+            'created_by' => $m['created_by'] !== '' ? $m['created_by'] : '-',
+        ];
+    }
+
+    // รวบรวมรายการยืม-คืนทั้งหมด
+    $borrowRows = inventory_borrow_records('all', '', 250);
+    $borrowRows = array_reverse($borrowRows);
+    $borrowsPayload = [];
+    foreach ($borrowRows as $b) {
+        $isRet = ($b['status'] ?? '') === 'returned';
+        $bSc = inventory_clean_stock_code((string) ($b['product_stock_code'] ?? $b['product_code'] ?? ''));
+        $bAc = trim((string) ($b['account_code1'] ?? ''));
+        if ($bAc === '') {
+            $bAc = '-';
+        }
+        $borrowsPayload[] = [
+            'id' => (int) $b['id'],
+            'action_name' => $isRet ? 'คืนพัสดุ' : 'ยืมพัสดุ',
+            'borrower_name' => (string) ($b['borrower_name'] ?? ''),
+            'product_name' => (string) ($b['product_name'] ?? ''),
+            'product_code' => inventory_sheet_display_code($bSc, $bAc, (string) ($b['product_code'] ?? '')),
+            'stock_code' => $bSc,
+            'account_code1' => $bAc,
+            'quantity' => (int) round((float) ($b['quantity'] ?? 1)),
+            'unit' => (string) ($b['unit'] ?? 'PCS'),
+            'location' => (string) ($b['location'] ?? ''),
+            'borrow_date' => (string) ($b['borrow_date'] ?? ''),
+            'borrow_time' => substr((string) ($b['borrow_time'] ?? ''), 0, 5),
+            'status' => $isRet ? 'คืนแล้ว' : 'กำลังยืม',
+            'return_date' => $isRet ? (string) ($b['return_date'] ?? '') : '',
+            'return_time' => ($isRet && !empty($b['return_time'])) ? substr((string) $b['return_time'], 0, 5) : '',
+            'return_received_by' => $isRet ? (string) ($b['return_received_by'] ?? '-') : '',
+            'notes' => (string) (($isRet && !empty($b['return_notes']))
+                ? ((!empty($b['notes']) && $b['notes'] !== '-') ? ($b['notes'] . ' | [คืน: ' . $b['return_notes'] . ']') : $b['return_notes'])
+                : ($b['notes'] ?: '-')),
+            'timestamp' => (string) ($b['updated_at'] ?? $b['created_at'] ?? date('Y-m-d H:i:s')),
         ];
     }
 
@@ -2859,6 +3420,8 @@ function inventory_sync_all_catalog_to_google_sheet(): array
         'action' => 'catalog_batch_sync',
         'count' => count($list),
         'products' => $list,
+        'movements' => $movementsPayload,
+        'borrows' => $borrowsPayload,
         'timestamp' => date('Y-m-d H:i:s'),
     ];
 

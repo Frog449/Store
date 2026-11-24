@@ -2,6 +2,7 @@
 $pageTitle = $pageTitle ?? 'Store Automeation | อะไหล่อุตสาหกรรม';
 $pageDescription = $pageDescription ?? 'รายการสินค้าและระบบจัดการสต๊อก';
 $activePage = $activePage ?? 'products';
+$resourcePrefix = app_resource_prefix();
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -12,8 +13,8 @@ $activePage = $activePage ?? 'products';
     <meta name="description" content="<?= h($pageDescription) ?>">
     <title><?= h($pageTitle) ?></title>
     <!-- PWA & Mobile Web App Meta -->
-    <link rel="manifest" href="../manifest.json">
-    <link rel="apple-touch-icon" sizes="180x180" href="../assets/icons/apple-touch-icon.png">
+    <link rel="manifest" href="<?= $resourcePrefix ?>manifest.json">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= $resourcePrefix ?>assets/icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Store AUT">
@@ -21,25 +22,26 @@ $activePage = $activePage ?? 'products';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="../assets/favicon.png?v=<?= @filemtime(__DIR__ . '/../../assets/favicon.png') ?>">
-    <link rel="shortcut icon" href="../favicon.ico?v=<?= @filemtime(__DIR__ . '/../../favicon.ico') ?>">
-    <link rel="stylesheet" href="style.css?v=4.5">
+    <link rel="icon" type="image/png" href="<?= $resourcePrefix ?>assets/favicon.png?v=<?= filemtime(__DIR__ . '/../assets/favicon.png') ?>">
+    <link rel="shortcut icon" href="<?= $resourcePrefix ?>favicon.ico?v=<?= filemtime(__DIR__ . '/../favicon.ico') ?>">
+    <link rel="stylesheet" href="style.css?v=4.7">
     <script>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('../sw.js?v=1.6').catch(() => {});
+            navigator.serviceWorker.register('<?= $resourcePrefix ?>sw.js?v=1.6').catch(() => {});
         });
     }
     </script>
 </head>
 <body>
+<?php require __DIR__ . '/loading-indicator.php'; ?>
 <div class="app-layout">
     <!-- Left Sidebar Navigation -->
     <aside class="site-sidebar" id="site-sidebar">
         <!-- Sidebar Brand Header -->
         <div class="sidebar-header">
             <a class="sidebar-brand" href="index.php" aria-label="Store Automeation หน้าแรก">
-                <img src="../assets/logo.png" alt="AUT Automation" class="sidebar-brand-img">
+                <img src="<?= $resourcePrefix ?>assets/logo.png" alt="AUT Automation" class="sidebar-brand-img">
                 <div class="sidebar-brand-text">
                     <span class="brand-name">Store <span>Automeation</span></span>
                     <small>INDUSTRIAL SUPPLY</small>
@@ -80,6 +82,10 @@ $activePage = $activePage ?? 'products';
             <a class="sidebar-link <?= $activePage === 'history' ? 'active' : '' ?>" href="history.php">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span>ประวัติรับ–เบิก</span>
+            </a>
+            <a class="sidebar-link <?= $activePage === 'excel_live' ? 'active' : '' ?>" href="excel-live.php">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="12" y1="9" x2="12" y2="21"/></svg>
+                <span>Excel อัปเดตสด</span>
             </a>
 
             <?php if (function_exists('auth_is_admin') && auth_is_admin()): ?>
@@ -158,7 +164,7 @@ $activePage = $activePage ?? 'products';
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <a class="mobile-brand" href="index.php">
-                <img src="../assets/logo.png" alt="AUT Automation" style="height:26px;width:auto;object-fit:contain;">
+                <img src="<?= $resourcePrefix ?>assets/logo.png" alt="AUT Automation" style="height:26px;width:auto;object-fit:contain;">
                 <span>Store <b>Automeation</b></span>
             </a>
             <div class="mobile-header-actions">

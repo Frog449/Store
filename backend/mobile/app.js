@@ -110,7 +110,8 @@ function filterProducts() {
         const matchesQuery = (card.dataset.search || "").toLocaleLowerCase("th").includes(query);
         const cardCategories = (card.dataset.categories || card.dataset.category || "").split("|").filter(Boolean);
         const matchesCategory = activeCategory === "all" || cardCategories.includes(activeCategory);
-        const matchesStatus = activeStatus === "all" || card.dataset.statusKey === activeStatus;
+        const matchesStatus = activeStatus === "all"
+            || (activeStatus === "borrowed" ? card.dataset.borrowed === "1" : card.dataset.statusKey === activeStatus);
         const visible = matchesQuery && matchesCategory && matchesStatus;
         card.hidden = !visible;
         visibleCount += Number(visible);
@@ -118,7 +119,7 @@ function filterProducts() {
 
     resultCount.textContent = `แสดง ${visibleCount} รายการ`;
     if (visibleCount === 0) {
-        const statusLabelMap = { normal: "ปกติ", low: "ควรสั่งซื้อ", negative: "หมด" };
+        const statusLabelMap = { normal: "ปกติ", low: "ควรสั่งซื้อ", negative: "หมด", borrowed: "กำลังยืม" };
         if (query !== "") {
             emptySearch.textContent = "ไม่พบสินค้าที่ตรงกับคำค้นหา ลองค้นหาด้วยคำอื่น";
         } else if (activeStatus !== "all") {
@@ -287,6 +288,7 @@ const productDetailDialog = document.querySelector("#product-detail-dialog");
 if (productDetailDialog) {
     const detailTitle = document.querySelector("#product-detail-title");
     const detailCode = document.querySelector("#product-detail-code");
+    const detailBorrowed = document.querySelector("#product-detail-borrowed");
     const detailBorrowLink = document.querySelector("#product-detail-borrow");
     const detailIssueLink = document.querySelector("#product-detail-issue");
     const detailAccountToggle = document.querySelector("#product-detail-account-toggle");
@@ -334,6 +336,25 @@ if (productDetailDialog) {
         if (detailCode) {
             detailCode.textContent = `Stock Code ${variant.stockCode || "-"}`;
         }
+        if (detailBorrowed) {
+            const vBorrowedQty = Number(variant.borrowedQty || 0);
+            const totalBorrowedQty = activeProductCard ? Number(activeProductCard.dataset.borrowedQty || 0) : vBorrowedQty;
+            detailBorrowed.replaceChildren();
+            if (vBorrowedQty > 0) {
+                const dot = document.createElement("i");
+                const txt = variant.borrowedBorrowers
+                    ? `กำลังยืมอยู่ · โดย ${variant.borrowedBorrowers}`
+                    : "กำลังยืมอยู่";
+                detailBorrowed.append(dot, document.createTextNode(txt));
+                detailBorrowed.hidden = false;
+            } else if (totalBorrowedQty > 0) {
+                const dot = document.createElement("i");
+                detailBorrowed.append(dot, document.createTextNode(`กำลังยืมอยู่ใน Stock Code นี้ ${totalBorrowedQty} รายการ`));
+                detailBorrowed.hidden = false;
+            } else {
+                detailBorrowed.hidden = true;
+            }
+        }
         if (detailBorrowLink) {
             const scParam = variant.stockCode && variant.stockCode !== "-"
                 ? `&stock_code=${encodeURIComponent(variant.stockCode)}`
@@ -343,8 +364,20 @@ if (productDetailDialog) {
         if (detailIssueLink) {
             detailIssueLink.href = `issue.php?product=${encodeURIComponent(variant.code || "")}`;
         }
+        const hideIfEmptyKeys = new Set(["calNo", "calDate", "calExp"]);
         detailFields.forEach((field) => {
             const key = field.dataset.detail;
+            const rawVal = String(variant[key] ?? "").trim();
+            if (hideIfEmptyKeys.has(key)) {
+                const row = field.closest("div");
+                const isEmpty = rawVal === "" || rawVal === "-" || rawVal === "—";
+                if (row) {
+                    row.hidden = isEmpty;
+                    row.style.display = isEmpty ? "none" : "";
+                }
+                field.textContent = isEmpty ? "" : rawVal;
+                return;
+            }
             if (key === "stock" && activeVariants.length > 1) {
                 field.textContent = `${totalStock} (ตัวนี้ ${variant.stock})`;
             } else {
@@ -401,15 +434,32 @@ if (productDetailDialog) {
             btn.className = "account-code-item-btn";
             btn.dataset.variantCode = v.code;
 
+            const isBorrowed = Number(v.borrowedQty || 0) > 0;
+            if (isBorrowed) {
+                btn.classList.add("is-borrowed");
+            }
+
+            const headWrap = document.createElement("div");
+            headWrap.className = "account-code-item-head";
+
             const codeSpan = document.createElement("strong");
             codeSpan.textContent = v.accountCode1 || "-";
+            headWrap.append(codeSpan);
+
+            if (isBorrowed) {
+                const tag = document.createElement("span");
+                tag.className = "account-code-borrowed-tag";
+                tag.textContent = "กำลังยืมอยู่";
+                headWrap.append(tag);
+            }
 
             const metaSpan = document.createElement("small");
             const metaParts = [`คงเหลือ ${v.stock} ${v.unit || ""}`.trim()];
             if (v.apex) metaParts.push(`Apex ${v.apex}`);
+            if (isBorrowed && v.borrowedBorrowers) metaParts.push(`ผู้ยืม: ${v.borrowedBorrowers}`);
             metaSpan.textContent = metaParts.join(" · ");
 
-            btn.append(codeSpan, metaSpan);
+            btn.append(headWrap, metaSpan);
             btn.addEventListener("click", () => {
                 renderActiveVariant(v, totalStock);
             });
@@ -484,7 +534,7 @@ if (productDetailDialog) {
             if (editForm.elements.original_code) editForm.elements.original_code.value = values.code;
             if (editForm.elements.code) editForm.elements.code.value = values.code;
             if (editForm.elements.name) editForm.elements.name.value = values.name;
-            [["account_code1", "accountCode1"], ["stock_code", "stockCode"], ["section_code", "sectionCode"], ["section_name", "sectionName"], ["apex", "apex"], ["notes", "notes"]].forEach(([field, key]) => {
+            [["account_code1", "accountCode1"], ["stock_code", "stockCode"], ["section_code", "sectionCode"], ["section_name", "sectionName"], ["apex", "apex"], ["notes", "notes"], ["cal_no", "calNo"], ["cal_date", "calDate"], ["cal_exp", "calExp"]].forEach(([field, key]) => {
                 if (editForm.elements[field]) editForm.elements[field].value = values[key] || "";
             });
             const editGlDropdown = editForm.querySelector("#edit-gl-description-dropdown");
@@ -497,6 +547,7 @@ if (productDetailDialog) {
             if (editForm.elements.location) editForm.elements.location.value = values.location;
             if (editForm.elements.reorder_point) editForm.elements.reorder_point.value = String(values.minimum || "").replace(/,/g, "");
             if (editForm.elements.buy_date) editForm.elements.buy_date.value = values.buyDateInput || "";
+            if (editForm.elements.buy_date_time) editForm.elements.buy_date_time.value = values.buyDateTimeInput || "";
             if (editForm.elements.buy_price) editForm.elements.buy_price.value = values.buyPriceRaw || "";
             if (editImagePreview) editImagePreview.dataset.currentImage = values.image;
             resetEditImage(values.image);

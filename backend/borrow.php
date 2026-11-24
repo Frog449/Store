@@ -207,6 +207,9 @@ require __DIR__ . '/includes/header.php';
                     + บันทึกการยืมพัสดุ
                 </button>
             <?php endif; ?>
+            <a class="secondary-button" href="excel-live.php" style="color:#15803d;border-color:#86efac;background:#f0fdf4;">
+                Excel อัปเดตสด (.xlsx)
+            </a>
             <?php if (auth_is_admin()): ?>
                 <a class="secondary-button" href="settings.php">
                     ตั้งค่าแจ้งเตือน (Telegram / Sheets)

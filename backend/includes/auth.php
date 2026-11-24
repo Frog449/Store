@@ -120,6 +120,43 @@ function auth_logout(): void
     }
 }
 
+function auth_login_guest(): bool
+{
+    try {
+        $db = inventory_db();
+        $stmt = $db->prepare('SELECT id, status FROM `users` WHERE username = :u LIMIT 1');
+        $stmt->execute(['u' => 'guest']);
+        $guest = $stmt->fetch();
+
+        if (!$guest) {
+            $insert = $db->prepare(
+                'INSERT INTO `users` (`username`, `password_hash`, `name`, `role`, `department`, `status`)
+                 VALUES (:u, :p, :n, "viewer", "ผู้มาเยือน", "active")'
+            );
+            $insert->execute([
+                'u' => 'guest',
+                'p' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT),
+                'n' => 'ผู้มาเยือน',
+            ]);
+            $guestId = (int) $db->lastInsertId();
+        } else {
+            if (($guest['status'] ?? 'active') === 'suspended') {
+                throw new DomainException('บัญชีผู้มาเยือนถูกระงับการใช้งาน');
+            }
+            $guestId = (int) $guest['id'];
+        }
+
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $guestId;
+        return true;
+    } catch (DomainException $e) {
+        throw $e;
+    } catch (Throwable $e) {
+        error_log('Guest login error: ' . $e->getMessage());
+        return false;
+    }
+}
+
 function auth_is_admin(): bool
 {
     $user = auth_user();

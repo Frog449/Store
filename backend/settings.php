@@ -263,16 +263,36 @@ require __DIR__ . '/includes/header.php';
         <textarea id="settings-gas-code" readonly
           style="width:100%;height:320px;font-family:monospace;font-size:11px;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;"><?= h('/**
  * =========================================================================
- * STORE AUTOMEATION - GOOGLE APPS SCRIPT WEBHOOK (V2.1)
- * ระบบเชื่อมต่อ Google Sheets: รายการสินค้า + รับ-เบิก + ยืม-คืน พัสดุ
+ * STORE AUTOMEATION - GOOGLE APPS SCRIPT WEBHOOK (V3.0)
+ * ระบบเชื่อมต่อ Google Sheets: รายการสินค้า + ประวัติรับ-เบิก + ยืม-คืน พัสดุ
+ * (รองรับซิงค์ข้อมูลและคอลัมน์ตรงกับหน้าเว็บ 100%)
  * =========================================================================
  */
+
+var CATALOG_HEADERS = [
+  "Account Code1", "Stock Code", "GL Description", "Name",
+  "Unit", "Quantity", "Section code", "Section Name", "Apex",
+  "Buydate", "เวลาBuydate", "BuyPrice/Unit",
+  "Cal No.", "Cal date", "Cal Exp.", "จุดสั่งซื้อขั้นต่ำ"
+];
+
+var MOVEMENT_HEADERS = [
+  "วัน-เวลา", "ประเภท", "Stock Code", "Account Code1", "ชื่อสินค้า",
+  "จำนวน", "หน่วยนับ", "คงเหลือหลังทำรายการ", "เลขที่เอกสาร",
+  "ผู้รับ/ผู้ขอเบิก", "ผู้อนุมัติ", "หมายเหตุ", "ผู้บันทึก"
+];
+
+var BORROW_HEADERS = [
+  "ID", "กิจกรรม", "ผู้ยืม", "รายการพัสดุ", "Stock Code", "Account Code1",
+  "จำนวน", "หน่วยนับ", "สถานที่ใช้งาน", "วันที่ยืม", "เวลาที่ยืม",
+  "สถานะ", "วันที่คืน", "เวลาที่คืน", "ผู้รับคืน", "หมายเหตุ", "เวลาที่บันทึก"
+];
 
 // 1. ฟังก์ชันตอบสนองเมื่อเปิดผ่าน Browser หรือ Health Check
 function doGet(e) {
   return jsonResponse({
     status: "ok",
-    message: "Google Apps Script Web App พร้อมใช้งาน (Store Automeation Ready)",
+    message: "Google Apps Script Web App พร้อมใช้งาน (Store Automeation V3.0 Ready)",
     timestamp: Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss")
   });
 }
@@ -280,7 +300,7 @@ function doGet(e) {
 // 2. ฟังก์ชันหลักรับข้อมูลแบบ POST จาก Store Automeation
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  var hasLock = lock.tryLock(20000); // รอคิวไม่เกิน 20 วินาทีป้องกันข้อมูลชนกัน
+  var hasLock = lock.tryLock(20000);
 
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -306,10 +326,16 @@ function doPost(e) {
       return jsonResponse({ status: "ok", message: "บันทึกประวัติรับ-เบิก และอัปเดตยอดคงเหลือในรายการสินค้าเรียบร้อยแล้ว" });
     }
 
-    // 2. ซิงค์รายการสินค้าทั้งหมด (Batch Catalog Sync)
+    // 2. ซิงค์ข้อมูลทั้งหมดให้ตรงกับหน้าเว็บ 100% (รายการสินค้า + ประวัติรับ-เบิก + ยืม-คืน)
     if (data.event === "catalog_batch_sync") {
       var count = batchSyncCatalog(ss, data.products || [], data.timestamp);
-      return jsonResponse({ status: "ok", message: "ซิงค์รายการสินค้าทั้งหมดสำเร็จ จำนวน " + count + " รายการ" });
+      if (Array.isArray(data.movements)) {
+        batchSyncMovements(ss, data.movements);
+      }
+      if (Array.isArray(data.borrows)) {
+        batchSyncBorrows(ss, data.borrows);
+      }
+      return jsonResponse({ status: "ok", message: "ซิงค์ข้อมูลทั้งหมดเข้า Google Sheet สำเร็จ (" + count + " รายการสินค้า)" });
     }
 
     // 3. ซิงค์ข้อมูลสินค้าเดี่ยว (Single Product Catalog Sync)
@@ -335,6 +361,45 @@ function jsonResponse(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function cleanCode(val) {
+  var s = String(val === undefined || val === null ? "" : val).trim();
+  if (s === "" || s === "—" || s.indexOf("ITEM-") === 0 || s.indexOf("legacy-") === 0) {
+    return "-";
+  }
+  return s;
+}
+
+function ensureSheetHeaders(sheet, headers) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  } else {
+    var lastCol = Math.max(headers.length, sheet.getLastColumn());
+    var currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var mismatch = false;
+    if (sheet.getLastColumn() > headers.length) {
+      mismatch = true;
+    } else {
+      for (var i = 0; i < headers.length; i++) {
+        if (String(currentHeaders[i] || "").trim() !== headers[i]) {
+          mismatch = true;
+          break;
+        }
+      }
+    }
+    if (mismatch) {
+      if (sheet.getLastColumn() > headers.length) {
+        var extraCols = sheet.getLastColumn() - headers.length;
+        sheet.getRange(1, headers.length + 1, Math.max(1, sheet.getLastRow()), extraCols).clearContent();
+        sheet.getRange(1, headers.length + 1, 1, extraCols).clearFormat();
+      }
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+  }
+  sheet.setFrozenRows(1);
+  var hRange = sheet.getRange(1, 1, 1, headers.length);
+  hRange.setFontWeight("bold").setBackground("#f1f5f9").setFontColor("#1e293b").setHorizontalAlignment("center");
+}
+
 function getOrCreateSheet(ss, name, headers) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
@@ -346,11 +411,8 @@ function getOrCreateSheet(ss, name, headers) {
       sheet = ss.insertSheet(name);
     }
   }
-  if (sheet.getLastRow() === 0 && headers && headers.length > 0) {
-    sheet.appendRow(headers);
-    sheet.setFrozenRows(1);
-    var hRange = sheet.getRange(1, 1, 1, headers.length);
-    hRange.setFontWeight("bold").setBackground("#f1f5f9").setFontColor("#1e293b").setHorizontalAlignment("center");
+  if (headers && headers.length > 0) {
+    ensureSheetHeaders(sheet, headers);
   }
   return sheet;
 }
@@ -359,13 +421,13 @@ function getCatalogSheet(ss) {
   var names = ["รายการสินค้า", "ทะเบียนสินค้า", "Catalog", "สินค้า"];
   for (var i = 0; i < names.length; i++) {
     var s = ss.getSheetByName(names[i]);
-    if (s) return s;
+    if (s) {
+      ensureSheetHeaders(s, CATALOG_HEADERS);
+      return s;
+    }
   }
-  var sNew = getOrCreateSheet(ss, "รายการสินค้า", [
-    "รหัสสินค้า", "ชื่อสินค้า", "หมวดหมู่", "คงเหลือ", "หน่วยนับ",
-    "จุดสั่งซื้อขั้นต่ำ", "ตำแหน่งจัดเก็บ", "อัปเดตล่าสุด"
-  ]);
-  try { sNew.getRange("A:A").setNumberFormat("@"); } catch(e) {}
+  var sNew = getOrCreateSheet(ss, "รายการสินค้า", CATALOG_HEADERS);
+  try { sNew.getRange("A:B").setNumberFormat("@"); } catch(e) {}
   return sNew;
 }
 
@@ -373,13 +435,13 @@ function getMovementSheet(ss) {
   var names = ["ประวัติรับ-เบิก", "รับ-เบิก", "ประวัติรับเบิก", "Movements"];
   for (var i = 0; i < names.length; i++) {
     var s = ss.getSheetByName(names[i]);
-    if (s) return s;
+    if (s) {
+      ensureSheetHeaders(s, MOVEMENT_HEADERS);
+      return s;
+    }
   }
-  var sNew = getOrCreateSheet(ss, "ประวัติรับ-เบิก", [
-    "วัน-เวลา", "ประเภท", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "หน่วยนับ",
-    "คงเหลือหลังทำรายการ", "เลขที่เอกสาร", "ผู้รับ/ผู้ขอเบิก", "ผู้อนุมัติ", "หมายเหตุ", "ผู้บันทึก"
-  ]);
-  try { sNew.getRange("C:C").setNumberFormat("@"); } catch(e) {}
+  var sNew = getOrCreateSheet(ss, "ประวัติรับ-เบิก", MOVEMENT_HEADERS);
+  try { sNew.getRange("C:D").setNumberFormat("@"); } catch(e) {}
   return sNew;
 }
 
@@ -387,63 +449,101 @@ function getBorrowSheet(ss) {
   var names = ["ยืม-คืน", "ยืมคืน", "Borrow"];
   for (var i = 0; i < names.length; i++) {
     var s = ss.getSheetByName(names[i]);
-    if (s) return s;
+    if (s) {
+      ensureSheetHeaders(s, BORROW_HEADERS);
+      return s;
+    }
   }
-  var sNew = getOrCreateSheet(ss, "ยืม-คืน", [
-    "ID", "กิจกรรม", "ผู้ยืม", "รายการพัสดุ", "รหัสสินค้า",
-    "จำนวน", "หน่วยนับ", "สถานที่ใช้งาน", "วันที่ยืม", "เวลาที่ยืม",
-    "สถานะ", "วันที่คืน", "เวลาที่คืน", "ผู้รับคืน", "หมายเหตุ", "เวลาที่บันทึก"
-  ]);
+  var sNew = getOrCreateSheet(ss, "ยืม-คืน", BORROW_HEADERS);
   try {
     sNew.getRange("A:A").setNumberFormat("@");
-    sNew.getRange("E:E").setNumberFormat("@");
+    sNew.getRange("E:F").setNumberFormat("@");
   } catch(e) {}
   return sNew;
 }
 
+function buildCatalogRow(p) {
+  var ac1 = cleanCode(p.account_code1 || "-");
+  var sc = cleanCode(p.stock_code !== undefined ? p.stock_code : (p.product_code || p.code || "-"));
+  var gl = String(p.gl_description || p.category || "").trim();
+  var name = String(p.product_name || p.name || "").trim();
+  var unit = String(p.unit || "PCS").trim();
+  var stock = Math.round(Number(p.current_stock !== undefined && p.current_stock !== null ? p.current_stock : (p.stock || 0)));
+  var secCode = String(p.section_code || "").trim();
+  var secName = String(p.section_name || "").trim();
+  var apex = String(p.apex || "").trim();
+  var rawBuy = String(p.buy_date || "").replace("T", " ").trim();
+  var buyDate = rawBuy;
+  var buyTime = String(p.buy_time !== undefined ? p.buy_time : (p.buy_date_time || "")).trim();
+  if (rawBuy.indexOf(" ") !== -1) {
+    var bParts = rawBuy.split(/\s+/);
+    buyDate = bParts[0] || "";
+    if (buyTime === "" && bParts[1]) {
+      buyTime = bParts[1].substring(0, 5);
+    }
+  }
+  var buyPrice = (p.buy_price !== undefined && p.buy_price !== null && p.buy_price !== "") ? Number(p.buy_price) : "";
+  var calNo = String(p.cal_no || "").trim();
+  var calDate = String(p.cal_date || "").trim();
+  var calExp = String(p.cal_exp || "").trim();
+  var minOrder = Math.round(Number(p.reorder_point !== undefined && p.reorder_point !== null ? p.reorder_point : (p.minimum || 0)));
+
+  return [
+    "\'" + ac1,
+    "\'" + sc,
+    gl,
+    name,
+    unit,
+    stock,
+    secCode !== "" ? "\'" + secCode : "",
+    secName,
+    apex,
+    buyDate !== "" ? "\'" + buyDate : "",
+    buyTime !== "" ? "\'" + buyTime : "",
+    buyPrice,
+    calNo !== "" ? "\'" + calNo : "",
+    calDate !== "" ? "\'" + calDate : "",
+    calExp !== "" ? "\'" + calExp : "",
+    minOrder
+  ];
+}
+
 function updateCatalogStock(ss, data) {
   var catalogSheet = getCatalogSheet(ss);
-  var targetCode = String(data.product_code || "").trim();
-  if (!targetCode) return;
+  var ac1 = cleanCode(data.account_code1 || "-").toLowerCase();
+  var sc = cleanCode(data.stock_code !== undefined ? data.stock_code : (data.product_code || "-")).toLowerCase();
+  var pName = String(data.product_name || data.name || "").trim().toLowerCase();
 
   var values = catalogSheet.getDataRange().getValues();
   var foundRow = 0;
-  var targetLower = targetCode.toLowerCase();
   for (var i = 1; i < values.length; i++) {
-    if (String(values[i][0]).trim().toLowerCase() === targetLower) {
+    var rowAc1 = String(values[i][0] || "").trim().toLowerCase();
+    var rowSc = String(values[i][1] || "").trim().toLowerCase();
+    var rowName = String(values[i][3] || "").trim().toLowerCase();
+
+    if (ac1 !== "-" && sc !== "-" && rowAc1 === ac1 && rowSc === sc) {
+      foundRow = i + 1;
+      break;
+    }
+    if (ac1 !== "-" && rowAc1 === ac1 && rowName === pName) {
+      foundRow = i + 1;
+      break;
+    }
+    if (ac1 === "-" && sc !== "-" && rowSc === sc && rowAc1 === "-") {
+      foundRow = i + 1;
+      break;
+    }
+    if (ac1 === "-" && sc === "-" && pName !== "" && rowName === pName && rowAc1 === "-" && rowSc === "-") {
       foundRow = i + 1;
       break;
     }
   }
 
-  var newStock = Math.round(Number((data.current_stock !== undefined && data.current_stock !== null)
-                 ? data.current_stock
-                 : (data.stock !== undefined ? data.stock : 0)));
-  var ts = data.timestamp || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss");
-
+  var rowValues = buildCatalogRow(data);
   if (foundRow > 0) {
-    catalogSheet.getRange(foundRow, 4).setValue(newStock);
-    catalogSheet.getRange(foundRow, 8).setValue(ts);
-    if (data.product_name) catalogSheet.getRange(foundRow, 2).setValue(data.product_name);
-    if (data.category !== undefined && data.category !== null) catalogSheet.getRange(foundRow, 3).setValue(data.category);
-    if (data.unit) catalogSheet.getRange(foundRow, 5).setValue(data.unit);
-    if (data.reorder_point !== undefined && data.reorder_point !== null && data.reorder_point !== "") {
-      catalogSheet.getRange(foundRow, 6).setValue(Math.round(Number(data.reorder_point || 0)));
-    }
-    if (data.location !== undefined && data.location !== null) {
-      catalogSheet.getRange(foundRow, 7).setValue(data.location);
-    }
+    catalogSheet.getRange(foundRow, 1, 1, CATALOG_HEADERS.length).setValues([rowValues]);
   } else {
-    catalogSheet.appendRow([
-      "\'" + targetCode,
-      data.product_name || "",
-      data.category || "",
-      newStock,
-      data.unit || "",
-      Math.round(Number(data.reorder_point || 0)),
-      data.location || "",
-      ts
-    ]);
+    catalogSheet.appendRow(rowValues);
   }
 }
 
@@ -451,14 +551,17 @@ function logMovement(ss, data) {
   var movSheet = getMovementSheet(ss);
   var isReceipt = (data.action === "receipt");
   var qtyPrefix = isReceipt ? "+" : "-";
-  var actor = isReceipt ? (data.received_by || "-") : (data.requested_by || "-");
-  var approver = isReceipt ? "-" : (data.approved_by || "-");
+  var actor = isReceipt ? (data.received_by || data.actor || "-") : (data.requested_by || data.actor || "-");
+  var approver = isReceipt ? "-" : (data.approved_by || data.approver || "-");
   var displayName = data.display_name || data.product_name || "";
+  var sc = cleanCode(data.stock_code !== undefined ? data.stock_code : (data.product_code || "-"));
+  var ac1 = cleanCode(data.account_code1 || "-");
 
   movSheet.appendRow([
     data.timestamp || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss"),
     data.action_name || (isReceipt ? "รับสินค้า" : "เบิกสินค้า"),
-    "\'" + (data.product_code || ""),
+    "\'" + sc,
+    "\'" + ac1,
     displayName,
     qtyPrefix + Math.round(Number(data.quantity || 0)),
     data.unit || "",
@@ -474,29 +577,97 @@ function logMovement(ss, data) {
 function batchSyncCatalog(ss, products, ts) {
   var catalogSheet = getCatalogSheet(ss);
   var lastRow = catalogSheet.getLastRow();
-  var lastCol = Math.max(8, catalogSheet.getLastColumn());
+  var lastCol = Math.max(CATALOG_HEADERS.length, catalogSheet.getLastColumn());
   if (lastRow > 1) {
     catalogSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
   }
+  ensureSheetHeaders(catalogSheet, CATALOG_HEADERS);
 
   var timeStr = ts || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss");
   var rows = [];
   for (var i = 0; i < products.length; i++) {
-    var p = products[i];
-    var code = String(p.product_code || p.code || "").trim();
+    rows.push(buildCatalogRow(products[i], timeStr));
+  }
+  if (rows.length > 0) {
+    catalogSheet.getRange(2, 1, rows.length, CATALOG_HEADERS.length).setValues(rows);
+  }
+  return rows.length;
+}
+
+function batchSyncMovements(ss, movements) {
+  var movSheet = getMovementSheet(ss);
+  var lastRow = movSheet.getLastRow();
+  var lastCol = Math.max(MOVEMENT_HEADERS.length, movSheet.getLastColumn());
+  if (lastRow > 1) {
+    movSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  }
+  ensureSheetHeaders(movSheet, MOVEMENT_HEADERS);
+
+  var rows = [];
+  for (var i = 0; i < movements.length; i++) {
+    var m = movements[i];
+    var isReceipt = (m.action === "receipt");
+    var qtyPrefix = isReceipt ? "+" : "-";
+    var sc = cleanCode(m.stock_code !== undefined ? m.stock_code : (m.product_code || "-"));
+    var ac1 = cleanCode(m.account_code1 || "-");
     rows.push([
-      "\'" + code,
-      p.product_name || p.name || "",
-      p.category || "",
-      Math.round(Number(p.current_stock !== undefined ? p.current_stock : (p.stock || 0))),
-      p.unit || "",
-      Math.round(Number(p.reorder_point || p.minimum || 0)),
-      p.location || "",
-      timeStr
+      m.timestamp || m.movement_date || "",
+      m.action_name || (isReceipt ? "รับสินค้า" : "เบิกสินค้า"),
+      "\'" + sc,
+      "\'" + ac1,
+      m.product_name || "",
+      qtyPrefix + Math.round(Number(m.quantity || 0)),
+      m.unit || "PCS",
+      m.current_stock !== undefined ? Math.round(Number(m.current_stock)) : 0,
+      m.document_no || "-",
+      m.actor || "-",
+      m.approver || "-",
+      m.notes || "-",
+      m.created_by || "-"
     ]);
   }
   if (rows.length > 0) {
-    catalogSheet.getRange(2, 1, rows.length, 8).setValues(rows);
+    movSheet.getRange(2, 1, rows.length, MOVEMENT_HEADERS.length).setValues(rows);
+  }
+  return rows.length;
+}
+
+function batchSyncBorrows(ss, borrows) {
+  var borrowSheet = getBorrowSheet(ss);
+  var lastRow = borrowSheet.getLastRow();
+  var lastCol = Math.max(BORROW_HEADERS.length, borrowSheet.getLastColumn());
+  if (lastRow > 1) {
+    borrowSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  }
+  ensureSheetHeaders(borrowSheet, BORROW_HEADERS);
+
+  var rows = [];
+  for (var i = 0; i < borrows.length; i++) {
+    var b = borrows[i];
+    var sc = cleanCode(b.stock_code !== undefined ? b.stock_code : (b.product_code || "-"));
+    var ac1 = cleanCode(b.account_code1 || "-");
+    rows.push([
+      "\'" + String(b.id || ""),
+      b.action_name || "ยืมพัสดุ",
+      b.borrower_name || "",
+      b.product_name || "",
+      "\'" + sc,
+      "\'" + ac1,
+      Math.round(Number(b.quantity || 1)),
+      b.unit || "PCS",
+      b.location || "",
+      b.borrow_date || "",
+      b.borrow_time || "",
+      b.status || "กำลังยืม",
+      b.return_date || "",
+      b.return_time || "",
+      b.return_received_by || "",
+      b.notes || "-",
+      b.timestamp || ""
+    ]);
+  }
+  if (rows.length > 0) {
+    borrowSheet.getRange(2, 1, rows.length, BORROW_HEADERS.length).setValues(rows);
   }
   return rows.length;
 }
@@ -506,6 +677,8 @@ function handleBorrowSync(ss, data) {
   var isReturn = (data.action === "return" || data.status === "คืนแล้ว" || data.status_code === "returned");
   var itemName = data.product_name || data.item || data.product || "";
   var targetId = String(data.id || "").trim();
+  var sc = cleanCode(data.stock_code !== undefined ? data.stock_code : (data.product_code || "-"));
+  var ac1 = cleanCode(data.account_code1 || "-");
   var foundRow = 0;
 
   if (targetId !== "") {
@@ -520,15 +693,15 @@ function handleBorrowSync(ss, data) {
 
   if (foundRow > 0 && isReturn) {
     borrowSheet.getRange(foundRow, 2).setValue("คืนพัสดุ");
-    borrowSheet.getRange(foundRow, 11).setValue("คืนแล้ว");
-    borrowSheet.getRange(foundRow, 12).setValue(data.return_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd"));
-    borrowSheet.getRange(foundRow, 13).setValue(data.return_time || Utilities.formatDate(new Date(), "Asia/Bangkok", "HH:mm"));
-    borrowSheet.getRange(foundRow, 14).setValue(data.return_received_by || "-");
-    var existingNote = String(borrowSheet.getRange(foundRow, 15).getValue() || "").trim();
+    borrowSheet.getRange(foundRow, 12).setValue("คืนแล้ว");
+    borrowSheet.getRange(foundRow, 13).setValue(data.return_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd"));
+    borrowSheet.getRange(foundRow, 14).setValue(data.return_time || Utilities.formatDate(new Date(), "Asia/Bangkok", "HH:mm"));
+    borrowSheet.getRange(foundRow, 15).setValue(data.return_received_by || "-");
+    var existingNote = String(borrowSheet.getRange(foundRow, 16).getValue() || "").trim();
     var returnNote = String(data.return_notes || "").trim();
     if (returnNote !== "") {
       var merged = (existingNote !== "" && existingNote !== "-") ? existingNote + " | [คืน: " + returnNote + "]" : returnNote;
-      borrowSheet.getRange(foundRow, 15).setValue(merged);
+      borrowSheet.getRange(foundRow, 16).setValue(merged);
     }
     return jsonResponse({status: "ok", message: "อัปเดตรายการคืนพัสดุในแถวที่ " + foundRow + " เรียบร้อย"});
   }
@@ -537,24 +710,26 @@ function handleBorrowSync(ss, data) {
     borrowSheet.getRange(foundRow, 2).setValue("ยืมพัสดุ");
     if (data.borrower_name) borrowSheet.getRange(foundRow, 3).setValue(data.borrower_name);
     if (itemName) borrowSheet.getRange(foundRow, 4).setValue(itemName);
-    if (data.product_code) borrowSheet.getRange(foundRow, 5).setValue("\'" + data.product_code);
-    if (data.quantity !== undefined) borrowSheet.getRange(foundRow, 6).setValue(Math.round(Number(data.quantity || 1)));
-    if (data.unit) borrowSheet.getRange(foundRow, 7).setValue(data.unit);
-    if (data.location) borrowSheet.getRange(foundRow, 8).setValue(data.location);
-    borrowSheet.getRange(foundRow, 11).setValue("กำลังยืม");
-    if (data.notes) borrowSheet.getRange(foundRow, 15).setValue(data.notes);
+    borrowSheet.getRange(foundRow, 5).setValue("\'" + sc);
+    borrowSheet.getRange(foundRow, 6).setValue("\'" + ac1);
+    if (data.quantity !== undefined) borrowSheet.getRange(foundRow, 7).setValue(Math.round(Number(data.quantity || 1)));
+    if (data.unit) borrowSheet.getRange(foundRow, 8).setValue(data.unit);
+    if (data.location) borrowSheet.getRange(foundRow, 9).setValue(data.location);
+    borrowSheet.getRange(foundRow, 12).setValue("กำลังยืม");
+    if (data.notes) borrowSheet.getRange(foundRow, 16).setValue(data.notes);
     return jsonResponse({status: "ok", message: "อัปเดตข้อมูลการยืมในแถวที่ " + foundRow + " เรียบร้อย"});
   }
 
   // Append new row
   borrowSheet.appendRow([
-    targetId,
+    "\'" + targetId,
     isReturn ? "คืนพัสดุ" : "ยืมพัสดุ",
     data.borrower_name || data.name || "",
     itemName,
-    "\'" + (data.product_code || ""),
+    "\'" + sc,
+    "\'" + ac1,
     Math.round(Number(data.quantity || 1)),
-    data.unit || "",
+    data.unit || "PCS",
     data.location || "",
     data.borrow_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd"),
     data.borrow_time || Utilities.formatDate(new Date(), "Asia/Bangkok", "HH:mm"),
@@ -577,14 +752,18 @@ function testWebhook() {
         event: "movement_sync",
         action: "receipt",
         action_name: "ทดสอบผ่าน Apps Script",
+        stock_code: "TEST-001",
+        account_code1: "AUT-TEST-01",
         product_code: "TEST-001",
         product_name: "สินค้าทดสอบระบบ (Test Item)",
-        category: "ทดสอบ",
+        gl_description: "Equipment, Tools",
+        section_code: "G9301",
+        section_name: "AUT-G",
+        apex: "A-2",
         quantity: 5,
         unit: "PCS",
         current_stock: 50,
         reorder_point: 10,
-        location: "Zone-A",
         document_no: "TEST-GAS",
         received_by: "Admin Tester",
         notes: "ทดสอบการทำงานผ่านฟังก์ชัน testWebhook",

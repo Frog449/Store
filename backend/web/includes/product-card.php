@@ -23,6 +23,7 @@ foreach ($variants as $v) {
     $vGlList = inventory_product_gl_list($v);
     $vPrimaryGl = $vGlList[0] ?? 'General';
     $vAc1 = trim((string) ($v['account_code1'] ?? ''));
+    $vBuyDate = str_replace('T', ' ', (string) ($v['buy_date'] ?? ''));
     $searchTokens[] = $vAc1;
     $searchTokens[] = (string) ($v['id'] ?? '');
     $variantPayloads[] = [
@@ -44,9 +45,15 @@ foreach ($variants as $v) {
         'stock' => inventory_quantity($v['stock'] ?? 0),
         'notes' => (string) ($v['notes'] ?? ''),
         'buyDate' => (string) ($v['buy_date'] ?? ''),
-        'buyDateInput' => str_replace(' ', 'T', substr((string) ($v['buy_date'] ?? ''), 0, 16)),
+        'buyDateInput' => substr($vBuyDate, 0, 10),
+        'buyDateTimeInput' => strlen($vBuyDate) > 10 ? substr($vBuyDate, 11, 5) : '',
         'buyPrice' => isset($v['buy_price']) && $v['buy_price'] !== null && $v['buy_price'] !== '' ? number_format((float) $v['buy_price'], 2) : '',
         'buyPriceRaw' => isset($v['buy_price']) && $v['buy_price'] !== null && $v['buy_price'] !== '' ? number_format((float) $v['buy_price'], 2, '.', '') : '',
+        'calNo' => (string) ($v['cal_no'] ?? ''),
+        'calDate' => (string) ($v['cal_date'] ?? ''),
+        'calExp' => (string) ($v['cal_exp'] ?? ''),
+        'borrowedQty' => (int) ($v['borrowed_qty'] ?? 0),
+        'borrowedBorrowers' => implode(', ', (array) ($v['borrowed_borrowers'] ?? [])),
         'image' => inventory_product_image_url($v['image_filename'] ?? null, $vPrimaryGl),
         'hasCustomImage' => inventory_has_custom_image($v['image_filename'] ?? null) ? '1' : '0',
     ];
@@ -77,9 +84,13 @@ if ($variantCount > 1) {
     data-apex="<?= h($product['apex'] ?? '') ?>"
     data-notes="<?= h($product['notes'] ?? '') ?>"
     data-buy-date="<?= h($product['buy_date'] ?? '') ?>"
-    data-buy-date-input="<?= h(str_replace(' ', 'T', substr((string) ($product['buy_date'] ?? ''), 0, 16))) ?>"
+    data-buy-date-input="<?= h(substr(str_replace('T', ' ', (string) ($product['buy_date'] ?? '')), 0, 10)) ?>"
+    data-buy-date-time-input="<?= h(strlen((string) ($product['buy_date'] ?? '')) > 10 ? substr(str_replace('T', ' ', (string) $product['buy_date']), 11, 5) : '') ?>"
     data-buy-price="<?= h(isset($product['buy_price']) && $product['buy_price'] !== null && $product['buy_price'] !== '' ? number_format((float) $product['buy_price'], 2) : '') ?>"
     data-buy-price-raw="<?= h(isset($product['buy_price']) && $product['buy_price'] !== null && $product['buy_price'] !== '' ? number_format((float) $product['buy_price'], 2, '.', '') : '') ?>"
+    data-cal-no="<?= h($product['cal_no'] ?? '') ?>"
+    data-cal-date="<?= h($product['cal_date'] ?? '') ?>"
+    data-cal-exp="<?= h($product['cal_exp'] ?? '') ?>"
     data-category="<?= h($primaryGl) ?>"
     data-type="<?= h($primaryGl) ?>"
     data-unit="<?= h($product['unit']) ?>"
@@ -99,6 +110,8 @@ if ($variantCount > 1) {
     data-variants="<?= h(json_encode($variantPayloads, JSON_UNESCAPED_UNICODE)) ?>"
     data-status="<?= h($stockLabel) ?>"
     data-status-key="<?= h($stockStatus) ?>"
+    data-borrowed="<?= ((int) ($product['borrowed_qty'] ?? 0)) > 0 ? '1' : '0' ?>"
+    data-borrowed-qty="<?= (int) ($product['borrowed_qty'] ?? 0) ?>"
     data-image="<?= h($productImageUrl) ?>"
     data-has-custom-image="<?= $hasCustomImage ? '1' : '0' ?>"
     style="--card-index: <?= (int) $index ?>"
@@ -115,7 +128,12 @@ if ($variantCount > 1) {
         <h3><?= h($product['name']) ?></h3>
         <div class="product-code">Stock Code <span><?= h($product['stock_code'] ?? $product['id']) ?></span></div>
         <div class="product-meta">
-            <span class="stock-status status-<?= h($stockStatus) ?>"><i></i><?= h($stockLabel) ?></span>
+            <div class="product-meta-statuses">
+                <span class="stock-status status-<?= h($stockStatus) ?>"><i></i><?= h($stockLabel) ?></span>
+                <?php if (((int) ($product['borrowed_qty'] ?? 0)) > 0): ?>
+                    <span class="stock-status status-borrowed"><i></i>กำลังยืม <?= (int) $product['borrowed_qty'] ?></span>
+                <?php endif; ?>
+            </div>
             <?php if (!empty($product['apex'])): ?>
                 <span class="location">Apex <?= h($product['apex']) ?></span>
             <?php elseif (!empty($product['location'])): ?>

@@ -1,11 +1,11 @@
 </main>
 <footer class="site-footer">
     <a class="footer-brand" href="index.php">Store <span>Automeation</span></a>
-    <span>MOBILE APPLICATION · INVENTORY</span>
-    <span><a href="../web/?view=desktop" style="color:#64748b;text-decoration:underline;">สลับไปหน้าเว็บเวอร์ชันคอมพิวเตอร์</a></span>
+    <span>INDUSTRIAL SUPPLY · INVENTORY</span>
+    <span>ข้อมูลสต๊อกอ้างอิงจากรายการสินค้า</span>
 </footer>
 </div><!-- /.app-content-wrapper -->
 </div><!-- /.app-layout -->
-<script src="app.js?v=4.8" defer></script>
+<script src="app.js?v=5.1" defer></script>
 </body>
 </html>

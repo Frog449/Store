@@ -36,34 +36,50 @@ function csv_excel_text(mixed $value): string
 
 if ($type === 'products') {
     fputcsv($output, [
-        'รหัสสินค้า',
-        'ชื่อสินค้า',
-        'หมวดหมู่',
-        'ประเภท',
-        'หน่วยนับ',
-        'ตำแหน่งจัดเก็บ',
+        'Account Code1',
+        'Stock Code',
+        'GL Description',
+        'Name',
+        'Unit',
+        'Quantity',
+        'Section code',
+        'Section Name',
+        'Apex',
+        'Buydate',
+        'เวลาBuydate',
+        'BuyPrice/Unit',
+        'Cal No.',
+        'Cal date',
+        'Cal Exp.',
         'จุดสั่งซื้อขั้นต่ำ',
-        'รับเข้ารวม',
-        'เบิกออกรวม',
-        'คงเหลือ',
-        'สถานะสต๊อก',
     ]);
 
     $products = inventory_products();
     foreach ($products as $p) {
-        $status = $p['stock'] < 0 ? 'สต๊อกติดลบ' : ($p['stock'] <= $p['minimum'] ? 'ควรสั่งซื้อ' : 'ปกติ');
+        $sc = inventory_clean_stock_code((string) ($p['stock_code'] ?? $p['id'] ?? ''));
+        $ac1 = trim((string) ($p['account_code1'] ?? ''));
+        if ($ac1 === '') {
+            $ac1 = '-';
+        }
+        $glDesc = trim((string) ($p['gl_description'] ?? '')) !== '' ? $p['gl_description'] : ($p['category'] ?? '');
+        $buyParts = inventory_split_buy_datetime((string) ($p['buy_date'] ?? ''));
         fputcsv($output, [
-            csv_excel_text($p['id']),
+            csv_excel_text($ac1),
+            csv_excel_text($sc),
+            $glDesc,
             $p['name'],
-            $p['category'],
-            $p['type'],
             $p['unit'],
-            $p['location'],
-            $p['minimum'],
-            $p['received'],
-            $p['issued'],
             $p['stock'],
-            $status,
+            csv_excel_text($p['section_code'] ?? ''),
+            $p['section_name'] ?? '',
+            $p['apex'] ?? '',
+            csv_excel_text($buyParts['date']),
+            csv_excel_text($buyParts['time']),
+            $p['buy_price'] !== null ? $p['buy_price'] : '',
+            csv_excel_text($p['cal_no']),
+            csv_excel_text($p['cal_date']),
+            csv_excel_text($p['cal_exp']),
+            $p['minimum'],
         ]);
     }
 
@@ -73,27 +89,30 @@ if ($type === 'products') {
     fputcsv($output, [
         'วันที่รับ',
         'เลขที่เอกสาร',
-        'รหัสสินค้า',
+        'Stock Code',
+        'Account Code1',
         'ชื่อสินค้า',
         'จำนวนรับ',
         'หน่วยนับ',
-        'ผู้ส่งมอบ',
         'ผู้รับสินค้า',
-        'แผนก/หน่วยงาน',
         'หมายเหตุ',
     ]);
 
     foreach ($receipts as $r) {
+        $sc = inventory_clean_stock_code((string) ($r['stock_code'] ?? $r['product_code'] ?? ''));
+        $ac1 = trim((string) ($r['account_code1'] ?? ''));
+        if ($ac1 === '') {
+            $ac1 = '-';
+        }
         fputcsv($output, [
             csv_excel_text($r['movement_date']),
             csv_excel_text($r['document_no']),
-            csv_excel_text($r['product_code']),
+            csv_excel_text($sc),
+            csv_excel_text($ac1),
             $r['product_name'],
             $r['quantity'],
             $r['unit'],
-            $r['supplier'],
             $r['received_by'],
-            $r['department'],
             $r['notes'],
         ]);
     }
@@ -104,26 +123,31 @@ if ($type === 'products') {
     fputcsv($output, [
         'วันที่เบิก',
         'เลขที่เอกสาร',
-        'รหัสสินค้า',
+        'Stock Code',
+        'Account Code1',
         'ชื่อสินค้า',
         'จำนวนเบิก',
         'หน่วยนับ',
         'ผู้เบิก',
-        'แผนก/ผู้รับ',
         'ผู้อนุมัติ',
         'หมายเหตุ',
     ]);
 
     foreach ($issues as $i) {
+        $sc = inventory_clean_stock_code((string) ($i['stock_code'] ?? $i['product_code'] ?? ''));
+        $ac1 = trim((string) ($i['account_code1'] ?? ''));
+        if ($ac1 === '') {
+            $ac1 = '-';
+        }
         fputcsv($output, [
             csv_excel_text($i['movement_date']),
             csv_excel_text($i['document_no']),
-            csv_excel_text($i['product_code']),
+            csv_excel_text($sc),
+            csv_excel_text($ac1),
             $i['product_name'],
             $i['quantity'],
             $i['unit'],
             $i['requested_by'],
-            $i['department'],
             $i['approved_by'],
             $i['notes'],
         ]);
@@ -138,44 +162,48 @@ if ($type === 'products') {
         'ประเภท',
         'วันที่',
         'เลขที่เอกสาร',
-        'รหัสสินค้า',
+        'Stock Code',
+        'Account Code1',
         'ชื่อสินค้า',
         'จำนวน',
         'หน่วยนับ',
-        'ผู้เกี่ยวข้อง 1 (ผู้ส่งมอบ / ผู้เบิก)',
-        'ผู้เกี่ยวข้อง 2 (ผู้รับ / ผู้อนุมัติ)',
-        'แผนก/หน่วยงาน',
+        'ผู้รับสินค้า / ผู้เบิก',
+        'ผู้อนุมัติ',
         'หมายเหตุ',
     ]);
 
     $all = [];
     foreach ($receipts as $r) {
+        $sc = inventory_clean_stock_code((string) ($r['stock_code'] ?? $r['product_code'] ?? ''));
+        $ac1 = trim((string) ($r['account_code1'] ?? ''));
         $all[] = [
             'type' => 'รับเข้า',
             'date' => $r['movement_date'],
             'doc' => $r['document_no'],
-            'code' => $r['product_code'],
+            'sc' => $sc,
+            'ac1' => $ac1 !== '' ? $ac1 : '-',
             'name' => $r['product_name'],
             'qty' => '+' . $r['quantity'],
             'unit' => $r['unit'],
-            'person1' => $r['supplier'],
-            'person2' => $r['received_by'],
-            'dept' => $r['department'],
+            'person1' => $r['received_by'],
+            'person2' => '-',
             'notes' => $r['notes'],
         ];
     }
     foreach ($issues as $i) {
+        $sc = inventory_clean_stock_code((string) ($i['stock_code'] ?? $i['product_code'] ?? ''));
+        $ac1 = trim((string) ($i['account_code1'] ?? ''));
         $all[] = [
             'type' => 'เบิกออก',
             'date' => $i['movement_date'],
             'doc' => $i['document_no'],
-            'code' => $i['product_code'],
+            'sc' => $sc,
+            'ac1' => $ac1 !== '' ? $ac1 : '-',
             'name' => $i['product_name'],
             'qty' => '-' . $i['quantity'],
             'unit' => $i['unit'],
             'person1' => $i['requested_by'],
             'person2' => $i['approved_by'],
-            'dept' => $i['department'],
             'notes' => $i['notes'],
         ];
     }
@@ -187,13 +215,13 @@ if ($type === 'products') {
             $row['type'],
             csv_excel_text($row['date']),
             csv_excel_text($row['doc']),
-            csv_excel_text($row['code']),
+            csv_excel_text($row['sc']),
+            csv_excel_text($row['ac1']),
             $row['name'],
             $row['qty'],
             $row['unit'],
             $row['person1'],
             $row['person2'],
-            $row['dept'],
             $row['notes'],
         ]);
     }
@@ -203,4 +231,3 @@ if ($type === 'products') {
 
 fclose($output);
 exit;
-

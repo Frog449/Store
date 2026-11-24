@@ -17,30 +17,40 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         inventory_require_csrf();
-        $identity = trim((string) ($_POST['username'] ?? ''));
-        $password = (string) ($_POST['password'] ?? '');
-
-        if ($identity === '' || $password === '') {
-            $error = 'กรุณากรอกชื่อผู้ใช้ รหัสพนักงาน หรืออีเมล และรหัสผ่าน';
-        } elseif (auth_login($identity, $password)) {
-            if (!empty($_POST['remember_me'])) {
-                $cookieParams = session_get_cookie_params();
-                setcookie(
-                    session_name(),
-                    session_id(),
-                    time() + 30 * 24 * 3600,
-                    $cookieParams['path'],
-                    $cookieParams['domain'],
-                    $cookieParams['secure'],
-                    $cookieParams['httponly']
-                );
+        if (($_POST['action'] ?? '') === 'guest_login') {
+            if (auth_login_guest()) {
+                $redirectTo = $_SESSION['redirect_after_login'] ?? 'index.php';
+                unset($_SESSION['redirect_after_login']);
+                header('Location: ' . $redirectTo);
+                exit;
             }
-            $redirectTo = $_SESSION['redirect_after_login'] ?? 'index.php';
-            unset($_SESSION['redirect_after_login']);
-            header('Location: ' . $redirectTo);
-            exit;
+            $error = 'ไม่สามารถเข้าสู่ระบบในฐานะผู้มาเยือนได้ กรุณาลองใหม่อีกครั้ง';
         } else {
-            $error = 'ชื่อผู้ใช้ รหัสพนักงาน อีเมล หรือรหัสผ่านไม่ถูกต้อง';
+            $identity = trim((string) ($_POST['username'] ?? ''));
+            $password = (string) ($_POST['password'] ?? '');
+
+            if ($identity === '' || $password === '') {
+                $error = 'กรุณากรอกชื่อผู้ใช้ รหัสพนักงาน หรืออีเมล และรหัสผ่าน';
+            } elseif (auth_login($identity, $password)) {
+                if (!empty($_POST['remember_me'])) {
+                    $cookieParams = session_get_cookie_params();
+                    setcookie(
+                        session_name(),
+                        session_id(),
+                        time() + 30 * 24 * 3600,
+                        $cookieParams['path'],
+                        $cookieParams['domain'],
+                        $cookieParams['secure'],
+                        $cookieParams['httponly']
+                    );
+                }
+                $redirectTo = $_SESSION['redirect_after_login'] ?? 'index.php';
+                unset($_SESSION['redirect_after_login']);
+                header('Location: ' . $redirectTo);
+                exit;
+            } else {
+                $error = 'ชื่อผู้ใช้ รหัสพนักงาน อีเมล หรือรหัสผ่านไม่ถูกต้อง';
+            }
         }
     } catch (Throwable $e) {
         $error = $e->getMessage();
@@ -222,6 +232,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             accent-color: #004bbb;
             cursor: pointer;
         }
+        .login-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 18px 0 14px;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+        .login-divider::before,
+        .login-divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+        }
+        .guest-login-btn {
+            width: 100%;
+            height: 44px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+            color: #334155;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            font-family: inherit;
+        }
+        .guest-login-btn:hover {
+            background: #eff6ff;
+            border-color: #93c5fd;
+            color: #0758b4;
+        }
     </style>
 </head>
 <body>
@@ -268,6 +311,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <input type="checkbox" name="remember_me" value="1">
                     จดจำฉัน (30 วัน)
                 </label>
+            </form>
+
+            <div class="login-divider">หรือ</div>
+
+            <form method="post" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="guest_login">
+                <button class="guest-login-btn" type="submit">เข้าชมในฐานะผู้มาเยือน (ดูข้อมูลอย่างเดียว)</button>
             </form>
         </div>
     </div>

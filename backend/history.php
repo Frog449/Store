@@ -108,6 +108,7 @@ require __DIR__ . '/includes/header.php';
             <span><strong><?= count($receipts) ?></strong> รายการรับเข้าล่าสุด</span>
             <span><strong><?= count($issues) ?></strong> รายการเบิกออกล่าสุด</span>
             <span style="font-size:11px;color:#475569;background:#f1f5f9;padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;">จำกัด 250 รายการล่าสุด</span>
+            <a class="secondary-button" href="excel-live.php" style="font-size:11px;color:#15803d;border-color:#86efac;background:#f0fdf4;" title="ดาวน์โหลดไฟล์ Excel อัปเดตอัตโนมัติ หรือเชื่อมต่อ Power Query">Excel อัปเดตสด (.xlsx)</a>
             <a class="secondary-button" href="export.php?type=history" style="font-size:11px;">Export ประวัติทั้งหมด</a>
             <a class="secondary-button" href="catalog.php">ดูรายการสินค้า ↗</a>
         </div>
@@ -233,7 +234,7 @@ require __DIR__ . '/includes/header.php';
                             </th>
                         <?php endif; ?>
                         <th>วันที่รับ</th>
-                        <th>รหัสสินค้า</th>
+                        <th>Stock Code</th>
                         <th>ชื่อสินค้า</th>
                         <th>ชื่อคนรับ</th>
                         <th class="numeric">จำนวนรับ</th>
@@ -243,8 +244,12 @@ require __DIR__ . '/includes/header.php';
                 <tbody>
                     <?php foreach ($receipts as $row): ?>
                         <?php
+                        $rScDisp = inventory_clean_stock_code((string) ($row['stock_code'] ?? $row['product_code'] ?? ''));
+                        $rAc1Disp = trim((string) ($row['account_code1'] ?? ''));
+                        $rTimeDisp = trim((string) ($row['movement_time'] ?? ''));
+                        $rDateTimeDisp = (string) ($row['movement_date'] ?? '') . ($rTimeDisp !== '' ? ' ' . $rTimeDisp : '');
                         $searchText = mb_strtolower(implode(' ', [
-                            (string) ($row['movement_date'] ?? ''),
+                            $rDateTimeDisp,
                             (string) ($row['document_no'] ?? ''),
                             (string) ($row['product_code'] ?? ''),
                             (string) ($row['stock_code'] ?? ''),
@@ -265,9 +270,9 @@ require __DIR__ . '/includes/header.php';
                                         style="accent-color:#0758b4;cursor:pointer;" onchange="updateBulkToolbar('receipt')">
                                 </td>
                             <?php endif; ?>
-                            <td><?= h($row['movement_date']) ?></td>
-                            <td class="code-cell"><?= h($row['product_code']) ?></td>
-                            <td class="name-cell"><strong><?= h($row['product_name']) ?></strong></td>
+                            <td style="white-space:nowrap;"><?= h($rDateTimeDisp) ?></td>
+                            <td class="code-cell"><?= h($rScDisp) ?></td>
+                            <td class="name-cell"><strong><?= h($row['product_name']) ?></strong><?= ($rAc1Disp !== '' && $rAc1Disp !== '-') ? ' <small style="color:#64748b;">[' . h($rAc1Disp) . ']</small>' : '' ?></td>
                             <td><?= h((string) ($row['received_by'] ?? '') !== '' ? $row['received_by'] : '—') ?></td>
                             <td class="numeric" style="color:#2b773c;font-weight:700;">
                                 +<?= inventory_quantity($row['quantity']) ?></td>
@@ -350,7 +355,7 @@ require __DIR__ . '/includes/header.php';
                             </th>
                         <?php endif; ?>
                         <th>วันที่เบิก</th>
-                        <th>รหัสสินค้า</th>
+                        <th>Stock Code</th>
                         <th>ชื่อสินค้า</th>
                         <th>ชื่อผู้เบิก</th>
                         <th class="numeric">จำนวนเบิก</th>
@@ -360,6 +365,8 @@ require __DIR__ . '/includes/header.php';
                 <tbody>
                     <?php foreach ($issues as $row): ?>
                         <?php
+                        $iScDisp = inventory_clean_stock_code((string) ($row['stock_code'] ?? $row['product_code'] ?? ''));
+                        $iAc1Disp = trim((string) ($row['account_code1'] ?? ''));
                         $searchText = mb_strtolower(implode(' ', [
                             (string) ($row['movement_date'] ?? ''),
                             (string) ($row['document_no'] ?? ''),
@@ -383,8 +390,8 @@ require __DIR__ . '/includes/header.php';
                                 </td>
                             <?php endif; ?>
                             <td><?= h($row['movement_date']) ?></td>
-                            <td class="code-cell"><?= h($row['product_code']) ?></td>
-                            <td class="name-cell"><strong><?= h($row['product_name']) ?></strong></td>
+                            <td class="code-cell"><?= h($iScDisp) ?></td>
+                            <td class="name-cell"><strong><?= h($row['product_name']) ?></strong><?= ($iAc1Disp !== '' && $iAc1Disp !== '-') ? ' <small style="color:#64748b;">[' . h($iAc1Disp) . ']</small>' : '' ?></td>
                             <td><?= h((string) ($row['requested_by'] ?? '') !== '' ? $row['requested_by'] : '—') ?></td>
                             <td class="numeric" style="color:#c53030;font-weight:700;">
                                 -<?= inventory_quantity($row['quantity']) ?></td>

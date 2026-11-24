@@ -11,6 +11,7 @@ $isAdmin = auth_is_admin();
 $scopeUserId = $isAdmin ? null : (int) ($currentUser['id'] ?? 0);
 $scopeUserName = $isAdmin ? null : (string) ($currentUser['name'] ?? '');
 
+$groupedProducts = inventory_group_products_by_stock_code($products);
 $statusCounts = ['normal' => 0, 'reorder' => 0, 'negative' => 0];
 $glOptions = inventory_gl_description_options();
 $categoryCounts = array_fill_keys($glOptions, 0);
@@ -18,7 +19,7 @@ $categoryStockTotals = array_fill_keys($glOptions, 0.0);
 $categoryRoundStats = inventory_category_round_stats($scopeUserId, $scopeUserName);
 $productsToReorder = 0;
 
-foreach ($products as $product) {
+foreach ($groupedProducts as $product) {
     if ($product['stock'] <= 0) {
         $statusCounts['negative']++;
     } elseif ($product['stock'] <= $product['minimum']) {
@@ -28,13 +29,22 @@ foreach ($products as $product) {
         $statusCounts['normal']++;
     }
 
-    foreach (inventory_product_gl_list($product) as $category) {
+    foreach ($product['gl_list'] as $category) {
         if (!array_key_exists($category, $categoryCounts)) {
             $categoryCounts[$category] = 0;
             $categoryStockTotals[$category] = 0.0;
         }
         $categoryCounts[$category] = ($categoryCounts[$category] ?? 0) + 1;
-        $categoryStockTotals[$category] = ($categoryStockTotals[$category] ?? 0.0) + (float) $product['stock'];
+    }
+
+    foreach ($product['variants'] as $variant) {
+        foreach (inventory_product_gl_list($variant) as $category) {
+            if (!array_key_exists($category, $categoryStockTotals)) {
+                $categoryCounts[$category] = $categoryCounts[$category] ?? 0;
+                $categoryStockTotals[$category] = 0.0;
+            }
+            $categoryStockTotals[$category] = ($categoryStockTotals[$category] ?? 0.0) + (float) ($variant['stock'] ?? 0);
+        }
     }
 }
 
@@ -45,7 +55,11 @@ $categoryGradientStops = [];
 $categoryLegend = [];
 $categoryOffset = 0.0;
 $categoryIndex = 0;
-$productCount = count($products);
+$productCount = count($groupedProducts);
+$totalStockCount = 0.0;
+foreach ($groupedProducts as $gp) {
+    $totalStockCount += (float) ($gp['stock'] ?? 0);
+}
 $totalCategoryAssignments = array_sum($categoryCounts);
 
 foreach ($categoryCounts as $category => $count) {
@@ -85,8 +99,12 @@ require __DIR__ . '/includes/header.php';
             <h2 class="dashboard-panel-heading" id="dashboard-metrics">ตัวชี้วัดหลัก</h2>
             <div class="dashboard-rows">
                 <div class="dashboard-row">
-                    <span>จำนวนสินค้าทั้งหมด</span>
+                    <span>รายการสินค้าทั้งหมด</span>
                     <strong><?= number_format($productCount) ?></strong>
+                </div>
+                <div class="dashboard-row">
+                    <span>จำนวนสินค้าทั้งหมด</span>
+                    <strong><?= h(inventory_quantity($totalStockCount)) ?></strong>
                 </div>
                 <div class="dashboard-row">
                     <span>รายการรับสินค้าทั้งหมด</span>

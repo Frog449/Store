@@ -55,12 +55,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             'reorder_point' => $reorderPoint,
             'buy_date' => inventory_optional_datetime('buy_date'),
             'buy_price' => inventory_optional_number('buy_price', 'BuyPrice/Unit', 2),
+            'cal_no' => inventory_text('cal_no', 'Cal No.', 100),
+            'cal_date' => inventory_optional_date('cal_date', 'Cal date'),
+            'cal_exp' => inventory_optional_date('cal_exp', 'Cal Exp.'),
             'notes' => $notes,
         ];
         $firstReceipt = [
             'movement_date' => date('Y-m-d'),
+            'movement_time' => date('H:i'),
             'document_no' => '',
             'product_code' => $code,
+            'account_code1' => $accountCode1,
             'quantity' => inventory_number('quantity', 'Quantity', false),
             'supplier' => '',
             'received_by' => (string) ($currentUser['name'] ?? ''),
@@ -83,16 +88,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
             throw new DomainException('เฉพาะ Admin และ Staff เท่านั้นที่สามารถบันทึกรับสินค้าเข้าคลังได้');
         }
         $productCode = inventory_text('product_code', 'รหัสสินค้า', 80, true);
-        inventory_record_movement('receipt', [
-            'movement_date' => inventory_date(),
+        $baseProduct = inventory_product($productCode);
+        if ($baseProduct === null) {
+            throw new DomainException('ไม่พบรหัสสินค้าที่เลือก กรุณาเลือกสินค้าใหม่');
+        }
+        $dt = inventory_receipt_datetime('movement_datetime', 'movement_date', 'movement_time');
+        $movementDate = $dt['date'];
+        $movementTime = $dt['time'];
+        $accountCode1 = inventory_text('account_code1', 'Account Code1', 100);
+        if ($accountCode1 === '' || $accountCode1 === '—') {
+            $accountCode1 = '-';
+        }
+        $receiptData = [
+            'movement_date' => $movementDate,
+            'movement_time' => $movementTime,
             'document_no' => inventory_text('document_no', 'เลขที่เอกสาร', 100),
             'product_code' => $productCode,
+            'account_code1' => $accountCode1,
             'quantity' => inventory_number('quantity', 'จำนวนรับ', false),
             'supplier' => '',
             'received_by' => inventory_text('received_by', 'ผู้รับสินค้า', 150),
             'department' => '',
             'notes' => inventory_text('notes', 'หมายเหตุ', 500),
-        ]);
+        ];
+
+        $baseStockCode = trim((string) ($baseProduct['stock_code'] ?? ''));
+        $hasRealStockCode = ($baseStockCode !== '' && $baseStockCode !== '-' && $baseStockCode !== '—');
+        if ($accountCode1 !== '-' && $hasRealStockCode) {
+            $matchedVariant = inventory_find_product_by_pair($baseStockCode, $accountCode1);
+            if ($matchedVariant !== null) {
+                $receiptData['product_code'] = (string) $matchedVariant['code'];
+                inventory_record_movement('receipt', $receiptData);
+            } else {
+                $newVariantCode = inventory_generate_internal_code();
+                $newVariant = [
+                    'code' => $newVariantCode,
+                    'stock_code' => $baseStockCode,
+                    'account_code1' => $accountCode1,
+                    'gl_description' => (string) ($baseProduct['gl_description'] ?? ''),
+                    'section_code' => (string) ($baseProduct['section_code'] ?? ''),
+                    'section_name' => (string) ($baseProduct['section_name'] ?? ''),
+                    'apex' => (string) ($baseProduct['apex'] ?? ''),
+                    'name' => (string) ($baseProduct['name'] ?? ''),
+                    'category' => (string) ($baseProduct['category'] ?? 'General'),
+                    'item_type' => (string) ($baseProduct['item_type'] ?? 'General'),
+                    'unit' => (string) ($baseProduct['unit'] ?? 'PCS'),
+                    'location' => (string) ($baseProduct['location'] ?? ''),
+                    'reorder_point' => (float) ($baseProduct['reorder_point'] ?? 0),
+                    'buy_date' => $movementDate . ($movementTime !== '' ? ' ' . $movementTime : ''),
+                    'buy_price' => $baseProduct['buy_price'] ?? null,
+                    'cal_no' => '',
+                    'cal_date' => '',
+                    'cal_exp' => '',
+                    'notes' => $receiptData['notes'],
+                    'art' => (string) ($baseProduct['art'] ?? 'coupler'),
+                    'image_filename' => $baseProduct['image_filename'] ?? null,
+                ];
+                $receiptData['product_code'] = $newVariantCode;
+                inventory_create_product_with_receipt($newVariant, $receiptData);
+            }
+        } else {
+            inventory_record_movement('receipt', $receiptData);
+        }
         inventory_flash_redirect('บันทึกรับสินค้าเข้าคลังแล้ว', 'receive.php');
     } catch (DomainException | PDOException $exception) {
         $notice = inventory_handle_error($exception);
@@ -101,19 +158,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
 }
 
 $pageProducts = inventory_products();
+$groupedProducts = inventory_group_products_by_stock_code($pageProducts);
 $history = inventory_movements('receipt');
-$openNewProduct = (isset($_GET['new']) && $_GET['new'] === '1')
-    || ($_POST['action'] ?? '') === 'create_product_receipt';
-$selectedProductCode = ($_POST['action'] ?? '') === 'record_receipt' ? (string) ($_POST['product_code'] ?? '') : '';
+$isRecordPost = ($_POST['action'] ?? '') === 'record_receipt';
+$isCreatePost = ($_POST['action'] ?? '') === 'create_product_receipt';
+$openNewProduct = (isset($_GET['new']) && $_GET['new'] === '1') || $isCreatePost;
+$selectedProductCode = $isRecordPost ? (string) ($_POST['product_code'] ?? '') : '';
 $selectedProductName = '';
 $selectedProductUnit = '';
-foreach ($pageProducts as $p) {
-    if ($p['id'] === $selectedProductCode) {
-        $selectedProductName = $p['name'];
-        $selectedProductUnit = $p['unit'];
+$selectedStockCodeDisplay = '';
+foreach ($groupedProducts as $p) {
+    $matchedOption = ($p['id'] === $selectedProductCode);
+    if (!$matchedOption) {
+        foreach ($p['variants'] as $v) {
+            if ($v['id'] === $selectedProductCode) {
+                $matchedOption = true;
+                break;
+            }
+        }
+    }
+    if ($matchedOption) {
+        $selectedProductCode = (string) $p['id'];
+        $selectedProductName = (string) $p['name'];
+        $selectedProductUnit = (string) $p['unit'];
+        $selectedStockCodeDisplay = (string) ($p['stock_code'] ?? $p['id']);
         break;
     }
 }
+$defaultMovementDatetime = $isRecordPost
+    ? (string) ($_POST['movement_datetime'] ?? (($_POST['movement_date'] ?? date('Y-m-d')) . 'T' . ($_POST['movement_time'] ?? date('H:i'))))
+    : date('Y-m-d\TH:i');
 $settings = inventory_get_settings();
 require __DIR__ . '/includes/header.php';
 ?>
@@ -152,10 +226,10 @@ require __DIR__ . '/includes/header.php';
         <form class="inventory-form movement-form" method="post" id="receive-movement-form">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>"><input type="hidden" name="action"
                 value="record_receipt">
-            <label>วันที่รับ <input type="date" name="movement_date" required
-                    value="<?= h((string) ($_POST['movement_date'] ?? date('Y-m-d'))) ?>"></label>
+            <label>วันที่และเวลารับ <input type="datetime-local" name="movement_datetime" required
+                    value="<?= h($defaultMovementDatetime) ?>"></label>
             <label>เลขที่เอกสาร <input name="document_no" maxlength="100"
-                    value="<?= h((string) ($_POST['document_no'] ?? '')) ?>" placeholder="ถ้ามี"></label>
+                    value="<?= h($isRecordPost ? (string) ($_POST['document_no'] ?? '') : '') ?>" placeholder="ถ้ามี"></label>
             <label class="form-span-2">
                 ชื่อสินค้า *
                 <div class="product-combobox" id="receive-product-combobox" data-product-combobox>
@@ -171,20 +245,30 @@ require __DIR__ . '/includes/header.php';
                     </div>
                     <div class="product-combobox-list" id="receive-product-list" data-combobox-list role="listbox"
                         hidden>
-                        <?php foreach ($pageProducts as $product): ?>
+                        <?php foreach ($groupedProducts as $product): ?>
                             <?php
                             $rSc = (string) ($product['stock_code'] ?? $product['id']);
-                            $rAc1 = (string) ($product['account_code1'] ?? '');
+                            $variantIds = [];
+                            $variantAc1s = [];
+                            foreach ($product['variants'] as $variant) {
+                                $variantIds[] = (string) $variant['id'];
+                                $vAc1 = trim((string) ($variant['account_code1'] ?? ''));
+                                if ($vAc1 !== '' && $vAc1 !== '-' && !in_array($vAc1, $variantAc1s, true)) {
+                                    $variantAc1s[] = $vAc1;
+                                }
+                            }
+                            $rAc1First = $variantAc1s[0] ?? '';
+                            $rSearchHaystack = trim($product['name'] . ' ' . $rSc . ' ' . implode(' ', $variantIds) . ' ' . implode(' ', $variantAc1s));
                             ?>
                             <button type="button" class="product-combobox-option" role="option"
                                 data-code="<?= h($product['id']) ?>"
                                 data-stock-code="<?= h($rSc) ?>"
-                                data-account-code1="<?= h($rAc1) ?>"
+                                data-account-code1="<?= h($rAc1First) ?>"
                                 data-name="<?= h($product['name']) ?>"
                                 data-unit="<?= h($product['unit']) ?>"
                                 data-stock="<?= h(inventory_quantity($product['stock'])) ?>"
-                                data-search="<?= h(mb_strtolower($product['name'] . ' ' . $product['id'] . ' ' . $rSc . ' ' . $rAc1, 'UTF-8')) ?>">
-                                <strong><?= h($product['name']) ?><?= $rAc1 !== '' && $rAc1 !== '-' ? ' [' . h($rAc1) . ']' : '' ?></strong>
+                                data-search="<?= h(mb_strtolower($rSearchHaystack, 'UTF-8')) ?>">
+                                <strong><?= h($product['name']) ?></strong>
                                 <small>Stock Code <?= h($rSc) ?> • คงเหลือ <?= inventory_quantity($product['stock']) ?>
                                     <?= h($product['unit']) ?></small>
                             </button>
@@ -194,17 +278,19 @@ require __DIR__ . '/includes/header.php';
                     </div>
                 </div>
             </label>
-            <label>รหัสสินค้า <input id="receive-product-code-display" data-combobox-code-display readonly
-                    placeholder="เลือกสินค้าเพื่อแสดงรหัส" value="<?= h($selectedProductCode) ?>"></label>
-            <label>จำนวนรับ <input type="number" name="quantity" min="0" step="1" required
-                    value="<?= h((string) ($_POST['quantity'] ?? '')) ?>"></label>
+            <label>Stock Code <input id="receive-product-code-display" data-combobox-code-display readonly
+                    placeholder="เลือกสินค้าเพื่อแสดงรหัส" value="<?= h($selectedStockCodeDisplay) ?>"></label>
+            <label>Account Code1 <input name="account_code1" maxlength="100" placeholder="ถ้าไม่มีใส่ -"
+                    value="<?= h($isRecordPost ? (string) ($_POST['account_code1'] ?? '') : '') ?>"></label>
+            <label>จำนวนรับ <input type="number" name="quantity" min="1" step="1" required
+                    value="<?= h($isRecordPost ? (string) ($_POST['quantity'] ?? '') : '') ?>"></label>
             <label>หน่วยนับ <input id="movement-product-unit" data-combobox-unit-display readonly placeholder="—"
                     value="<?= h($selectedProductUnit) ?>"></label>
             <label>ผู้รับสินค้า <input name="received_by" maxlength="150"
-                    value="<?= h((string) ($_POST['received_by'] ?? '')) ?>"></label>
+                    value="<?= h($isRecordPost ? (string) ($_POST['received_by'] ?? '') : '') ?>"></label>
             <label class="form-span-2">หมายเหตุ <input name="notes" maxlength="500"
-                    value="<?= h((string) ($_POST['notes'] ?? '')) ?>"></label>
-            <div class="form-actions form-span-2"><button class="primary-button" type="submit">บันทึกรับสินค้า</button>
+                    value="<?= h($isRecordPost ? (string) ($_POST['notes'] ?? '') : '') ?>"></label>
+            <div class="form-actions"><button class="primary-button" type="submit">บันทึกรับสินค้า</button>
             </div>
         </form>
     </section>
@@ -266,11 +352,19 @@ require __DIR__ . '/includes/header.php';
                 <label>จุดสั่งซื้อขั้นต่ำ <input type="number" name="reorder_point" min="0" step="1"
                         placeholder="ไม่บังคับ"
                         value="<?= h((string) ($_POST['reorder_point'] ?? '')) ?>"></label>
-                <label>Buydate <input type="datetime-local" name="buy_date"
+                <label>Buydate <input type="date" name="buy_date"
                         value="<?= h((string) ($_POST['buy_date'] ?? '')) ?>"></label>
+                <label>เวลา Buydate (ไม่บังคับ) <input type="time" name="buy_date_time"
+                        value="<?= h((string) ($_POST['buy_date_time'] ?? '')) ?>"></label>
                 <label>BuyPrice/Unit <input type="number" name="buy_price" min="0" step="0.01"
                         placeholder="ไม่บังคับ"
                         value="<?= h((string) ($_POST['buy_price'] ?? '')) ?>"></label>
+                <label>Cal No. (ไม่บังคับ) <input type="text" name="cal_no" maxlength="100" placeholder="ไม่บังคับ"
+                        value="<?= h((string) ($_POST['cal_no'] ?? '')) ?>"></label>
+                <label>Cal date (ไม่บังคับ) <input type="date" name="cal_date"
+                        value="<?= h((string) ($_POST['cal_date'] ?? '')) ?>"></label>
+                <label>Cal Exp. (ไม่บังคับ) <input type="date" name="cal_exp"
+                        value="<?= h((string) ($_POST['cal_exp'] ?? '')) ?>"></label>
                 <label class="product-image-upload-field form-span-2">รูปสินค้า
                     <input class="product-image-upload" type="file" name="product_image"
                         accept="image/jpeg,image/png,image/webp">
@@ -296,9 +390,10 @@ require __DIR__ . '/includes/header.php';
             <table class="inventory-table movement-table">
                 <thead>
                     <tr>
-                        <th>วันที่รับ</th>
+                        <th>วันที่–เวลารับ</th>
                         <th>เลขที่เอกสาร</th>
-                        <th>รหัสสินค้า</th>
+                        <th>Stock Code</th>
+                        <th>Account Code1</th>
                         <th>ชื่อสินค้า</th>
                         <th class="numeric">จำนวนรับ</th>
                         <th>หน่วยนับ</th>
@@ -307,10 +402,17 @@ require __DIR__ . '/includes/header.php';
                     </tr>
                 </thead>
                 <tbody><?php foreach ($history as $row): ?>
+                        <?php
+                        $rHistSc = inventory_clean_stock_code((string) ($row['stock_code'] ?? $row['product_code'] ?? ''));
+                        $rHistAc1 = trim((string) ($row['account_code1'] ?? ''));
+                        $rHistTime = trim((string) ($row['movement_time'] ?? ''));
+                        $rHistDateTime = $row['movement_date'] . ($rHistTime !== '' ? ' ' . $rHistTime : '');
+                        ?>
                         <tr>
-                            <td><?= h($row['movement_date']) ?></td>
+                            <td style="white-space:nowrap;"><?= h($rHistDateTime) ?></td>
                             <td><?= h($row['document_no']) ?></td>
-                            <td class="code-cell"><?= h($row['product_code']) ?></td>
+                            <td class="code-cell"><?= h($rHistSc) ?></td>
+                            <td class="code-cell"><?= h($rHistAc1 !== '' ? $rHistAc1 : '-') ?></td>
                             <td class="name-cell"><?= h($row['product_name']) ?></td>
                             <td class="numeric"><?= inventory_quantity($row['quantity']) ?></td>
                             <td><?= h($row['unit']) ?></td>

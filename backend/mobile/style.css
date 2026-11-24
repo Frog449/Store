@@ -791,6 +791,7 @@ body {
 .status-filter-chip .dot-normal { background: #22c55e; }
 .status-filter-chip .dot-low { background: #f59e0b; }
 .status-filter-chip .dot-negative { background: #ef233c; }
+.status-filter-chip .dot-borrowed { background: #3b82f6; }
 .status-filter-chip:hover {
     border-color: #93c5fd;
     color: #0758b4;
@@ -810,6 +811,11 @@ body {
     border-color: #dc2626;
     background: #fee2e2;
     color: #b91c1c;
+}
+.status-filter-chip[data-status-filter="borrowed"].selected {
+    border-color: #2563eb;
+    background: #dbeafe;
+    color: #1d4ed8;
 }
 
 @media (max-width: 600px) {
@@ -2269,6 +2275,69 @@ body {
     background: #fef2f2 !important;
     color: #dc2626 !important;
     border: 1px solid #fecaca !important;
+}
+.status-borrowed {
+    background: #eff6ff !important;
+    color: #2563eb !important;
+    border: 1px solid #bfdbfe !important;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+.status-borrowed i {
+    background: #3b82f6 !important;
+}
+.product-meta-statuses {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+.product-detail-borrowed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #eff6ff;
+    border: 1px solid #93c5fd;
+    color: #1d4ed8;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+.product-detail-borrowed-badge[hidden] {
+    display: none !important;
+}
+.product-detail-borrowed-badge i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #3b82f6;
+    flex-shrink: 0;
+}
+.account-code-item-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.account-code-borrowed-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #dbeafe;
+    border: 1px solid #93c5fd;
+    color: #1d4ed8;
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.account-code-item-btn.is-borrowed {
+    border-color: #93c5fd;
+    background: #f8fbff;
 }
 
 /* Polished Dialogs / Modals */

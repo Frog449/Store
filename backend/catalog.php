@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         : null;
 }
 $editProduct = $editCode === null ? null : inventory_product($editCode);
+$editBuyDate = str_replace('T', ' ', (string) ($editProduct['buy_date'] ?? ''));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sync_catalog_to_sheet') {
     try {
@@ -85,6 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
             'notes' => inventory_text('notes', 'หมายเหตุ', 500),
             'buy_date' => inventory_optional_datetime('buy_date'),
             'buy_price' => inventory_optional_number('buy_price', 'BuyPrice/Unit', 2),
+            'cal_no' => inventory_text('cal_no', 'Cal No.', 100),
+            'cal_date' => inventory_optional_date('cal_date', 'Cal date'),
+            'cal_exp' => inventory_optional_date('cal_exp', 'Cal Exp.'),
             'name' => inventory_text('name', 'Name', 250, true),
             'category' => $primaryCategory,
             'item_type' => $primaryCategory,
@@ -129,12 +133,47 @@ $unitOptions = inventory_unit_options();
 $editGlList = $editProduct !== null ? inventory_product_gl_list($editProduct) : [];
 $editProductImageUrl = inventory_product_image_url($editProduct['image_filename'] ?? null, $editGlList[0] ?? 'General');
 $groupedProducts = inventory_group_products_by_stock_code($products);
+$borrowedMap = inventory_borrowed_quantities_by_product();
 $categoryCounts = [];
 foreach ($categoryOptions as $cat) {
     $categoryCounts[$cat] = 0;
 }
-$statusCounts = ['normal' => 0, 'low' => 0, 'negative' => 0];
-foreach ($groupedProducts as $product) {
+$statusCounts = ['normal' => 0, 'low' => 0, 'negative' => 0, 'borrowed' => 0];
+foreach ($groupedProducts as &$product) {
+    $scKey = trim((string) ($product['stock_code'] ?? ''));
+    $borrowedQty = 0;
+    $borrowedBorrowers = [];
+    if ($scKey !== '' && $scKey !== '-' && $scKey !== '—') {
+        $borrowedQty = (int) ($borrowedMap['by_stock_code'][$scKey] ?? 0);
+        $borrowedBorrowers = $borrowedMap['borrowers_by_stock_code'][$scKey] ?? [];
+    }
+    foreach ($product['variants'] as &$v) {
+        $vCode = (string) ($v['id'] ?? '');
+        $vAc1 = trim((string) ($v['account_code1'] ?? ''));
+        $vBorrowedQty = 0;
+        $vBorrowers = [];
+        if ($vAc1 !== '' && $vAc1 !== '-' && $vAc1 !== '—' && isset($borrowedMap['by_account_code'][$vAc1])) {
+            $vBorrowedQty += (int) $borrowedMap['by_account_code'][$vAc1];
+            $vBorrowers = array_merge($vBorrowers, $borrowedMap['borrowers_by_account_code'][$vAc1] ?? []);
+        }
+        if (isset($borrowedMap['by_product_code_generic'][$vCode])) {
+            $vBorrowedQty += (int) $borrowedMap['by_product_code_generic'][$vCode];
+            $vBorrowers = array_merge($vBorrowers, $borrowedMap['borrowers_by_product_code'][$vCode] ?? []);
+        }
+        $v['borrowed_qty'] = $vBorrowedQty;
+        $v['borrowed_borrowers'] = array_values(array_unique($vBorrowers));
+        if ($scKey === '' || $scKey === '-' || $scKey === '—') {
+            $borrowedQty += (int) ($borrowedMap['by_product_code'][$vCode] ?? 0);
+            $borrowedBorrowers = array_merge($borrowedBorrowers, $borrowedMap['borrowers_by_product_code'][$vCode] ?? []);
+        }
+    }
+    unset($v);
+    $product['borrowed_qty'] = $borrowedQty;
+    $product['borrowed_borrowers'] = array_values(array_unique($borrowedBorrowers));
+    if ($borrowedQty > 0) {
+        $statusCounts['borrowed']++;
+    }
+
     foreach ($product['gl_list'] as $glCat) {
         $categoryCounts[$glCat] = ($categoryCounts[$glCat] ?? 0) + 1;
     }
@@ -146,6 +185,7 @@ foreach ($groupedProducts as $product) {
         $statusCounts['normal']++;
     }
 }
+unset($product);
 require __DIR__ . '/includes/header.php';
 ?>
 <section class="catalog-section catalog-page" id="catalog">
@@ -156,6 +196,7 @@ require __DIR__ . '/includes/header.php';
             <p>คลิกการ์ดสินค้าเพื่อดูรายละเอียด<?= auth_is_admin() ? ' รูปสินค้าเพิ่มหรือเปลี่ยนได้ในหน้าต่างแก้ไข' : '' ?></p>
         </div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <a class="secondary-button" href="excel-live.php" style="font-size:11px;color:#15803d;border-color:#86efac;background:#f0fdf4;" title="ดาวน์โหลดไฟล์ Excel อัปเดตอัตโนมัติ หรือเชื่อมต่อ Power Query">Excel อัปเดตสด (.xlsx)</a>
             <a class="secondary-button" href="export.php?type=products" style="font-size:11px;">Export รายการสินค้า (.csv)</a>
             <?php if (auth_can_manage_stock()): ?>
                 <form method="post" style="display:inline;margin:0;">
@@ -191,6 +232,9 @@ require __DIR__ . '/includes/header.php';
                 <button class="status-filter-chip" type="button" data-status-filter="negative" title="กรองเฉพาะสินค้าที่หมดสต๊อก">
                     <span class="status-dot dot-negative"></span>หมด <span><?= $statusCounts['negative'] ?></span>
                 </button>
+                <button class="status-filter-chip" type="button" data-status-filter="borrowed" title="กรองเฉพาะสินค้าที่กำลังถูกยืม">
+                    <span class="status-dot dot-borrowed"></span>กำลังยืม <span><?= $statusCounts['borrowed'] ?></span>
+                </button>
             </div>
             <select id="product-sort" class="user-filter-select" aria-label="เรียงลำดับสินค้า" style="min-height:32px;font-size:11px;">
                 <option value="default">เรียงตามลำดับเริ่มต้น</option>
@@ -220,7 +264,7 @@ require __DIR__ . '/includes/header.php';
             <span id="product-detail-image-empty">ยังไม่มีรูปสินค้า</span>
         </div>
         <div class="product-detail-heading">
-            <div><div class="eyebrow section-eyebrow">PRODUCT DETAILS</div><h2 id="product-detail-title"></h2><p id="product-detail-code"></p></div>
+            <div><div class="eyebrow section-eyebrow">PRODUCT DETAILS</div><h2 id="product-detail-title"></h2><p id="product-detail-code"></p><div class="product-detail-borrowed-badge" id="product-detail-borrowed" hidden></div></div>
             <button class="product-detail-close" type="button" aria-label="ปิดรายละเอียด" data-close-product-dialog>×</button>
         </div>
         <dl class="product-detail-list">
@@ -244,6 +288,9 @@ require __DIR__ . '/includes/header.php';
             <div><dt>จุดสั่งซื้อขั้นต่ำ</dt><dd data-detail="minimum"></dd></div>
             <div><dt>Buydate</dt><dd data-detail="buyDate"></dd></div>
             <div><dt>BuyPrice/Unit</dt><dd data-detail="buyPrice"></dd></div>
+            <div><dt>Cal No.</dt><dd data-detail="calNo"></dd></div>
+            <div><dt>Cal date</dt><dd data-detail="calDate"></dd></div>
+            <div><dt>Cal Exp.</dt><dd data-detail="calExp"></dd></div>
             <div><dt>หมายเหตุ</dt><dd data-detail="notes"></dd></div>
         </dl>
         <div class="product-detail-actions">
@@ -313,8 +360,12 @@ require __DIR__ . '/includes/header.php';
                 <?php foreach ($unitOptions as $option): ?><option value="<?= h($option) ?>" <?= ($_POST['unit'] ?? $editProduct['unit'] ?? '') === $option ? 'selected' : '' ?>><?= h($option) ?></option><?php endforeach; ?>
             </select></label>
             <label>จุดสั่งซื้อขั้นต่ำ <input name="reorder_point" type="number" step="1" min="0" placeholder="ไม่บังคับ" value="<?= h((string) ($_POST['reorder_point'] ?? (isset($editProduct['reorder_point']) ? (int) round((float) $editProduct['reorder_point']) : ''))) ?>"></label>
-            <label>Buydate <input name="buy_date" type="datetime-local" value="<?= h((string) ($_POST['buy_date'] ?? str_replace(' ', 'T', substr((string) ($editProduct['buy_date'] ?? ''), 0, 16)))) ?>"></label>
+            <label>Buydate <input name="buy_date" type="date" value="<?= h((string) ($_POST['buy_date'] ?? substr($editBuyDate, 0, 10))) ?>"></label>
+            <label>เวลา Buydate (ไม่บังคับ) <input name="buy_date_time" type="time" value="<?= h((string) ($_POST['buy_date_time'] ?? (strlen($editBuyDate) > 10 ? substr($editBuyDate, 11, 5) : ''))) ?>"></label>
             <label>BuyPrice/Unit <input name="buy_price" type="number" step="0.01" min="0" placeholder="ไม่บังคับ" value="<?= h((string) ($_POST['buy_price'] ?? (isset($editProduct['buy_price']) && $editProduct['buy_price'] !== null ? number_format((float) $editProduct['buy_price'], 2, '.', '') : ''))) ?>"></label>
+            <label>Cal No. (ไม่บังคับ) <input name="cal_no" maxlength="100" placeholder="ไม่บังคับ" value="<?= h((string) ($_POST['cal_no'] ?? $editProduct['cal_no'] ?? '')) ?>"></label>
+            <label>Cal date (ไม่บังคับ) <input name="cal_date" type="date" value="<?= h((string) ($_POST['cal_date'] ?? $editProduct['cal_date'] ?? '')) ?>"></label>
+            <label>Cal Exp. (ไม่บังคับ) <input name="cal_exp" type="date" value="<?= h((string) ($_POST['cal_exp'] ?? $editProduct['cal_exp'] ?? '')) ?>"></label>
             <label class="form-span-2">หมายเหตุ <input name="notes" maxlength="500" value="<?= h((string) ($_POST['notes'] ?? $editProduct['notes'] ?? '')) ?>"></label>
             <label class="product-image-upload-field form-span-2">รูปสินค้า
                 <input class="product-image-upload" type="file" name="product_image" accept="image/jpeg,image/png,image/webp">
