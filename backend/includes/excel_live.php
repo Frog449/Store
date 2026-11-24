@@ -108,6 +108,15 @@ function excel_live_is_local_url(string $url): bool
     return false;
 }
 
+function excel_live_is_ephemeral_url(string $url): bool
+{
+    $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''));
+    if ($host === '') {
+        return false;
+    }
+    return (bool) preg_match('/\.(trycloudflare\.com|ngrok\.io|ngrok-free\.app|ngrok-free\.dev|loca\.lt)$/', $host);
+}
+
 function excel_live_valid_types(): array
 {
     return ['summary', 'products', 'receipts', 'issues', 'history', 'borrows'];

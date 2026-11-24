@@ -31,11 +31,13 @@ if ($mode === 'iqy') {
 
     audit_log('export', 'excel_live_iqy', 'ดาวน์โหลดไฟล์ Excel Web Query (.iqy) ประเภท ' . $safeType);
 
+    header_remove('Pragma');
+    header_remove('Expires');
     header('Content-Type: text/x-ms-iqy; charset=UTF-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Content-Length: ' . (string) strlen($content));
-    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-    header('Pragma: no-cache');
+    header('Cache-Control: private, must-revalidate, max-age=0');
+    header('Expires: 0');
     echo $content;
     exit;
 }
@@ -60,11 +62,13 @@ $xlsxBinary = excel_live_build_xlsx($sheetTypes, $baseUrl, $interval);
 
 audit_log('export', 'excel_live_xlsx', $logDetail);
 
+header_remove('Pragma');
+header_remove('Expires');
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Content-Length: ' . (string) strlen($xlsxBinary));
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
+header('Cache-Control: private, must-revalidate, max-age=0');
+header('Expires: 0');
 header('X-Content-Type-Options: nosniff');
 
 echo $xlsxBinary;

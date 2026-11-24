@@ -4,7 +4,7 @@ declare(strict_types=1);
 define('PUBLIC_PAGE', true);
 require __DIR__ . '/includes/bootstrap.php';
 
-echo "=== Setting up Local Database (Laragon MySQL) ===\n";
+echo "=== Setting up Local Database (XAMPP / Local MySQL) ===\n";
 
 try {
     $db = inventory_db();

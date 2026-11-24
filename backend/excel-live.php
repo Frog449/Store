@@ -51,6 +51,7 @@ $detectedBaseUrl = excel_live_detect_base_url();
 $configuredPublicUrl = trim(inventory_get_setting('excel_public_base_url', ''));
 $activeBaseUrl = excel_live_base_url();
 $isLocalUrl = excel_live_is_local_url($activeBaseUrl);
+$isEphemeralUrl = excel_live_is_ephemeral_url($activeBaseUrl);
 $defaultInterval = excel_live_refresh_interval();
 
 $db = inventory_db();
@@ -133,6 +134,16 @@ require __DIR__ . '/includes/header.php';
             ลิงก์นี้จะอัปเดตได้เฉพาะบนเครื่องนี้เท่านั้น หากต้องการให้เปิดดูและอัปเดตจาก <strong>ที่ไหนก็ได้</strong> กรุณาเปิดหน้าเว็บนี้ผ่านลิงก์เว็บออนไลน์ที่ Deploy แล้ว (เช่น Render / Railway / โดเมนบริษัท)
             <?php if ($isAdmin): ?>
                 หรือกรอก <strong>Public Server URL</strong> ในส่วนตั้งค่าผู้ดูแลระบบด้านล่าง
+            <?php endif; ?>
+        </div>
+    <?php elseif ($isEphemeralUrl): ?>
+        <div class="notice" style="background:#fffbeb;border:1px solid #f59e0b;color:#92400e;margin-bottom:20px;line-height:1.65;">
+            <strong>แจ้งเตือนลิงก์ชั่วคราว (<code><?= h($activeBaseUrl) ?></code>):</strong>
+            ลิงก์ <code>trycloudflare.com</code> จะใช้งานได้เฉพาะตอนที่เปิดหน้าต่าง <code>run-share-online.bat</code> ค้างไว้เท่านั้น
+            หากปิดแล้วเปิดใหม่ ลิงก์เดิมจะหมดอายุทันที (ทำให้ Excel แจ้ง <em>Unable to open ... Cannot download the information you requested</em>) และต้องดาวน์โหลดไฟล์ Excel ใหม่จากลิงก์ปัจจุบัน
+            — หากต้องการให้ไฟล์ Excel เดิมอัปเดตได้ถาวรตลอดเวลา แนะนำให้ Deploy บน Render / Railway / โดเมนถาวร
+            <?php if ($isAdmin): ?>
+                แล้วกำหนด <strong>Public Server URL</strong> ด้านล่าง
             <?php endif; ?>
         </div>
     <?php endif; ?>

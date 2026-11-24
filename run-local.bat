@@ -2,12 +2,24 @@
 title Store Automeation - Local Preview
 color 0A
 
-set "PHP_BIN=C:\laragon\bin\php\php-8.3.33-Win32-vs16-x64\php.exe"
+set "PHP_BIN="
+if exist "C:\xampp\php\php.exe" (
+    set "PHP_BIN=C:\xampp\php\php.exe"
+) else (
+    for /f "delims=" %%p in ('where php 2^>nul') do (
+        if not defined PHP_BIN set "PHP_BIN=%%p"
+    )
+)
+if not defined PHP_BIN (
+    if exist "C:\laragon\bin\php\php-8.3.33-Win32-vs16-x64\php.exe" (
+        set "PHP_BIN=C:\laragon\bin\php\php-8.3.33-Win32-vs16-x64\php.exe"
+    )
+)
 
-if not exist "%PHP_BIN%" (
-    echo [ERROR] PHP not found at %PHP_BIN%
+if not defined PHP_BIN (
+    echo [ERROR] PHP not found. Please install XAMPP ^(C:\xampp\php\php.exe^) or add php to PATH.
     pause
-    exit /b
+    exit /b 1
 )
 
 echo ========================================================
