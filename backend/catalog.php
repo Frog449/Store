@@ -171,7 +171,7 @@ foreach ($groupedProducts as &$product) {
     $product['borrowed_qty'] = $borrowedQty;
     $product['borrowed_borrowers'] = array_values(array_unique($borrowedBorrowers));
     if ($borrowedQty > 0) {
-        $statusCounts['borrowed']++;
+        $statusCounts['borrowed'] += $borrowedQty;
     }
 
     foreach ($product['gl_list'] as $glCat) {
@@ -196,7 +196,6 @@ require __DIR__ . '/includes/header.php';
             <p>คลิกการ์ดสินค้าเพื่อดูรายละเอียด<?= auth_is_admin() ? ' รูปสินค้าเพิ่มหรือเปลี่ยนได้ในหน้าต่างแก้ไข' : '' ?></p>
         </div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <a class="secondary-button" href="excel-live.php" style="font-size:11px;color:#15803d;border-color:#86efac;background:#f0fdf4;" title="ดาวน์โหลดไฟล์ Excel อัปเดตอัตโนมัติ หรือเชื่อมต่อ Power Query">Excel อัปเดตสด (.xlsx)</a>
             <a class="secondary-button" href="export.php?type=products" style="font-size:11px;">Export รายการสินค้า (.csv)</a>
             <?php if (auth_can_manage_stock()): ?>
                 <form method="post" style="display:inline;margin:0;">

@@ -43,14 +43,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'recor
 }
 
 $pageProducts = inventory_products();
-$isAdmin = auth_is_admin();
-$allUsers = $isAdmin ? inventory_users() : [];
-$selectedUserParam = ($isAdmin && isset($_GET['user']) && is_string($_GET['user'])) ? trim($_GET['user']) : 'all';
+$canViewAllUsers = auth_can_manage_stock();
+$allUsers = $canViewAllUsers ? inventory_users() : [];
+$selectedUserParam = ($canViewAllUsers && isset($_GET['user']) && is_string($_GET['user'])) ? trim($_GET['user']) : 'all';
 $filterUserId = null;
 $filterUserName = null;
 $selectedUserLabel = '';
 
-if ($isAdmin) {
+if ($canViewAllUsers) {
     if ($selectedUserParam !== '' && $selectedUserParam !== 'all' && ctype_digit($selectedUserParam)) {
         $targetId = (int) $selectedUserParam;
         foreach ($allUsers as $u) {
@@ -77,14 +77,17 @@ $preselectIssueCode = isset($_GET['product']) && is_string($_GET['product']) ? t
 $selectedProductCode = (string) ($_POST['product_code'] ?? $preselectIssueCode);
 $selectedProductName = '';
 $selectedProductUnit = '';
+$selectedProductStockCode = '';
 $preselectIssueProduct = null;
 foreach ($pageProducts as $p) {
     if ($p['id'] === $selectedProductCode) {
         $selectedProductName = $p['name'];
         $selectedProductUnit = $p['unit'];
+        $selectedProductStockCode = (string) ($p['stock_code'] ?? $p['id']);
         if ($preselectIssueCode !== '' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
             $preselectIssueProduct = [
                 'code' => $p['id'],
+                'stock_code' => $selectedProductStockCode,
                 'name' => $p['name'],
                 'unit' => $p['unit'],
             ];
@@ -101,8 +104,8 @@ require __DIR__ . '/includes/header.php';
     <div class="page-heading">
         <div>
             <div class="eyebrow section-eyebrow">ISSUE HISTORY</div>
-            <h1><?= $isAdmin ? 'ประวัติเบิกสินค้า (ทั้งหมด)' : 'ประวัติเบิกสินค้าของคุณ' ?><span class="heading-period">.</span></h1>
-            <p><?= $isAdmin
+            <h1><?= $canViewAllUsers ? 'ประวัติเบิกสินค้า (ทั้งหมด)' : 'ประวัติเบิกสินค้าของคุณ' ?><span class="heading-period">.</span></h1>
+            <p><?= $canViewAllUsers
                 ? ($selectedUserLabel !== '' ? 'กำลังแสดงประวัติเบิกสินค้าของผู้ใช้งาน: ' . h($selectedUserLabel) : 'แสดงประวัติการเบิกสินค้าของผู้ใช้งานทั้งหมด พร้อมตัวกรองรายบุคคล')
                 : 'แสดงรายการเบิกสินค้าของ ' . h((string) ($currentUser['name'] ?? '')) . ' เท่านั้น' ?></p>
         </div>
@@ -123,7 +126,7 @@ require __DIR__ . '/includes/header.php';
             <span class="stat-icon icon-alert" style="color:#dc2626;background:#fee2e2;font-weight:700;font-size:11px;">OUT</span>
             <div>
                 <strong><?= number_format(count($history)) ?> <small style="font-size:11px;font-weight:normal;">รายการ</small></strong>
-                <span><?= $isAdmin && $filterUserId === null ? 'รายการเบิกทั้งหมด' : 'รายการเบิกของบัญชีนี้' ?></span>
+                <span><?= $canViewAllUsers && $filterUserId === null ? 'รายการเบิกทั้งหมด' : 'รายการเบิกของบัญชีนี้' ?></span>
             </div>
         </div>
         <div class="stat-item">
@@ -150,7 +153,7 @@ require __DIR__ . '/includes/header.php';
     <section class="inventory-panel table-panel">
         <div class="panel-heading">
             <div>
-                <h2><?= $isAdmin ? ($selectedUserLabel !== '' ? 'ประวัติเบิกสินค้าของ ' . h($selectedUserLabel) : 'ประวัติเบิกสินค้าทั้งหมด') : 'ประวัติเบิกสินค้าของคุณ (' . h((string) ($currentUser['name'] ?? '')) . ')' ?></h2>
+                <h2><?= $canViewAllUsers ? ($selectedUserLabel !== '' ? 'ประวัติเบิกสินค้าของ ' . h($selectedUserLabel) : 'ประวัติเบิกสินค้าทั้งหมด') : 'ประวัติเบิกสินค้าของคุณ (' . h((string) ($currentUser['name'] ?? '')) . ')' ?></h2>
                 <p>แสดงรายการล่าสุดไม่เกิน 250 รายการ</p>
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -162,7 +165,7 @@ require __DIR__ . '/includes/header.php';
                     <input id="issue-history-search" type="search" placeholder="ค้นหาชื่อ, Stock Code, Account Code1..." autocomplete="off">
                     <kbd>/</kbd>
                 </label>
-                <?php if ($isAdmin): ?>
+                <?php if ($canViewAllUsers): ?>
                     <form method="get" style="margin:0;">
                         <select name="user" class="user-filter-select" aria-label="กรองตามผู้ใช้งาน" onchange="this.form.submit()">
                             <option value="all" <?= $filterUserId === null ? 'selected' : '' ?>>ผู้ใช้งานทั้งหมด</option>
@@ -236,7 +239,7 @@ require __DIR__ . '/includes/header.php';
             <button class="product-detail-close" type="button"
                 onclick="document.querySelector('#issue-dialog').close()">×</button>
         </div>
-        <form class="inventory-form movement-form" method="post" id="issue-movement-form"
+        <form class="inventory-form movement-form" method="post" action="issue.php" id="issue-movement-form"
             style="grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
             <input type="hidden" name="action" value="record_issue">
@@ -291,7 +294,7 @@ require __DIR__ . '/includes/header.php';
 
             <label>Stock Code
                 <input id="issue-product-code-display" data-combobox-code-display readonly
-                    placeholder="เลือกสินค้าเพื่อแสดงรหัส" value="<?= h($selectedProductCode) ?>">
+                    placeholder="เลือกสินค้าเพื่อแสดงรหัส" value="<?= h($selectedProductStockCode) ?>">
             </label>
 
             <label>หน่วยนับ
@@ -348,22 +351,49 @@ require __DIR__ . '/includes/header.php';
             const unitDisplay = dialog.querySelector('#movement-product-unit');
             if (codeHidden) codeHidden.value = preselect.code;
             if (nameInput) nameInput.value = preselect.name || '';
-            if (codeDisplay) codeDisplay.value = preselect.code;
+            if (codeDisplay) codeDisplay.value = preselect.stock_code || preselect.code;
             if (unitDisplay) unitDisplay.value = preselect.unit || '';
         }
 
         dialog.showModal();
     }
 
-    <?php if ($preselectIssueProduct !== null): ?>
     window.addEventListener('DOMContentLoaded', () => {
+        const dialog = document.querySelector('#issue-dialog');
+        const form = document.querySelector('#issue-movement-form');
+
+        if (dialog) {
+            dialog.addEventListener('click', (event) => {
+                if (event.target === dialog) {
+                    dialog.close();
+                }
+            });
+        }
+
+        if (form && dialog) {
+            form.addEventListener('submit', (event) => {
+                if (event.defaultPrevented) return;
+                window.__storeFormSubmitting = true;
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'กำลังบันทึก...';
+                }
+                if (dialog.open) {
+                    dialog.close();
+                }
+            });
+        }
+
+        <?php if ($preselectIssueProduct !== null): ?>
         openIssueDialog(<?= json_encode($preselectIssueProduct, JSON_UNESCAPED_UNICODE) ?>);
-    });
-    <?php elseif ($reopenIssueDialog): ?>
-    window.addEventListener('DOMContentLoaded', () => {
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', 'issue.php');
+        }
+        <?php elseif ($reopenIssueDialog): ?>
         openIssueDialog();
+        <?php endif; ?>
     });
-    <?php endif; ?>
 </script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>

@@ -57,14 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
 }
 
 $limit = 250; // ล็อกจำกัดจำนวนรายการล่าสุดที่ 250 รายการ
-$isAdmin = auth_is_admin();
-$allUsers = $isAdmin ? inventory_users() : [];
-$selectedUserParam = ($isAdmin && isset($_GET['user']) && is_string($_GET['user'])) ? trim($_GET['user']) : 'all';
+$canViewAllUsers = auth_can_manage_stock() || auth_is_viewer();
+$allUsers = $canViewAllUsers ? inventory_users() : [];
+$selectedUserParam = ($canViewAllUsers && isset($_GET['user']) && is_string($_GET['user'])) ? trim($_GET['user']) : 'all';
 $issueFilterUserId = null;
 $issueFilterUserName = null;
 $selectedUserLabel = '';
 
-if ($isAdmin) {
+if ($canViewAllUsers) {
     if ($selectedUserParam !== '' && $selectedUserParam !== 'all' && ctype_digit($selectedUserParam)) {
         $targetId = (int) $selectedUserParam;
         foreach ($allUsers as $u) {
@@ -108,7 +108,6 @@ require __DIR__ . '/includes/header.php';
             <span><strong><?= count($receipts) ?></strong> รายการรับเข้าล่าสุด</span>
             <span><strong><?= count($issues) ?></strong> รายการเบิกออกล่าสุด</span>
             <span style="font-size:11px;color:#475569;background:#f1f5f9;padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;">จำกัด 250 รายการล่าสุด</span>
-            <a class="secondary-button" href="excel-live.php" style="font-size:11px;color:#15803d;border-color:#86efac;background:#f0fdf4;" title="ดาวน์โหลดไฟล์ Excel อัปเดตอัตโนมัติ หรือเชื่อมต่อ Power Query">Excel อัปเดตสด (.xlsx)</a>
             <a class="secondary-button" href="export.php?type=history" style="font-size:11px;">Export ประวัติทั้งหมด</a>
             <a class="secondary-button" href="catalog.php">ดูรายการสินค้า ↗</a>
         </div>
@@ -162,7 +161,7 @@ require __DIR__ . '/includes/header.php';
             </button>
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <?php if ($isAdmin): ?>
+            <?php if ($canViewAllUsers): ?>
                 <form method="get" style="margin:0;">
                     <select name="user" class="user-filter-select" aria-label="กรองประวัติเบิกตามผู้ใช้งาน" onchange="this.form.submit()">
                         <option value="all" <?= $issueFilterUserId === null ? 'selected' : '' ?>>ผู้เบิกทั้งหมด</option>
@@ -314,7 +313,7 @@ require __DIR__ . '/includes/header.php';
         <div class="panel-heading">
             <div>
                 <div class="eyebrow section-eyebrow" style="color:#c53030;">STOCK OUT</div>
-                <h2><?= $isAdmin ? ($selectedUserLabel !== '' ? 'ประวัติเบิกสินค้าออกของ ' . h($selectedUserLabel) : 'ประวัติเบิกสินค้าออกทั้งหมด') : 'ประวัติเบิกสินค้าออกของคุณ (' . h((string) ($currentUser['name'] ?? '')) . ')' ?></h2>
+                <h2><?= $canViewAllUsers ? ($selectedUserLabel !== '' ? 'ประวัติเบิกสินค้าออกของ ' . h($selectedUserLabel) : 'ประวัติเบิกสินค้าออกทั้งหมด') : 'ประวัติเบิกสินค้าออกของคุณ (' . h((string) ($currentUser['name'] ?? '')) . ')' ?></h2>
                 <p>รายการเบิกจ่ายสินค้าออกจากคลัง ผู้ขอเบิก แผนกที่นำไปใช้ และผู้อนุมัติ</p>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">

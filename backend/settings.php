@@ -86,9 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'sync_all_catalog') {
       $res = inventory_sync_all_catalog_to_google_sheet();
       if ($res['success']) {
-        inventory_flash_redirect('ซิงค์รายการสินค้าทั้งหมด (' . $productCount . ' รายการ) ไปยัง Google Sheet สำเร็จแล้ว', 'settings.php');
+        inventory_flash_redirect('ส่งข้อมูลล่าสุดทั้งหมดไปยัง Google Sheet สำเร็จแล้ว (สินค้า ' . $productCount . ' รายการ พร้อมตารางรับสินค้า, เบิกสินค้า และยืม-คืนแยกกัน)', 'settings.php');
       } else {
-        throw new DomainException('ซิงค์รายการสินค้าไม่สำเร็จ: ' . $res['message']);
+        throw new DomainException('ส่งข้อมูลทั้งหมดไปยัง Google Sheet ไม่สำเร็จ: ' . $res['message']);
       }
     }
   } catch (DomainException $e) {
@@ -193,8 +193,8 @@ require __DIR__ . '/includes/header.php';
           <div>
             <h2 style="margin:0;font-size:18px;color:#1e293b;">การเชื่อมต่อ Google Sheets (Real-time Sync)</h2>
             <p style="margin:2px 0 0;font-size:13px;color:#64748b;">
-              ส่งข้อมูลลง Google Sheet อัตโนมัติ: อัปเดตยอดคงเหลือในแท็บ <strong>รายการสินค้า</strong> (ลดลงเมื่อเบิก
-              เพิ่มเมื่อรับ), บันทึกประวัติในแท็บ <strong>ประวัติรับ-เบิก</strong>, และบันทึกแท็บ
+              ส่งข้อมูลลง Google Sheet อัตโนมัติ แยกตารางชัดเจน 4 แท็บ: <strong>รายการสินค้า</strong> (อัปเดตยอดคงเหลืออัตโนมัติ),
+              <strong>ประวัติรับสินค้า</strong> (ตารางรับเข้า), <strong>ประวัติเบิกสินค้า</strong> (ตารางเบิกออก), และ
               <strong>ยืม-คืน</strong>
             </p>
           </div>
@@ -224,8 +224,8 @@ require __DIR__ . '/includes/header.php';
           <?php if (!empty($settings['google_sheet_webhook_url'])): ?>
             <button type="submit" form="sync-catalog-form" class="secondary-button"
               style="padding:6px 14px;font-size:12px;"
-              title="ส่งรายการสินค้าทั้งหมดในเว็บ พร้อมยอดคงเหลือปัจจุบัน ไปสร้างและอัปเดตในแท็บ รายการสินค้า บน Google Sheet">
-              ซิงค์รายการสินค้าทั้งหมดเข้า Sheet (<?= number_format($productCount) ?> รายการ)
+              title="ส่งข้อมูลล่าสุดจากเว็บทั้งหมดไปยังแท็บ รายการสินค้า, ประวัติรับสินค้า, ประวัติเบิกสินค้า และยืม-คืน บน Google Sheet">
+              ส่งข้อมูลทั้งหมดให้เป็นปัจจุบัน
             </button>
           <?php endif; ?>
         </div>
@@ -247,14 +247,12 @@ require __DIR__ . '/includes/header.php';
           <li>เปิด Google Sheet ของคุณ > ไปที่เมนู <strong>ส่วนขยาย (Extensions)</strong> > <strong>Apps Script</strong>
           </li>
           <li>ลบโค้ดเดิมออกทั้งหมด แล้ววางโค้ดด้านล่างนี้ลงไป > กด <strong>บันทึก (Save รูปแผ่นดิสก์)</strong></li>
-          <li>กดปุ่มสีน้ำเงิน <strong>ทำให้ใช้งานได้ (Deploy)</strong> > <strong>การทำให้ใช้งานได้รายการใหม่ (New
-              deployment)</strong> > เลือกประเภท <strong>เว็บแอป (Web app)</strong> > ตั้งค่า Who has access เป็น
-            <strong>ทุกคน (Anyone)</strong> > คัดลอก Web App URL มาวางในช่องด้านบน</li>
+          <li>กดปุ่มสีน้ำเงิน <strong>ทำให้ใช้งานได้ (Deploy)</strong> > หากเคย Deploy แล้วให้เลือก <strong>จัดการการทำให้ใช้งานได้ (Manage deployments)</strong> > กดรูปดินสอ > เลือกเวอร์ชัน <strong>เวอร์ชันใหม่ (New version)</strong> > กดทำให้ใช้งานได้ (หรือถ้าทำครั้งแรกให้เลือก <strong>การทำให้ใช้งานได้รายการใหม่</strong> > <strong>เว็บแอป</strong> > Who has access: <strong>ทุกคน (Anyone)</strong> แล้วคัดลอก URL มาวางด้านบน)</li>
+          <li>กลับมาที่หน้านี้แล้วกดปุ่ม <strong>ส่งข้อมูลทั้งหมดให้เป็นปัจจุบัน</strong> ระบบจะสร้างแท็บ <strong>ประวัติรับสินค้า</strong> และ <strong>ประวัติเบิกสินค้า</strong> แยกตารางให้อัตโนมัติ (แท็บ "ประวัติรับ-เบิก" เดิมสามารถลบออกได้ตามต้องการ)</li>
         </ol>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <span style="font-weight:600;color:#475569;">โค้ด Google Apps Script (รองรับ รายการสินค้า + รับ-เบิก +
-            ยืม-คืน ในไฟล์เดียว):</span>
+          <span style="font-weight:600;color:#475569;">โค้ด Google Apps Script V4.0 (แยกตาราง: รายการสินค้า + ประวัติรับสินค้า + ประวัติเบิกสินค้า + ยืม-คืน):</span>
           <button type="button" class="secondary-button" style="padding:3px 10px;font-size:11px;"
             onclick="copySettingsGasCode()">
             คัดลอกโค้ด
@@ -263,8 +261,12 @@ require __DIR__ . '/includes/header.php';
         <textarea id="settings-gas-code" readonly
           style="width:100%;height:320px;font-family:monospace;font-size:11px;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;"><?= h('/**
  * =========================================================================
- * STORE AUTOMEATION - GOOGLE APPS SCRIPT WEBHOOK (V3.0)
- * ระบบเชื่อมต่อ Google Sheets: รายการสินค้า + ประวัติรับ-เบิก + ยืม-คืน พัสดุ
+ * STORE AUTOMEATION - GOOGLE APPS SCRIPT WEBHOOK (V4.0)
+ * ระบบเชื่อมต่อ Google Sheets แยกตาราง 4 แท็บ:
+ *   1. รายการสินค้า      (อัปเดตสต๊อกคงเหลืออัตโนมัติ)
+ *   2. ประวัติรับสินค้า   (ตารางรับสินค้าเข้าแยกเฉพาะ - สีเขียว)
+ *   3. ประวัติเบิกสินค้า  (ตารางเบิกสินค้าออกแยกเฉพาะ - สีแดง)
+ *   4. ยืม-คืน          (ตารางยืม-คืนพัสดุ)
  * (รองรับซิงค์ข้อมูลและคอลัมน์ตรงกับหน้าเว็บ 100%)
  * =========================================================================
  */
@@ -276,10 +278,16 @@ var CATALOG_HEADERS = [
   "Cal No.", "Cal date", "Cal Exp.", "จุดสั่งซื้อขั้นต่ำ"
 ];
 
-var MOVEMENT_HEADERS = [
-  "วัน-เวลา", "ประเภท", "Stock Code", "Account Code1", "ชื่อสินค้า",
-  "จำนวน", "หน่วยนับ", "คงเหลือหลังทำรายการ", "เลขที่เอกสาร",
-  "ผู้รับ/ผู้ขอเบิก", "ผู้อนุมัติ", "หมายเหตุ", "ผู้บันทึก"
+var RECEIPT_HEADERS = [
+  "วัน-เวลารับ", "ประเภท", "เลขที่เอกสาร", "Stock Code", "Account Code1",
+  "ชื่อสินค้า", "จำนวนรับ", "หน่วยนับ", "คงเหลือหลังรับ",
+  "ผู้รับสินค้า", "หมายเหตุ", "ผู้บันทึก"
+];
+
+var ISSUE_HEADERS = [
+  "วัน-เวลาเบิก", "เลขที่เอกสาร", "Stock Code", "Account Code1",
+  "ชื่อสินค้า", "จำนวนเบิก", "หน่วยนับ", "คงเหลือหลังเบิก",
+  "ผู้เบิก", "ผู้อนุมัติ", "หมายเหตุ", "ผู้บันทึก"
 ];
 
 var BORROW_HEADERS = [
@@ -292,7 +300,7 @@ var BORROW_HEADERS = [
 function doGet(e) {
   return jsonResponse({
     status: "ok",
-    message: "Google Apps Script Web App พร้อมใช้งาน (Store Automeation V3.0 Ready)",
+    message: "Google Apps Script Web App พร้อมใช้งาน (Store Automeation V4.0 - แยกตารางรับ/เบิก)",
     timestamp: Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss")
   });
 }
@@ -319,23 +327,43 @@ function doPost(e) {
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // 1. รับ-เบิกสินค้า (Receipt / Issue)
+    // 1. รับ-เบิกสินค้า (Receipt / Issue) — แยกบันทึกลงแท็บ "ประวัติรับสินค้า" และ "ประวัติเบิกสินค้า"
     if (data.event === "movement_sync" || data.action === "receipt" || data.action === "issue") {
       updateCatalogStock(ss, data);
-      logMovement(ss, data);
-      return jsonResponse({ status: "ok", message: "บันทึกประวัติรับ-เบิก และอัปเดตยอดคงเหลือในรายการสินค้าเรียบร้อยแล้ว" });
+      if (data.action === "receipt") {
+        logReceipt(ss, data);
+        return jsonResponse({ status: "ok", message: "บันทึกประวัติรับสินค้า และอัปเดตยอดคงเหลือในรายการสินค้าเรียบร้อยแล้ว" });
+      } else {
+        logIssue(ss, data);
+        return jsonResponse({ status: "ok", message: "บันทึกประวัติเบิกสินค้า และอัปเดตยอดคงเหลือในรายการสินค้าเรียบร้อยแล้ว" });
+      }
     }
 
-    // 2. ซิงค์ข้อมูลทั้งหมดให้ตรงกับหน้าเว็บ 100% (รายการสินค้า + ประวัติรับ-เบิก + ยืม-คืน)
+    // 2. ซิงค์ข้อมูลทั้งหมดให้ตรงกับหน้าเว็บ 100% (รายการสินค้า + ประวัติรับสินค้า + ประวัติเบิกสินค้า + ยืม-คืน)
     if (data.event === "catalog_batch_sync") {
       var count = batchSyncCatalog(ss, data.products || [], data.timestamp);
-      if (Array.isArray(data.movements)) {
-        batchSyncMovements(ss, data.movements);
+      var receiptsList = Array.isArray(data.receipts)
+        ? data.receipts
+        : (Array.isArray(data.movements) ? data.movements.filter(function(m) { return m.action === "receipt"; }) : null);
+      var issuesList = Array.isArray(data.issues)
+        ? data.issues
+        : (Array.isArray(data.movements) ? data.movements.filter(function(m) { return m.action !== "receipt"; }) : null);
+
+      var receiptCount = 0;
+      var issueCount = 0;
+      if (receiptsList !== null) {
+        receiptCount = batchSyncReceipts(ss, receiptsList);
+      }
+      if (issuesList !== null) {
+        issueCount = batchSyncIssues(ss, issuesList);
       }
       if (Array.isArray(data.borrows)) {
         batchSyncBorrows(ss, data.borrows);
       }
-      return jsonResponse({ status: "ok", message: "ซิงค์ข้อมูลทั้งหมดเข้า Google Sheet สำเร็จ (" + count + " รายการสินค้า)" });
+      return jsonResponse({
+        status: "ok",
+        message: "ซิงค์ข้อมูลทั้งหมดเข้า Google Sheet สำเร็จ (สินค้า " + count + " รายการ, รับเข้า " + receiptCount + " รายการ, เบิกออก " + issueCount + " รายการ)"
+      });
     }
 
     // 3. ซิงค์ข้อมูลสินค้าเดี่ยว (Single Product Catalog Sync)
@@ -369,7 +397,20 @@ function cleanCode(val) {
   return s;
 }
 
-function ensureSheetHeaders(sheet, headers) {
+function asTextCell(val, fallback) {
+  var s = String(val === undefined || val === null ? "" : val).trim();
+  if (s === "") {
+    return fallback !== undefined ? fallback : "";
+  }
+  if (s === "-") {
+    return "-";
+  }
+  return "\'" + s;
+}
+
+function ensureSheetHeaders(sheet, headers, bgColor, fontColor) {
+  bgColor = bgColor || "#f1f5f9";
+  fontColor = fontColor || "#1e293b";
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
   } else {
@@ -397,10 +438,10 @@ function ensureSheetHeaders(sheet, headers) {
   }
   sheet.setFrozenRows(1);
   var hRange = sheet.getRange(1, 1, 1, headers.length);
-  hRange.setFontWeight("bold").setBackground("#f1f5f9").setFontColor("#1e293b").setHorizontalAlignment("center");
+  hRange.setFontWeight("bold").setBackground(bgColor).setFontColor(fontColor).setHorizontalAlignment("center");
 }
 
-function getOrCreateSheet(ss, name, headers) {
+function getOrCreateSheet(ss, name, headers, bgColor, fontColor) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
     var sheets = ss.getSheets();
@@ -412,7 +453,7 @@ function getOrCreateSheet(ss, name, headers) {
     }
   }
   if (headers && headers.length > 0) {
-    ensureSheetHeaders(sheet, headers);
+    ensureSheetHeaders(sheet, headers, bgColor, fontColor);
   }
   return sheet;
 }
@@ -422,26 +463,48 @@ function getCatalogSheet(ss) {
   for (var i = 0; i < names.length; i++) {
     var s = ss.getSheetByName(names[i]);
     if (s) {
-      ensureSheetHeaders(s, CATALOG_HEADERS);
+      ensureSheetHeaders(s, CATALOG_HEADERS, "#f1f5f9", "#1e293b");
       return s;
     }
   }
-  var sNew = getOrCreateSheet(ss, "รายการสินค้า", CATALOG_HEADERS);
+  var sNew = getOrCreateSheet(ss, "รายการสินค้า", CATALOG_HEADERS, "#f1f5f9", "#1e293b");
   try { sNew.getRange("A:B").setNumberFormat("@"); } catch(e) {}
   return sNew;
 }
 
-function getMovementSheet(ss) {
-  var names = ["ประวัติรับ-เบิก", "รับ-เบิก", "ประวัติรับเบิก", "Movements"];
+function getReceiptSheet(ss) {
+  var names = ["ประวัติรับสินค้า", "ประวัติรับเข้า", "รับสินค้า", "รับเข้า", "Receipts"];
   for (var i = 0; i < names.length; i++) {
     var s = ss.getSheetByName(names[i]);
     if (s) {
-      ensureSheetHeaders(s, MOVEMENT_HEADERS);
+      ensureSheetHeaders(s, RECEIPT_HEADERS, "#dcfce7", "#166534");
+      try { s.setTabColor("#16a34a"); } catch(e) {}
       return s;
     }
   }
-  var sNew = getOrCreateSheet(ss, "ประวัติรับ-เบิก", MOVEMENT_HEADERS);
-  try { sNew.getRange("C:D").setNumberFormat("@"); } catch(e) {}
+  var sNew = getOrCreateSheet(ss, "ประวัติรับสินค้า", RECEIPT_HEADERS, "#dcfce7", "#166534");
+  try {
+    sNew.setTabColor("#16a34a");
+    sNew.getRange("C:E").setNumberFormat("@");
+  } catch(e) {}
+  return sNew;
+}
+
+function getIssueSheet(ss) {
+  var names = ["ประวัติเบิกสินค้า", "ประวัติเบิกออก", "เบิกสินค้า", "เบิกออก", "Issues"];
+  for (var i = 0; i < names.length; i++) {
+    var s = ss.getSheetByName(names[i]);
+    if (s) {
+      ensureSheetHeaders(s, ISSUE_HEADERS, "#fee2e2", "#991b1b");
+      try { s.setTabColor("#dc2626"); } catch(e) {}
+      return s;
+    }
+  }
+  var sNew = getOrCreateSheet(ss, "ประวัติเบิกสินค้า", ISSUE_HEADERS, "#fee2e2", "#991b1b");
+  try {
+    sNew.setTabColor("#dc2626");
+    sNew.getRange("B:D").setNumberFormat("@");
+  } catch(e) {}
   return sNew;
 }
 
@@ -450,11 +513,11 @@ function getBorrowSheet(ss) {
   for (var i = 0; i < names.length; i++) {
     var s = ss.getSheetByName(names[i]);
     if (s) {
-      ensureSheetHeaders(s, BORROW_HEADERS);
+      ensureSheetHeaders(s, BORROW_HEADERS, "#f1f5f9", "#1e293b");
       return s;
     }
   }
-  var sNew = getOrCreateSheet(ss, "ยืม-คืน", BORROW_HEADERS);
+  var sNew = getOrCreateSheet(ss, "ยืม-คืน", BORROW_HEADERS, "#f1f5f9", "#1e293b");
   try {
     sNew.getRange("A:A").setNumberFormat("@");
     sNew.getRange("E:F").setNumberFormat("@");
@@ -508,6 +571,51 @@ function buildCatalogRow(p) {
   ];
 }
 
+function buildReceiptRow(m) {
+  var sc = cleanCode(m.stock_code !== undefined ? m.stock_code : (m.product_code || "-"));
+  var ac1 = cleanCode(m.account_code1 || "-");
+  var ts = m.timestamp || (m.movement_date ? (m.movement_date + (m.movement_time ? " " + m.movement_time : "")) : Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss"));
+  var displayName = m.display_name || m.product_name || "";
+  var receiver = m.received_by || m.actor || "-";
+  return [
+    asTextCell(ts, ""),
+    m.action_name || "รับสินค้า",
+    asTextCell(m.document_no, "-"),
+    "\'" + sc,
+    "\'" + ac1,
+    displayName,
+    Math.round(Number(m.quantity || 0)),
+    m.unit || "PCS",
+    m.current_stock !== undefined ? Math.round(Number(m.current_stock)) : 0,
+    receiver,
+    m.notes || "-",
+    m.created_by || "-"
+  ];
+}
+
+function buildIssueRow(m) {
+  var sc = cleanCode(m.stock_code !== undefined ? m.stock_code : (m.product_code || "-"));
+  var ac1 = cleanCode(m.account_code1 || "-");
+  var ts = m.timestamp || m.movement_date || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss");
+  var displayName = m.display_name || m.product_name || "";
+  var requester = m.requested_by || m.actor || "-";
+  var approver = m.approved_by || m.approver || "-";
+  return [
+    asTextCell(ts, ""),
+    asTextCell(m.document_no, "-"),
+    "\'" + sc,
+    "\'" + ac1,
+    displayName,
+    Math.round(Number(m.quantity || 0)),
+    m.unit || "PCS",
+    m.current_stock !== undefined ? Math.round(Number(m.current_stock)) : 0,
+    requester,
+    approver,
+    m.notes || "-",
+    m.created_by || "-"
+  ];
+}
+
 function updateCatalogStock(ss, data) {
   var catalogSheet = getCatalogSheet(ss);
   var ac1 = cleanCode(data.account_code1 || "-").toLowerCase();
@@ -547,31 +655,14 @@ function updateCatalogStock(ss, data) {
   }
 }
 
-function logMovement(ss, data) {
-  var movSheet = getMovementSheet(ss);
-  var isReceipt = (data.action === "receipt");
-  var qtyPrefix = isReceipt ? "+" : "-";
-  var actor = isReceipt ? (data.received_by || data.actor || "-") : (data.requested_by || data.actor || "-");
-  var approver = isReceipt ? "-" : (data.approved_by || data.approver || "-");
-  var displayName = data.display_name || data.product_name || "";
-  var sc = cleanCode(data.stock_code !== undefined ? data.stock_code : (data.product_code || "-"));
-  var ac1 = cleanCode(data.account_code1 || "-");
+function logReceipt(ss, data) {
+  var receiptSheet = getReceiptSheet(ss);
+  receiptSheet.appendRow(buildReceiptRow(data));
+}
 
-  movSheet.appendRow([
-    data.timestamp || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss"),
-    data.action_name || (isReceipt ? "รับสินค้า" : "เบิกสินค้า"),
-    "\'" + sc,
-    "\'" + ac1,
-    displayName,
-    qtyPrefix + Math.round(Number(data.quantity || 0)),
-    data.unit || "",
-    data.current_stock !== undefined ? Math.round(Number(data.current_stock)) : 0,
-    data.document_no || "-",
-    actor,
-    approver,
-    data.notes || "-",
-    data.created_by || "-"
-  ]);
+function logIssue(ss, data) {
+  var issueSheet = getIssueSheet(ss);
+  issueSheet.appendRow(buildIssueRow(data));
 }
 
 function batchSyncCatalog(ss, products, ts) {
@@ -581,7 +672,7 @@ function batchSyncCatalog(ss, products, ts) {
   if (lastRow > 1) {
     catalogSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
   }
-  ensureSheetHeaders(catalogSheet, CATALOG_HEADERS);
+  ensureSheetHeaders(catalogSheet, CATALOG_HEADERS, "#f1f5f9", "#1e293b");
 
   var timeStr = ts || Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss");
   var rows = [];
@@ -594,40 +685,40 @@ function batchSyncCatalog(ss, products, ts) {
   return rows.length;
 }
 
-function batchSyncMovements(ss, movements) {
-  var movSheet = getMovementSheet(ss);
-  var lastRow = movSheet.getLastRow();
-  var lastCol = Math.max(MOVEMENT_HEADERS.length, movSheet.getLastColumn());
+function batchSyncReceipts(ss, receipts) {
+  var receiptSheet = getReceiptSheet(ss);
+  var lastRow = receiptSheet.getLastRow();
+  var lastCol = Math.max(RECEIPT_HEADERS.length, receiptSheet.getLastColumn());
   if (lastRow > 1) {
-    movSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+    receiptSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
   }
-  ensureSheetHeaders(movSheet, MOVEMENT_HEADERS);
+  ensureSheetHeaders(receiptSheet, RECEIPT_HEADERS, "#dcfce7", "#166534");
 
   var rows = [];
-  for (var i = 0; i < movements.length; i++) {
-    var m = movements[i];
-    var isReceipt = (m.action === "receipt");
-    var qtyPrefix = isReceipt ? "+" : "-";
-    var sc = cleanCode(m.stock_code !== undefined ? m.stock_code : (m.product_code || "-"));
-    var ac1 = cleanCode(m.account_code1 || "-");
-    rows.push([
-      m.timestamp || m.movement_date || "",
-      m.action_name || (isReceipt ? "รับสินค้า" : "เบิกสินค้า"),
-      "\'" + sc,
-      "\'" + ac1,
-      m.product_name || "",
-      qtyPrefix + Math.round(Number(m.quantity || 0)),
-      m.unit || "PCS",
-      m.current_stock !== undefined ? Math.round(Number(m.current_stock)) : 0,
-      m.document_no || "-",
-      m.actor || "-",
-      m.approver || "-",
-      m.notes || "-",
-      m.created_by || "-"
-    ]);
+  for (var i = 0; i < receipts.length; i++) {
+    rows.push(buildReceiptRow(receipts[i]));
   }
   if (rows.length > 0) {
-    movSheet.getRange(2, 1, rows.length, MOVEMENT_HEADERS.length).setValues(rows);
+    receiptSheet.getRange(2, 1, rows.length, RECEIPT_HEADERS.length).setValues(rows);
+  }
+  return rows.length;
+}
+
+function batchSyncIssues(ss, issues) {
+  var issueSheet = getIssueSheet(ss);
+  var lastRow = issueSheet.getLastRow();
+  var lastCol = Math.max(ISSUE_HEADERS.length, issueSheet.getLastColumn());
+  if (lastRow > 1) {
+    issueSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  }
+  ensureSheetHeaders(issueSheet, ISSUE_HEADERS, "#fee2e2", "#991b1b");
+
+  var rows = [];
+  for (var i = 0; i < issues.length; i++) {
+    rows.push(buildIssueRow(issues[i]));
+  }
+  if (rows.length > 0) {
+    issueSheet.getRange(2, 1, rows.length, ISSUE_HEADERS.length).setValues(rows);
   }
   return rows.length;
 }
@@ -639,7 +730,7 @@ function batchSyncBorrows(ss, borrows) {
   if (lastRow > 1) {
     borrowSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
   }
-  ensureSheetHeaders(borrowSheet, BORROW_HEADERS);
+  ensureSheetHeaders(borrowSheet, BORROW_HEADERS, "#f1f5f9", "#1e293b");
 
   var rows = [];
   for (var i = 0; i < borrows.length; i++) {
@@ -744,14 +835,15 @@ function handleBorrowSync(ss, data) {
   return jsonResponse({status: "ok", message: isReturn ? "บันทึกรายการคืนพัสดุใหม่เรียบร้อยแล้ว" : "บันทึกการยืมพัสดุใหม่เรียบร้อยแล้ว"});
 }
 
-// ฟังก์ชันสำหรับทดสอบรันใน Google Apps Script Editor โดยตรง
+// ฟังก์ชันสำหรับทดสอบรันใน Google Apps Script Editor โดยตรง (สร้างและทดสอบทั้งตารางรับและเบิก)
 function testWebhook() {
-  var testPayload = {
+  var nowStr = Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss");
+  var receiptPayload = {
     postData: {
       contents: JSON.stringify({
         event: "movement_sync",
         action: "receipt",
-        action_name: "ทดสอบผ่าน Apps Script",
+        action_name: "รับสินค้า (ทดสอบ)",
         stock_code: "TEST-001",
         account_code1: "AUT-TEST-01",
         product_code: "TEST-001",
@@ -764,15 +856,43 @@ function testWebhook() {
         unit: "PCS",
         current_stock: 50,
         reorder_point: 10,
-        document_no: "TEST-GAS",
+        document_no: "TEST-IN-01",
         received_by: "Admin Tester",
-        notes: "ทดสอบการทำงานผ่านฟังก์ชัน testWebhook",
-        timestamp: Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss")
+        notes: "ทดสอบตารางประวัติรับสินค้าผ่าน testWebhook",
+        created_by: "Admin Tester",
+        timestamp: nowStr
       })
     }
   };
-  var result = doPost(testPayload);
-  Logger.log(result.getContent());
+  var issuePayload = {
+    postData: {
+      contents: JSON.stringify({
+        event: "movement_sync",
+        action: "issue",
+        action_name: "เบิกสินค้า (ทดสอบ)",
+        stock_code: "TEST-001",
+        account_code1: "AUT-TEST-01",
+        product_code: "TEST-001",
+        product_name: "สินค้าทดสอบระบบ (Test Item)",
+        gl_description: "Equipment, Tools",
+        section_code: "G9301",
+        section_name: "AUT-G",
+        apex: "A-2",
+        quantity: 2,
+        unit: "PCS",
+        current_stock: 48,
+        reorder_point: 10,
+        document_no: "TEST-OUT-01",
+        requested_by: "Staff Tester",
+        approved_by: "Supervisor Tester",
+        notes: "ทดสอบตารางประวัติเบิกสินค้าผ่าน testWebhook",
+        created_by: "Staff Tester",
+        timestamp: nowStr
+      })
+    }
+  };
+  Logger.log(doPost(receiptPayload).getContent());
+  Logger.log(doPost(issuePayload).getContent());
 }') ?></textarea>
       </div>
     </div>

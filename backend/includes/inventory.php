@@ -1307,8 +1307,11 @@ function inventory_migrate_opening_stock(PDO $db): void
     }
 }
 
-function inventory_products(): array
+function inventory_products(bool $includeWithdrawn = false): array
 {
+    $whereClause = $includeWithdrawn
+        ? ''
+        : 'WHERE NOT (COALESCE(i.total, 0) > 0 AND (COALESCE(r.total, 0) - COALESCE(i.total, 0)) <= 0)';
     $statement = inventory_db()->query(
         'SELECT p.`รหัสสินค้า` AS row_id,
                 p.`code`,
@@ -1336,6 +1339,7 @@ function inventory_products(): array
             ON r.product_code = p.`code`
          LEFT JOIN (SELECT product_code, SUM(quantity) AS total FROM issues GROUP BY product_code) i
             ON i.product_code = p.`code`
+         ' . $whereClause . '
          ORDER BY p.`รหัสสินค้า`, p.`code`'
     );
     $products = [];
@@ -1927,7 +1931,11 @@ function inventory_record_movement(string $kind, array $values): void
     $updatedProduct = inventory_product($values['product_code']);
     if ($updatedProduct !== null) {
         inventory_notify_telegram_movement($values, $kind, $updatedProduct);
-        inventory_sync_google_sheet_movement($values, $kind, $updatedProduct);
+        if ($kind === 'issue' && (int) ($updatedProduct['stock'] ?? 0) <= 0) {
+            inventory_sync_all_catalog_to_google_sheet();
+        } else {
+            inventory_sync_google_sheet_movement($values, $kind, $updatedProduct);
+        }
     }
 }
 
@@ -2277,9 +2285,12 @@ function inventory_borrow_counts(?int $userId = null, ?string $userName = null):
 {
     try {
         $sql = 'SELECT 
-                COUNT(*) AS total,
-                SUM(CASE WHEN `status` = "borrowed" THEN 1 ELSE 0 END) AS borrowed,
-                SUM(CASE WHEN `status` = "returned" THEN 1 ELSE 0 END) AS returned
+                COUNT(*) AS total_records,
+                COALESCE(SUM(CASE WHEN `status` = "borrowed" THEN 1 ELSE 0 END), 0) AS borrowed_records,
+                COALESCE(SUM(CASE WHEN `status` = "returned" THEN 1 ELSE 0 END), 0) AS returned_records,
+                COALESCE(SUM(GREATEST(ROUND(COALESCE(`quantity`, 1), 0), 1)), 0) AS total_qty,
+                COALESCE(SUM(CASE WHEN `status` = "borrowed" THEN GREATEST(ROUND(COALESCE(`quantity`, 1), 0), 1) ELSE 0 END), 0) AS borrowed_qty,
+                COALESCE(SUM(CASE WHEN `status` = "returned" THEN GREATEST(ROUND(COALESCE(`quantity`, 1), 0), 1) ELSE 0 END), 0) AS returned_qty
              FROM `borrow_records`';
         $params = [];
         if ($userId !== null) {
@@ -2297,12 +2308,15 @@ function inventory_borrow_counts(?int $userId = null, ?string $userName = null):
         $stmt->execute($params);
         $row = $stmt->fetch();
         return [
-            'total' => (int) ($row['total'] ?? 0),
-            'borrowed' => (int) ($row['borrowed'] ?? 0),
-            'returned' => (int) ($row['returned'] ?? 0),
+            'total' => (int) round((float) ($row['total_qty'] ?? 0)),
+            'borrowed' => (int) round((float) ($row['borrowed_qty'] ?? 0)),
+            'returned' => (int) round((float) ($row['returned_qty'] ?? 0)),
+            'total_records' => (int) ($row['total_records'] ?? 0),
+            'borrowed_records' => (int) ($row['borrowed_records'] ?? 0),
+            'returned_records' => (int) ($row['returned_records'] ?? 0),
         ];
     } catch (Throwable $e) {
-        return ['total' => 0, 'borrowed' => 0, 'returned' => 0];
+        return ['total' => 0, 'borrowed' => 0, 'returned' => 0, 'total_records' => 0, 'borrowed_records' => 0, 'returned_records' => 0];
     }
 }
 
@@ -3133,6 +3147,18 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
 
     $actionName = $isNew ? 'รับสินค้าใหม่ [NEW]' : ($isReceipt ? 'รับสินค้า' : 'เบิกสินค้า');
     $buyParts = inventory_split_buy_datetime((string) ($product['buy_date'] ?? ''));
+    $movementDate = trim((string) ($movement['movement_date'] ?? date('Y-m-d')));
+    $movementTime = trim((string) ($movement['movement_time'] ?? ''));
+    $nowTime = date('H:i:s');
+    $effectiveTime = $movementTime !== '' ? $movementTime : $nowTime;
+    $displayTimestamp = $movementDate !== ''
+        ? ($movementTime !== '' ? ($movementDate . ' ' . $movementTime) : ($movementDate . ' ' . $nowTime))
+        : date('Y-m-d H:i:s');
+    $receivedBy = (string) ($movement['received_by'] ?? '');
+    $requestedBy = (string) ($movement['requested_by'] ?? '');
+    $approvedBy = (string) ($movement['approved_by'] ?? '');
+    $actor = $isReceipt ? $receivedBy : $requestedBy;
+    $approver = $isReceipt ? '-' : ($approvedBy !== '' ? $approvedBy : '-');
 
     $payload = [
         'event' => 'movement_sync',
@@ -3140,8 +3166,8 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
         'action_name' => $actionName,
         'is_new' => $isNew ? '1' : '0',
         'id' => (int) ($movement['id'] ?? 0),
-        'movement_date' => (string) ($movement['movement_date'] ?? date('Y-m-d')),
-        'movement_time' => date('H:i:s'),
+        'movement_date' => $movementDate !== '' ? $movementDate : date('Y-m-d'),
+        'movement_time' => $effectiveTime,
         'internal_code' => $internalCode,
         'product_code' => $displayCode,
         'stock_code' => $stockCode,
@@ -3168,12 +3194,14 @@ function inventory_sync_google_sheet_movement(array $movement, string $kind, ?ar
         'product_notes' => (string) ($product['notes'] ?? ''),
         'location' => inventory_sheet_section_location($product ?? []),
         'document_no' => (string) ($movement['document_no'] ?? ''),
-        'received_by' => (string) ($movement['received_by'] ?? ''),
-        'requested_by' => (string) ($movement['requested_by'] ?? ''),
-        'approved_by' => (string) ($movement['approved_by'] ?? ''),
+        'received_by' => $receivedBy,
+        'requested_by' => $requestedBy,
+        'approved_by' => $approvedBy,
+        'actor' => $actor,
+        'approver' => $approver,
         'notes' => (string) ($movement['notes'] ?? ''),
         'created_by' => $createdByName,
-        'timestamp' => date('Y-m-d H:i:s'),
+        'timestamp' => $displayTimestamp,
     ];
 
     return inventory_post_google_sheet($payload);
@@ -3235,7 +3263,7 @@ function inventory_sync_google_sheet_product(array $product): array
  */
 function inventory_sync_all_catalog_to_google_sheet(): array
 {
-    $all = inventory_products();
+    $all = inventory_products(true);
     $list = [];
     $productMap = [];
     foreach ($all as $p) {
@@ -3250,6 +3278,7 @@ function inventory_sync_all_catalog_to_google_sheet(): array
         $category = $glDescription !== '' ? $glDescription : (string) ($p['category'] ?? '');
         $buyParts = inventory_split_buy_datetime((string) ($p['buy_date'] ?? ''));
         $stockQty = (int) round((float) ($p['stock'] ?? 0));
+        $issuedQty = (int) round((float) ($p['issued'] ?? 0));
 
         $productMap[$internalCode] = [
             'stock_code' => $stockCode,
@@ -3259,6 +3288,11 @@ function inventory_sync_all_catalog_to_google_sheet(): array
             'unit' => (string) ($p['unit'] ?? 'PCS'),
             'stock' => $stockQty,
         ];
+
+        // สินค้าที่เบิกจนคงเหลือ 0 (หรือติดลบ) ให้เอาออกจากแท็บรายการสินค้า แต่ยังคงประวัติรับ-เบิกไว้ครบ
+        if ($issuedQty > 0 && $stockQty <= 0) {
+            continue;
+        }
 
         $list[] = [
             'internal_code' => $internalCode,
@@ -3289,21 +3323,24 @@ function inventory_sync_all_catalog_to_google_sheet(): array
     }
 
     // รวบรวมประวัติรับ-เบิกทั้งหมดเรียงตามลำดับเวลาเพื่อคำนวณยอดคงเหลือหลังทำรายการให้ตรงกัน 100%
+    // และแยกส่งเป็นตาราง "ประวัติรับสินค้า" (receipts) กับ "ประวัติเบิกสินค้า" (issues)
     $db = inventory_db();
     $rawMovements = [];
     $receiptRows = $db->query(
-        'SELECT r.id, r.movement_date, r.document_no, r.product_code, r.quantity, r.received_by, r.notes, r.created_by_name, r.created_at
+        'SELECT r.id, r.movement_date, COALESCE(r.movement_time, \'\') AS movement_time, r.document_no, r.product_code, COALESCE(r.account_code1, \'\') AS account_code1, r.quantity, r.received_by, r.notes, r.created_by_name, r.created_at
          FROM `receipts` r
-         ORDER BY r.movement_date ASC, r.id ASC'
+         ORDER BY r.movement_date ASC, r.movement_time ASC, r.id ASC'
     )->fetchAll();
     foreach ($receiptRows as $r) {
         $rawMovements[] = [
             'kind' => 'receipt',
             'id' => (int) $r['id'],
             'movement_date' => (string) $r['movement_date'],
+            'movement_time' => trim((string) ($r['movement_time'] ?? '')),
             'created_at' => (string) ($r['created_at'] ?? $r['movement_date']),
             'document_no' => (string) ($r['document_no'] ?? ''),
             'internal_code' => (string) $r['product_code'],
+            'account_code1' => trim((string) ($r['account_code1'] ?? '')),
             'quantity' => (int) round((float) $r['quantity']),
             'actor' => (string) ($r['received_by'] ?? ''),
             'approver' => '-',
@@ -3321,9 +3358,11 @@ function inventory_sync_all_catalog_to_google_sheet(): array
             'kind' => 'issue',
             'id' => (int) $i['id'],
             'movement_date' => (string) $i['movement_date'],
+            'movement_time' => '',
             'created_at' => (string) ($i['created_at'] ?? $i['movement_date']),
             'document_no' => (string) ($i['document_no'] ?? ''),
             'internal_code' => (string) $i['product_code'],
+            'account_code1' => '',
             'quantity' => (int) round((float) $i['quantity']),
             'actor' => (string) ($i['requested_by'] ?? ''),
             'approver' => (string) ($i['approved_by'] ?? ''),
@@ -3345,6 +3384,8 @@ function inventory_sync_all_catalog_to_google_sheet(): array
 
     $runningStock = [];
     $movementsPayload = [];
+    $receiptsPayload = [];
+    $issuesPayload = [];
     foreach ($rawMovements as $m) {
         $ic = $m['internal_code'];
         if (!isset($productMap[$ic])) {
@@ -3359,29 +3400,53 @@ function inventory_sync_all_catalog_to_google_sheet(): array
         }
         $runningStock[$ic] = $cur;
 
-        $movementsPayload[] = [
-            'timestamp' => $m['created_at'] !== '' ? $m['created_at'] : $m['movement_date'],
+        $ac1 = $m['account_code1'] !== '' && $m['account_code1'] !== '-' ? $m['account_code1'] : $pInfo['account_code1'];
+        if ($m['movement_time'] !== '') {
+            $displayTs = $m['movement_date'] . ' ' . $m['movement_time'];
+        } elseif ($m['created_at'] !== '' && str_starts_with($m['created_at'], $m['movement_date'])) {
+            $displayTs = $m['created_at'];
+        } else {
+            $displayTs = $m['movement_date'];
+        }
+
+        $item = [
+            'timestamp' => $displayTs,
             'movement_date' => $m['movement_date'],
+            'movement_time' => $m['movement_time'],
             'action' => $m['kind'],
             'action_name' => $m['kind'] === 'receipt' ? 'รับสินค้า' : 'เบิกสินค้า',
             'internal_code' => $ic,
             'product_code' => $pInfo['display_code'],
             'stock_code' => $pInfo['stock_code'],
-            'account_code1' => $pInfo['account_code1'],
+            'account_code1' => $ac1,
             'product_name' => $pInfo['name'],
             'quantity' => $m['quantity'],
             'unit' => $pInfo['unit'],
             'current_stock' => $cur,
             'document_no' => $m['document_no'] !== '' ? $m['document_no'] : '-',
+            'received_by' => $m['kind'] === 'receipt' ? ($m['actor'] !== '' ? $m['actor'] : '-') : '',
+            'requested_by' => $m['kind'] === 'issue' ? ($m['actor'] !== '' ? $m['actor'] : '-') : '',
+            'approved_by' => $m['kind'] === 'issue' ? ($m['approver'] !== '' ? $m['approver'] : '-') : '-',
             'actor' => $m['actor'] !== '' ? $m['actor'] : '-',
             'approver' => $m['approver'] !== '' ? $m['approver'] : '-',
             'notes' => $m['notes'] !== '' ? $m['notes'] : '-',
             'created_by' => $m['created_by'] !== '' ? $m['created_by'] : '-',
         ];
+        $movementsPayload[] = $item;
+        if ($m['kind'] === 'receipt') {
+            $receiptsPayload[] = $item;
+        } else {
+            $issuesPayload[] = $item;
+        }
     }
 
     // รวบรวมรายการยืม-คืนทั้งหมด
-    $borrowRows = inventory_borrow_records('all', '', 250);
+    $borrowRows = $db->query(
+        'SELECT b.*, COALESCE(p.`stock_code`, b.`product_code`) AS product_stock_code
+         FROM `borrow_records` b
+         LEFT JOIN `product` p ON p.`code` = b.`product_code`
+         ORDER BY (b.`status` = "borrowed") DESC, b.`borrow_date` DESC, b.`borrow_time` DESC, b.`id` DESC'
+    )->fetchAll();
     $borrowRows = array_reverse($borrowRows);
     $borrowsPayload = [];
     foreach ($borrowRows as $b) {
@@ -3420,6 +3485,8 @@ function inventory_sync_all_catalog_to_google_sheet(): array
         'action' => 'catalog_batch_sync',
         'count' => count($list),
         'products' => $list,
+        'receipts' => $receiptsPayload,
+        'issues' => $issuesPayload,
         'movements' => $movementsPayload,
         'borrows' => $borrowsPayload,
         'timestamp' => date('Y-m-d H:i:s'),

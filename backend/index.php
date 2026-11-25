@@ -7,9 +7,9 @@ $pageTitle = 'Store Automeation | ภาพรวมคลังสินค้�
 $pageDescription = 'ภาพรวมคลังสินค้า จำนวนสินค้า สถานะสต๊อก และรายการรับเบิก';
 $activePage = 'overview';
 
-$isAdmin = auth_is_admin();
-$scopeUserId = $isAdmin ? null : (int) ($currentUser['id'] ?? 0);
-$scopeUserName = $isAdmin ? null : (string) ($currentUser['name'] ?? '');
+$canViewAllUsers = auth_can_manage_stock() || auth_is_viewer();
+$scopeUserId = $canViewAllUsers ? null : (int) ($currentUser['id'] ?? 0);
+$scopeUserName = $canViewAllUsers ? null : (string) ($currentUser['name'] ?? '');
 
 $groupedProducts = inventory_group_products_by_stock_code($products);
 $statusCounts = ['normal' => 0, 'reorder' => 0, 'negative' => 0];
@@ -50,6 +50,7 @@ foreach ($groupedProducts as $product) {
 
 $movementCounts = inventory_movement_counts($scopeUserId, $scopeUserName);
 $borrowCounts = inventory_borrow_counts($scopeUserId, $scopeUserName);
+$warehouseBorrowCounts = $scopeUserId === null ? $borrowCounts : inventory_borrow_counts();
 $categoryPalette = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4', '#f97316', '#ec4899'];
 $categoryGradientStops = [];
 $categoryLegend = [];
@@ -111,11 +112,11 @@ require __DIR__ . '/includes/header.php';
                     <strong><?= number_format($movementCounts['receipts'] ?? 0) ?></strong>
                 </div>
                 <div class="dashboard-row">
-                    <span><?= $isAdmin ? 'รายการเบิกสินค้าทั้งหมด' : 'รายการเบิกสินค้าของคุณ' ?></span>
+                    <span><?= $canViewAllUsers ? 'รายการเบิกสินค้าทั้งหมด' : 'รายการเบิกสินค้าของคุณ' ?></span>
                     <strong><a href="issue.php" style="color:inherit;text-decoration:none;"><?= number_format($movementCounts['issues'] ?? 0) ?></a></strong>
                 </div>
                 <div class="dashboard-row">
-                    <span><?= $isAdmin ? 'รายการยืม–คืนทั้งหมด' : 'รายการยืม–คืนของคุณ' ?></span>
+                    <span><?= $canViewAllUsers ? 'รายการยืม–คืนทั้งหมด' : 'รายการยืม–คืนของคุณ' ?></span>
                     <strong><a href="borrow.php" style="color:inherit;text-decoration:none;"><?= number_format($borrowCounts['total'] ?? 0) ?></a></strong>
                 </div>
             </div>
@@ -143,11 +144,11 @@ require __DIR__ . '/includes/header.php';
                     </span>
                     <strong style="color:#dc2626;"><?= number_format($statusCounts['negative']) ?></strong>
                 </div>
-                <div class="dashboard-row" style="<?= ($borrowCounts['borrowed'] ?? 0) > 0 ? 'background:#eff6ff;' : '' ?>">
+                <div class="dashboard-row" style="<?= ($warehouseBorrowCounts['borrowed'] ?? 0) > 0 ? 'background:#eff6ff;' : '' ?>">
                     <span style="display:flex;align-items:center;gap:8px;">
                         <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#3b82f6;flex-shrink:0;"></span>กำลังยืม
                     </span>
-                    <strong style="color:#2563eb;"><a href="borrow.php?status=borrowed" style="color:inherit;text-decoration:none;"><?= number_format($borrowCounts['borrowed'] ?? 0) ?></a></strong>
+                    <strong style="color:#2563eb;"><a href="borrow.php?status=borrowed" style="color:inherit;text-decoration:none;"><?= number_format($warehouseBorrowCounts['borrowed'] ?? 0) ?></a></strong>
                 </div>
             </div>
         </section>
@@ -163,7 +164,7 @@ require __DIR__ . '/includes/header.php';
                     <span>รายการสินค้า</span>
                     <span>จำนวนสินค้า</span>
                     <span>รายการรับเข้า</span>
-                    <span><?= $isAdmin ? 'รายการเบิกออก' : 'เบิกออกของคุณ' ?></span>
+                    <span><?= $canViewAllUsers ? 'รายการเบิกออก' : 'เบิกออกของคุณ' ?></span>
                 </div>
                 <?php foreach ($categoryLegend as $category): ?>
                     <div class="dashboard-category-row">

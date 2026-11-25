@@ -985,12 +985,20 @@ if (historySearch || historyTabs.length > 0) {
     filterHistory();
 }
 
+// Prevent live-sync auto-reload from interrupting an in-flight form submission
+document.addEventListener('submit', (event) => {
+    if (!event.defaultPrevented) {
+        window.__storeFormSubmitting = true;
+    }
+});
+
 // --- Real-time Cross-Device Sync Engine ---
 (function initCrossDeviceSync() {
     let lastVersion = null;
     const syncUrl = (window.location.pathname.includes('/web/') || window.location.pathname.includes('/mobile/')) ? '../api/sync.php' : 'api/sync.php';
 
     async function checkSync() {
+        if (window.__storeFormSubmitting) return;
         try {
             const resp = await fetch(syncUrl + '?_=' + Date.now(), {
                 cache: 'no-store',
@@ -1007,9 +1015,11 @@ if (historySearch || historyTabs.length > 0) {
 
             if (data.version !== lastVersion) {
                 lastVersion = data.version;
+                if (window.__storeFormSubmitting) return;
                 const active = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
                 const isFormInput = (active === 'input' || active === 'textarea' || active === 'select');
-                if (!isFormInput) {
+                const hasOpenDialog = Boolean(document.querySelector('dialog[open]'));
+                if (!isFormInput && !hasOpenDialog) {
                     window.location.reload();
                 } else {
                     showLiveSyncPill();

@@ -115,14 +115,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $statusFilter = isset($_GET['status']) && is_string($_GET['status']) ? trim($_GET['status']) : 'all';
 $searchQuery = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']) : '';
-$isAdmin = auth_is_admin();
-$allUsers = $isAdmin ? inventory_users() : [];
-$selectedUserParam = ($isAdmin && isset($_GET['user']) && is_string($_GET['user'])) ? trim($_GET['user']) : 'all';
+$canViewAllUsers = auth_can_manage_stock() || auth_is_viewer();
+$allUsers = $canViewAllUsers ? inventory_users() : [];
+$selectedUserParam = ($canViewAllUsers && isset($_GET['user']) && is_string($_GET['user'])) ? trim($_GET['user']) : 'all';
 $filterUserId = null;
 $filterUserName = null;
 $selectedUserLabel = '';
 
-if ($isAdmin) {
+if ($canViewAllUsers) {
     if ($selectedUserParam !== '' && $selectedUserParam !== 'all' && ctype_digit($selectedUserParam)) {
         $targetId = (int) $selectedUserParam;
         foreach ($allUsers as $u) {
@@ -176,7 +176,7 @@ foreach ($pageProducts as $p) {
     ];
 }
 
-$buildBorrowUrl = static function (string $status) use ($searchQuery, $isAdmin, $filterUserId): string {
+$buildBorrowUrl = static function (string $status) use ($searchQuery, $canViewAllUsers, $filterUserId): string {
     $params = [];
     if ($status !== 'all') {
         $params['status'] = $status;
@@ -184,7 +184,7 @@ $buildBorrowUrl = static function (string $status) use ($searchQuery, $isAdmin, 
     if ($searchQuery !== '') {
         $params['q'] = $searchQuery;
     }
-    if ($isAdmin && $filterUserId !== null) {
+    if ($canViewAllUsers && $filterUserId !== null) {
         $params['user'] = (string) $filterUserId;
     }
     return 'borrow.php' . ($params !== [] ? '?' . http_build_query($params) : '');
@@ -196,8 +196,8 @@ require __DIR__ . '/includes/header.php';
     <div class="page-heading">
         <div>
             <div class="eyebrow section-eyebrow">BORROW & RETURN TRACKING</div>
-            <h1><?= $isAdmin ? 'ยืม–คืนพัสดุและอุปกรณ์ (ทั้งหมด)' : 'ประวัติยืม–คืนพัสดุของคุณ' ?><span class="heading-period">.</span></h1>
-            <p><?= $isAdmin
+            <h1><?= $canViewAllUsers ? 'ยืม–คืนพัสดุและอุปกรณ์ (ทั้งหมด)' : 'ประวัติยืม–คืนพัสดุของคุณ' ?><span class="heading-period">.</span></h1>
+            <p><?= $canViewAllUsers
                 ? ($selectedUserLabel !== '' ? 'กำลังแสดงประวัติยืม-คืนของผู้ใช้งาน: ' . h($selectedUserLabel) : 'แสดงประวัติการยืม-คืนพัสดุของผู้ใช้งานทั้งหมด พร้อมตัวกรองรายบุคคล')
                 : 'แสดงรายการยืม-คืนพัสดุของ ' . h((string) ($currentUser['name'] ?? '')) . ' เท่านั้น' ?></p>
         </div>
@@ -207,9 +207,6 @@ require __DIR__ . '/includes/header.php';
                     + บันทึกการยืมพัสดุ
                 </button>
             <?php endif; ?>
-            <a class="secondary-button" href="excel-live.php" style="color:#15803d;border-color:#86efac;background:#f0fdf4;">
-                Excel อัปเดตสด (.xlsx)
-            </a>
             <?php if (auth_is_admin()): ?>
                 <a class="secondary-button" href="settings.php">
                     ตั้งค่าแจ้งเตือน (Telegram / Sheets)
@@ -225,7 +222,7 @@ require __DIR__ . '/includes/header.php';
             <div>
                 <strong><?= number_format($counts['total']) ?> <small
                         style="font-size:11px;font-weight:normal;">รายการ</small></strong>
-                <span><?= $isAdmin && $filterUserId === null ? 'รายการยืมทั้งหมด' : 'รายการยืมของบัญชีนี้' ?></span>
+                <span><?= $canViewAllUsers && $filterUserId === null ? 'รายการยืมทั้งหมด' : 'รายการยืมของบัญชีนี้' ?></span>
             </div>
         </div>
         <div class="stat-item">
@@ -278,7 +275,7 @@ require __DIR__ . '/includes/header.php';
             <?php if ($statusFilter !== 'all'): ?>
                 <input type="hidden" name="status" value="<?= h($statusFilter) ?>">
             <?php endif; ?>
-            <?php if ($isAdmin): ?>
+            <?php if ($canViewAllUsers): ?>
                 <select name="user" class="user-filter-select" aria-label="กรองตามผู้ใช้งาน" onchange="this.form.submit()">
                     <option value="all" <?= $filterUserId === null ? 'selected' : '' ?>>ผู้ใช้งานทั้งหมด</option>
                     <?php foreach ($allUsers as $u): ?>
@@ -304,7 +301,7 @@ require __DIR__ . '/includes/header.php';
     <section class="inventory-panel table-panel">
         <div class="panel-heading">
             <div>
-                <h2><?= $isAdmin ? ($selectedUserLabel !== '' ? 'ประวัติยืม–คืนของ ' . h($selectedUserLabel) : 'ประวัติยืม–คืนพัสดุทั้งหมด') : 'ประวัติยืม–คืนพัสดุของคุณ' ?></h2>
+                <h2><?= $canViewAllUsers ? ($selectedUserLabel !== '' ? 'ประวัติยืม–คืนของ ' . h($selectedUserLabel) : 'ประวัติยืม–คืนพัสดุทั้งหมด') : 'ประวัติยืม–คืนพัสดุของคุณ' ?></h2>
                 <p>แสดงรายการยืมพัสดุและอุปกรณ์ สถานะการคืน วันที่เวลา และสถานที่นำไปใช้งาน</p>
             </div>
             <span class="result-count">แสดง <?= count($records) ?> รายการล่าสุด (จำกัด 250 รายการ)</span>
@@ -329,6 +326,9 @@ require __DIR__ . '/includes/header.php';
                         $isBorrowed = $r['status'] === 'borrowed';
                         $hasBorrowPhoto = !empty($r['borrow_photo']);
                         $hasReturnPhoto = !empty($r['return_photo']);
+                        $isBorrowOwner = (int) ($r['created_by_user_id'] ?? 0) === (int) ($currentUser['id'] ?? 0)
+                            || trim((string) ($r['borrower_name'] ?? '')) === trim((string) ($currentUser['name'] ?? ''));
+                        $canReturnBorrow = $isBorrowed && (auth_is_admin() || (auth_is_staff() && $isBorrowOwner));
                         ?>
                         <tr>
                             <td style="font-size:11px;color:#64748b;white-space:nowrap;">
@@ -382,7 +382,7 @@ require __DIR__ . '/includes/header.php';
                             </td>
                             <td style="text-align:right;white-space:nowrap;">
                                 <div class="users-action-group">
-                                    <?php if ($isBorrowed && !auth_is_viewer()): ?>
+                                    <?php if ($canReturnBorrow): ?>
                                         <button class="primary-button users-action-btn" type="button"
                                             style="background:linear-gradient(105deg,#16a34a,#15803d);border-color:#16a34a;"
                                             onclick="openReturnDialog(<?= htmlspecialchars(json_encode($r), ENT_QUOTES, 'UTF-8') ?>)">

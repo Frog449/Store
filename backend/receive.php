@@ -157,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     }
 }
 
-$pageProducts = inventory_products();
+$pageProducts = inventory_products(true);
 $groupedProducts = inventory_group_products_by_stock_code($pageProducts);
 $history = inventory_movements('receipt');
 $isRecordPost = ($_POST['action'] ?? '') === 'record_receipt';
